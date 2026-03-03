@@ -18,13 +18,16 @@
 	import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
 	import type { CardDrawTrayParams } from '$lib/models/cardTray';
 	import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
-	import { getTrayDimensions, getCustomCardSizesFromBox } from '$lib/models/box';
+	import { getTrayDimensions } from '$lib/models/box';
 	import {
 		getProject,
 		getCumulativeTrayLetter,
 		moveTray,
-		setTrayRotation
+		setTrayRotation,
+		getCounterShapes,
+		getCardSizes
 	} from '$lib/stores/project.svelte';
+	import { DEFAULT_SHAPE_IDS, DEFAULT_CARD_SIZE_IDS } from '$lib/models/counterTray';
 
 	interface Props {
 		selectedBox: Box | null;
@@ -106,11 +109,8 @@
 		handleDragEnd();
 	}
 
-	let shapeOptions = $derived(
-		selectedTray && isCounterTray(selectedTray)
-			? selectedTray.params.customShapes.map((s) => `custom:${s.name}`)
-			: []
-	);
+	// Get shape options from project-level counterShapes
+	let shapeOptions = $derived(getCounterShapes().map((s) => ({ id: s.id, name: s.name })));
 
 	const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
@@ -146,13 +146,6 @@
 			isCardTray: false,
 			isCardDivider: false
 		};
-	}
-
-	function getShapeDisplayName(shapeRef: string): string {
-		if (shapeRef.startsWith('custom:')) {
-			return shapeRef.substring(7);
-		}
-		return shapeRef;
 	}
 
 	// Get the tray letter based on cumulative position across all boxes
@@ -203,14 +196,14 @@
 	// Card divider stack handlers
 	function updateCardDividerStack(
 		index: number,
-		field: 'cardSizeName' | 'count' | 'label',
+		field: 'cardSizeId' | 'count' | 'label',
 		value: string | number
 	) {
 		if (!selectedTray || !isCardDividerTray(selectedTray) || !onUpdateCardDividerParams) return;
 		const newStacks = [...selectedTray.params.stacks];
 		const current = newStacks[index];
-		if (field === 'cardSizeName') {
-			newStacks[index] = { ...current, cardSizeName: value as string };
+		if (field === 'cardSizeId') {
+			newStacks[index] = { ...current, cardSizeId: value as string };
 		} else if (field === 'count') {
 			newStacks[index] = { ...current, count: value as number };
 		} else {
@@ -225,7 +218,7 @@
 			...selectedTray.params,
 			stacks: [
 				...selectedTray.params.stacks,
-				{ cardSizeName: 'Standard', count: 30, label: undefined }
+				{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined }
 			]
 		});
 	}
@@ -267,7 +260,10 @@
 		if (!selectedTray || !isCounterTray(selectedTray) || !onUpdateCounterParams) return;
 		onUpdateCounterParams({
 			...selectedTray.params,
-			topLoadedStacks: [...selectedTray.params.topLoadedStacks, ['custom:Square', 10, undefined]]
+			topLoadedStacks: [
+				...selectedTray.params.topLoadedStacks,
+				[DEFAULT_SHAPE_IDS.square, 10, undefined]
+			]
 		});
 	}
 
@@ -304,7 +300,7 @@
 			...selectedTray.params,
 			edgeLoadedStacks: [
 				...selectedTray.params.edgeLoadedStacks,
-				['custom:Square', 10, 'lengthwise', undefined]
+				[DEFAULT_SHAPE_IDS.square, 10, 'lengthwise', undefined]
 			]
 		});
 	}
@@ -526,8 +522,8 @@
 										<Select
 											selected={[stack[0]]}
 											options={shapeOptions.map((s) => ({
-												value: s,
-												label: getShapeDisplayName(s)
+												value: s.id,
+												label: s.name
 											}))}
 											onSelectedChange={(selected) =>
 												updateTopLoadedStack(index, 'shape', selected[0])}
@@ -600,8 +596,8 @@
 										<Select
 											selected={[stack[0]]}
 											options={shapeOptions.map((s) => ({
-												value: s,
-												label: getShapeDisplayName(s)
+												value: s.id,
+												label: s.name
 											}))}
 											onSelectedChange={(selected) =>
 												updateEdgeLoadedStack(index, 'shape', selected[0])}
@@ -786,7 +782,6 @@
 				</div>
 			{:else if isCardDividerTray(selectedTray)}
 				<!-- Card Divider Tray Settings -->
-				{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
 				<div class="panelFormSection">
 					<section class="section">
 						<h3 class="sectionTitle">Layout</h3>
@@ -854,13 +849,13 @@
 									</div>
 									<div class="stackSelect">
 										<Select
-											selected={[stack.cardSizeName]}
-											options={customCardSizes.map((s) => ({
-												value: s.name,
+											selected={[stack.cardSizeId]}
+											options={getCardSizes().map((s) => ({
+												value: s.id,
 												label: s.name
 											}))}
 											onSelectedChange={(selected) =>
-												updateCardDividerStack(index, 'cardSizeName', selected[0])}
+												updateCardDividerStack(index, 'cardSizeId', selected[0])}
 										/>
 									</div>
 									<Input
@@ -949,26 +944,24 @@
 				</div>
 			{:else if isCardTray(selectedTray)}
 				<!-- Card Draw Tray Settings -->
-				{@const customCardSizes = selectedBox ? getCustomCardSizesFromBox(selectedBox) : []}
-				{@const selectedCardSize = customCardSizes.find(
-					(s) => s.name === selectedTray.params.cardSizeName
-				)}
+				{@const cardSizes = getCardSizes()}
+				{@const selectedCardSize = cardSizes.find((s) => s.id === selectedTray.params.cardSizeId)}
 				<div class="panelFormSection">
 					<section class="section">
 						<h3 class="sectionTitle">Card Size</h3>
 						<Spacer size="0.5rem" />
-						<FormControl label="Card size" name="cardSizeName">
+						<FormControl label="Card size" name="cardSizeId">
 							{#snippet input({ inputProps })}
 								<Select
 									{...inputProps}
-									selected={[selectedTray.params.cardSizeName]}
-									options={customCardSizes.map((s) => ({
-										value: s.name,
+									selected={[selectedTray.params.cardSizeId]}
+									options={cardSizes.map((s) => ({
+										value: s.id,
 										label: `${s.name} (${s.width}×${s.length}mm)`
 									}))}
 									onSelectedChange={(selected) => {
 										if (selected[0]) {
-											updateCardParam('cardSizeName', selected[0]);
+											updateCardParam('cardSizeId', selected[0]);
 										}
 									}}
 								/>
