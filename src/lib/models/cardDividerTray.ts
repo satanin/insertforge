@@ -3,7 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, scale, mirrorY, rotateX } = jscad.transforms;
+const { translate, scale, mirrorY, rotateX, rotateZ } = jscad.transforms;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
@@ -300,6 +300,130 @@ export function getCardDividerPositions(
 	return positions;
 }
 
+/**
+ * Creates geometry for a stack label to be subtracted from the tray.
+ * Labels are embossed (cut into) on walls - front wall for side-by-side, left wall for front-to-back.
+ * Text is oriented perpendicular to the floor (vertical, reads bottom-to-top).
+ */
+function createStackLabelGeometry(
+	label: string,
+	slotCenterX: number,
+	slotCenterY: number,
+	slotWidth: number,
+	slotDepth: number,
+	trayHeight: number,
+	floorThickness: number,
+	wallThickness: number,
+	stackDirection: 'sideBySide' | 'frontToBack'
+): Geom3 | null {
+	const trimmedLabel = label.trim();
+	if (trimmedLabel.length === 0) return null;
+
+	const textDepth = 0.6; // mm, emboss depth
+	const strokeWidth = 1.0; // mm, slightly thinner for smaller labels
+	const baseTextHeight = 5; // mm, base font size before scaling
+
+	// Generate text segments
+	const textSegments = vectorText(
+		{ height: baseTextHeight, align: 'center' },
+		trimmedLabel.toUpperCase()
+	);
+
+	if (textSegments.length === 0) return null;
+
+	// Create text shapes
+	const textShapes: ReturnType<typeof extrudeLinear>[] = [];
+	for (const segment of textSegments) {
+		if (segment.length >= 2) {
+			const pathObj = path2.fromPoints({ closed: false }, segment);
+			const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
+			const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+			textShapes.push(extruded);
+		}
+	}
+
+	if (textShapes.length === 0) return null;
+
+	// Calculate text bounds
+	let minX = Infinity,
+		maxX = -Infinity;
+	let minY = Infinity,
+		maxY = -Infinity;
+	for (const segment of textSegments) {
+		for (const point of segment) {
+			minX = Math.min(minX, point[0]);
+			maxX = Math.max(maxX, point[0]);
+			minY = Math.min(minY, point[1]);
+			maxY = Math.max(maxY, point[1]);
+		}
+	}
+
+	const textWidth = maxX - minX + strokeWidth;
+	const textHeight = maxY - minY + strokeWidth;
+
+	// Calculate wall height available for text
+	const wallHeight = trayHeight - floorThickness;
+	const wallCenterZ = floorThickness + wallHeight / 2;
+
+	// Minimum margins
+	const verticalMargin = 2;
+	const availableVertical = wallHeight - verticalMargin * 2;
+
+	// Skip if wall is too short for readable text
+	if (availableVertical < 3) return null;
+
+	// Calculate scale based on text orientation
+	let textScale: number;
+	if (stackDirection === 'sideBySide') {
+		// Horizontal text: textWidth is horizontal, textHeight is vertical
+		const availableHorizontal = slotWidth - strokeWidth * 2;
+		const scaleH = Math.min(1, availableHorizontal / textWidth);
+		const scaleV = Math.min(1, availableVertical / textHeight);
+		textScale = Math.min(scaleH, scaleV);
+	} else {
+		// Vertical text: textWidth becomes vertical, textHeight becomes horizontal
+		const availableHorizontal = slotDepth - strokeWidth * 2;
+		const scaleH = Math.min(1, availableHorizontal / textHeight);
+		const scaleV = Math.min(1, availableVertical / textWidth);
+		textScale = Math.min(scaleH, scaleV);
+	}
+
+	// Combine text shapes
+	let combinedText = union(...textShapes);
+
+	// Center point of original text
+	const textCenterX = (minX + maxX) / 2;
+	const textCenterY = (minY + maxY) / 2;
+
+	// First center the text at origin, then scale
+	combinedText = translate([-textCenterX, -textCenterY, 0], combinedText);
+	combinedText = scale([textScale, textScale, 1], combinedText);
+
+	if (stackDirection === 'sideBySide') {
+		// Front wall: text horizontal (parallel to floor), visible from -Y
+		// Mirror so text reads correctly when embossed
+		combinedText = mirrorY(combinedText);
+		// Stand text up perpendicular to floor
+		combinedText = rotateX(-Math.PI / 2, combinedText);
+		// Position at front wall surface
+		combinedText = translate([slotCenterX, -0.1, wallCenterZ], combinedText);
+	} else {
+		// Left wall: text vertical (reading bottom-to-top), visible from -X
+		// Mirror so text reads correctly when embossed
+		combinedText = mirrorY(combinedText);
+		// Rotate to be vertical (reading bottom-to-top)
+		combinedText = rotateZ(-Math.PI / 2, combinedText);
+		// Stand text up perpendicular to floor
+		combinedText = rotateX(-Math.PI / 2, combinedText);
+		// Rotate to face the left wall
+		combinedText = rotateZ(-Math.PI / 2, combinedText);
+		// Position at left wall surface
+		combinedText = translate([-0.1, slotCenterY, wallCenterZ], combinedText);
+	}
+
+	return combinedText;
+}
+
 export function createCardDividerTray(
 	params: CardDividerTrayParams,
 	customCardSizes: CustomCardSize[],
@@ -563,6 +687,81 @@ export function createCardDividerTray(
 				tray = subtract(tray, positionedText);
 			}
 		}
+	}
+
+	// Emboss stack labels on walls
+	const stackLabelCuts: Geom3[] = [];
+
+	if (stackDirection === 'sideBySide') {
+		// Labels on front wall, beneath each stack
+		let currentX = wallThickness;
+
+		for (const stack of stacks) {
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+			if (!cardSize) continue;
+
+			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+
+			const slotWidth =
+				orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+			const slotDepth = stack.count * cardThickness + clearance * 2;
+			const slotCenterX = currentX + slotWidth / 2;
+			const slotCenterY = trayDepth / 2;
+
+			if (stack.label?.trim()) {
+				const labelGeom = createStackLabelGeometry(
+					stack.label,
+					slotCenterX,
+					slotCenterY,
+					slotWidth,
+					slotDepth,
+					trayHeight,
+					floorThickness,
+					wallThickness,
+					stackDirection
+				);
+				if (labelGeom) stackLabelCuts.push(labelGeom);
+			}
+
+			currentX += slotWidth + wallThickness;
+		}
+	} else {
+		// Labels on left wall, next to each stack
+		let currentY = wallThickness;
+
+		for (const stack of stacks) {
+			const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+			if (!cardSize) continue;
+
+			const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
+
+			const slotWidth =
+				orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+			const slotDepth = stack.count * cardThickness + clearance * 2;
+			const slotCenterX = trayWidth / 2;
+			const slotCenterY = currentY + slotDepth / 2;
+
+			if (stack.label?.trim()) {
+				const labelGeom = createStackLabelGeometry(
+					stack.label,
+					slotCenterX,
+					slotCenterY,
+					slotWidth,
+					slotDepth,
+					trayHeight,
+					floorThickness,
+					wallThickness,
+					stackDirection
+				);
+				if (labelGeom) stackLabelCuts.push(labelGeom);
+			}
+
+			currentY += slotDepth + wallThickness;
+		}
+	}
+
+	if (stackLabelCuts.length > 0) {
+		tray = subtract(tray, ...stackLabelCuts);
 	}
 
 	return tray;
