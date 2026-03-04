@@ -270,13 +270,13 @@
 		if (!selectedTray || !isCounterTray(selectedTray)) return 0;
 		// Use trayWidthOverride=0 to get the auto-calculated width
 		const paramsWithoutOverride = { ...selectedTray.params, trayWidthOverride: 0 };
-		return getTrayDimensions(paramsWithoutOverride).width;
+		return getTrayDimensions(paramsWithoutOverride, getCounterShapes()).width;
 	});
 
 	// Compute dimensions for counter trays
 	let counterTrayDimensions = $derived.by(() => {
 		if (!selectedTray || !isCounterTray(selectedTray)) return null;
-		return getTrayDimensions(selectedTray.params);
+		return getTrayDimensions(selectedTray.params, getCounterShapes());
 	});
 
 	// Compute dimensions for card draw trays
