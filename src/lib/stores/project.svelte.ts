@@ -454,6 +454,12 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
 	box.trays.push(tray);
 	project.selectedBoxId = boxId;
 	project.selectedTrayId = tray.id;
+
+	// Clear manual layout and custom dimensions so auto layout takes over
+	box.manualLayout = undefined;
+	box.customWidth = undefined;
+	box.customDepth = undefined;
+
 	autosave();
 	return tray;
 }
@@ -466,6 +472,11 @@ export function deleteTray(boxId: string, trayId: string): void {
 	if (index === -1) return;
 
 	box.trays.splice(index, 1);
+
+	// Clear manual layout and custom dimensions so auto layout takes over
+	box.manualLayout = undefined;
+	box.customWidth = undefined;
+	box.customDepth = undefined;
 
 	// Update selection
 	if (project.selectedTrayId === trayId) {
@@ -717,4 +728,36 @@ export function importProject(data: Project): void {
 		project.selectedTrayId = null;
 	}
 	autosave();
+}
+
+// Manual layout operations
+import type { ManualTrayPlacement } from '$lib/types/project';
+
+// Save manual tray layout for a box (box dimensions auto-calculate from tray positions)
+export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[]): void {
+	const box = project.boxes.find((b) => b.id === boxId);
+	if (!box) return;
+
+	box.manualLayout = placements;
+
+	autosave();
+}
+
+// Clear manual layout for a box (reverts to auto bin-packing)
+export function clearManualLayout(boxId: string): void {
+	const box = project.boxes.find((b) => b.id === boxId);
+	if (!box) return;
+
+	box.manualLayout = undefined;
+	// Optionally clear custom dimensions to let auto-sizing take over
+	box.customWidth = undefined;
+	box.customDepth = undefined;
+
+	autosave();
+}
+
+// Get manual layout for a box
+export function getManualLayout(boxId: string): ManualTrayPlacement[] | undefined {
+	const box = project.boxes.find((b) => b.id === boxId);
+	return box?.manualLayout;
 }

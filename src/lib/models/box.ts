@@ -6,6 +6,7 @@ import type { CounterTrayParams } from './counterTray';
 import { getCardDrawTrayDimensions } from './cardTray';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 import { getCupTrayDimensions } from './cupTray';
+import { GuillotineBinPack, Rect } from 'rectangle-packer';
 
 const { cylinder } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -439,206 +440,294 @@ export function getCounterTrayDimensions(
 // Backwards compatibility alias for counter tray dimensions
 export const getTrayDimensions = getCounterTrayDimensions;
 
+import type { ManualTrayPlacement } from '$lib/types/project';
+
 // Arrange trays in a box layout with bin-packing
 // Smaller trays can share a row if their combined width fits within the max tray width
 // If customBoxWidth is provided, use interior width (minus walls/tolerance) for packing
 // Supports tray rotation: trays can be rotated 90° for more efficient packing
+// If manualLayout is provided, uses those positions instead of auto-arrangement
 export function arrangeTrays(
 	trays: Tray[],
 	options?: {
 		customBoxWidth?: number;
+		customBoxDepth?: number;
 		wallThickness?: number;
 		tolerance?: number;
 		cardSizes?: CardSize[];
 		counterShapes?: CounterShape[];
+		manualLayout?: ManualTrayPlacement[];
+		printBedSize?: number;
 	}
 ): TrayPlacement[] {
 	if (trays.length === 0) return [];
 
-	// Calculate dimensions for each tray with both orientations
-	interface TrayOption {
-		tray: Tray;
-		dims: TrayDimensions;
-		rotated: boolean;
+	// If manual layout is provided, use it instead of auto-arrangement
+	if (options?.manualLayout && options.manualLayout.length > 0) {
+		const placements: TrayPlacement[] = [];
+		for (const manual of options.manualLayout) {
+			const tray = trays.find((t) => t.id === manual.trayId);
+			if (!tray) continue;
+
+			const dims = getTrayDimensionsForTray(
+				tray,
+				options?.cardSizes ?? [],
+				options?.counterShapes ?? []
+			);
+			// Apply rotation: 90° and 270° swap width/depth
+			const swapDims = manual.rotation === 90 || manual.rotation === 270;
+			const effectiveDims: TrayDimensions = swapDims
+				? { width: dims.depth, depth: dims.width, height: dims.height }
+				: dims;
+
+			placements.push({
+				tray,
+				dimensions: effectiveDims,
+				x: manual.x,
+				y: manual.y,
+				rotated: swapDims // TrayPlacement still uses boolean for compatibility
+			});
+		}
+		// Add any trays not in manual layout at auto positions (new trays)
+		const manualIds = new Set(options.manualLayout.map((m) => m.trayId));
+		const unplacedTrays = trays.filter((t) => !manualIds.has(t.id));
+		if (unplacedTrays.length > 0) {
+			// Auto-arrange remaining trays starting after the manual ones
+			const autoPlacements = arrangeTraysAuto(unplacedTrays, options);
+			// Offset them past the manual layout
+			let maxY = 0;
+			for (const p of placements) {
+				maxY = Math.max(maxY, p.y + p.dimensions.depth);
+			}
+			for (const p of autoPlacements) {
+				placements.push({ ...p, y: p.y + maxY });
+			}
+		}
+		return placements;
 	}
 
-	const trayOptions: TrayOption[][] = trays.map((tray) => {
+	return arrangeTraysAuto(trays, options);
+}
+
+// Tray rectangle for packing
+interface TrayRect {
+	tray: Tray;
+	width: number;
+	depth: number;
+	height: number;
+}
+
+function arrangeTraysAuto(
+	trays: Tray[],
+	options?: {
+		customBoxWidth?: number;
+		customBoxDepth?: number;
+		wallThickness?: number;
+		tolerance?: number;
+		cardSizes?: CardSize[];
+		counterShapes?: CounterShape[];
+		printBedSize?: number;
+	}
+): TrayPlacement[] {
+	if (trays.length === 0) return [];
+
+	// Get dimensions for each tray
+	const trayRects: TrayRect[] = trays.map((tray) => {
 		const dims = getTrayDimensionsForTray(
 			tray,
 			options?.cardSizes ?? [],
 			options?.counterShapes ?? []
 		);
-		const rotatedDims: TrayDimensions = {
-			width: dims.depth,
-			depth: dims.width,
+		return {
+			tray,
+			width: dims.width,
+			depth: dims.depth,
 			height: dims.height
 		};
-
-		// Respect user override
-		const override = tray.rotationOverride;
-		if (override === 0) {
-			return [{ tray, dims, rotated: false }];
-		}
-		if (override === 90) {
-			return [{ tray, dims: rotatedDims, rotated: true }];
-		}
-		// Auto: consider both orientations
-		return [
-			{ tray, dims, rotated: false },
-			{ tray, dims: rotatedDims, rotated: true }
-		];
 	});
 
-	// Sort trays by area (largest first) for better packing
-	// Use the first (normal) orientation for sorting
-	const sortedIndices = trayOptions
-		.map((opts, i) => ({ index: i, area: opts[0].dims.width * opts[0].dims.depth }))
-		.sort((a, b) => b.area - a.area)
-		.map((item) => item.index);
+	// Calculate target bin size
+	const wallThickness = options?.wallThickness ?? 3;
+	const tolerance = options?.tolerance ?? 0.5;
 
-	// Track rows: each row has a Y position, current X fill, and max depth
-	interface Row {
-		y: number;
-		currentX: number;
-		depth: number;
-	}
-
-	// Track which row each placement belongs to
-	interface PlacementWithRow {
-		tray: Tray;
-		dimensions: TrayDimensions;
-		x: number;
-		rowIndex: number;
-		rotated: boolean;
-	}
-
-	// Try to place a tray with given dimensions and return the resulting placement
-	function tryPlace(
-		dims: TrayDimensions,
-		rows: Row[],
-		maxRowWidth: number
-	): { rowIndex: number; x: number; isNewRow: boolean } | null {
-		// Try to find an existing row where this tray fits
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			if (row.currentX + dims.width <= maxRowWidth) {
-				return { rowIndex: i, x: row.currentX, isNewRow: false };
+	// Get print bed size from options or extract from first counter tray
+	let printBedSize = options?.printBedSize;
+	if (!printBedSize) {
+		for (const tray of trays) {
+			if (tray.type === 'counter' && tray.params.printBedSize) {
+				printBedSize = tray.params.printBedSize;
+				break;
 			}
 		}
-		// Need a new row
-		return { rowIndex: rows.length, x: 0, isNewRow: true };
 	}
+	printBedSize = printBedSize ?? 256;
 
-	// Calculate max row width
-	// If customBoxWidth is set, use it as a hard constraint (trays pack into more rows)
-	// Otherwise, use the widest tray as the constraint
-	let maxRowWidth: number;
-	const widestTray = Math.max(
-		...trayOptions.map((opts) => Math.max(...opts.map((o) => o.dims.width)))
-	);
+	// Calculate interior cavity max from print bed
+	const interiorMax = printBedSize - (wallThickness + tolerance) * 2;
 
-	if (options?.customBoxWidth) {
-		const wallThickness = options.wallThickness ?? 3;
-		const tolerance = options.tolerance ?? 0.5;
-		const interiorWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
-		// Use interior width as the constraint, but ensure single trays can still fit
-		// If a tray is wider than interior, we'll still need to use that width
-		maxRowWidth = Math.max(interiorWidth, 0);
+	let targetWidth: number;
+	let targetDepth: number;
+
+	if (options?.customBoxWidth && options?.customBoxDepth) {
+		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
+	} else if (options?.customBoxWidth) {
+		// Only width constrained - use it for width, print bed max for depth
+		targetWidth = options.customBoxWidth - wallThickness * 2 - tolerance * 2;
+		targetDepth = interiorMax;
+	} else if (options?.customBoxDepth) {
+		// Only depth constrained - use print bed max for width
+		targetWidth = interiorMax;
+		targetDepth = options.customBoxDepth - wallThickness * 2 - tolerance * 2;
 	} else {
-		maxRowWidth = widestTray;
+		targetWidth = interiorMax;
+		targetDepth = interiorMax;
 	}
 
-	// Greedy algorithm: place each tray, choosing the best orientation
-	const rows: Row[] = [];
-	const placementsWithRow: PlacementWithRow[] = [];
+	// Extended Rect class to store tray data
+	class TrayPackRect extends Rect {
+		trayRect: TrayRect;
+		originalWidth: number;
+		originalHeight: number;
 
-	for (const trayIndex of sortedIndices) {
-		const opts = trayOptions[trayIndex];
+		constructor(trayRect: TrayRect) {
+			super(0, 0, trayRect.width, trayRect.depth);
+			this.trayRect = trayRect;
+			this.originalWidth = trayRect.width;
+			this.originalHeight = trayRect.depth;
+		}
+	}
 
-		let bestOption: TrayOption | null = null;
-		let bestPlacement: { rowIndex: number; x: number; isNewRow: boolean } | null = null;
-		let bestScore = -Infinity;
+	// Try GuillotineBinPack with different heuristics
+	const tryGuillotine = (
+		width: number,
+		height: number,
+		allowFlip: boolean,
+		rectChoice: number,
+		splitMethod: number
+	): TrayPlacement[] | null => {
+		const packer = new GuillotineBinPack<TrayPackRect>(width, height, allowFlip);
 
-		for (const opt of opts) {
-			const placement = tryPlace(opt.dims, rows, maxRowWidth);
-			if (!placement) continue;
+		// Sort trays by area (largest first) for better packing
+		const sortedTrayRects = [...trayRects].sort((a, b) => b.width * b.depth - a.width * a.depth);
 
-			// Score based on how much this placement increases total box depth
-			// Lower depth increase = better score
-			let depthIncrease: number;
+		// Create rect objects for packing (sorted by area)
+		const rects = sortedTrayRects.map((r) => new TrayPackRect(r));
 
-			if (!placement.isNewRow) {
-				// Fitting in existing row: only increases depth if tray is deeper than row
-				const rowDepth = rows[placement.rowIndex].depth;
-				depthIncrease = Math.max(0, opt.dims.depth - rowDepth);
-			} else {
-				// New row: adds full depth to box
-				depthIncrease = opt.dims.depth;
-			}
+		// Insert all rectangles
+		packer.InsertSizes(rects, true, rectChoice, splitMethod);
 
-			// Score is negative of depth increase (less increase = higher score)
-			// Add small bonus for fitting in existing rows when depth increase is equal
-			const score = -depthIncrease + (placement.isNewRow ? 0 : 0.1);
+		// Check if all were placed
+		if (packer.usedRectangles.length !== trayRects.length) return null;
 
-			if (score > bestScore) {
-				bestScore = score;
-				bestOption = opt;
-				bestPlacement = placement;
+		// Verify no overlaps in the packing result
+		const OVERLAP_EPSILON = 0.01;
+		for (let i = 0; i < packer.usedRectangles.length; i++) {
+			for (let j = i + 1; j < packer.usedRectangles.length; j++) {
+				const r1 = packer.usedRectangles[i];
+				const r2 = packer.usedRectangles[j];
+				const noOverlapX =
+					r1.x + r1.width <= r2.x + OVERLAP_EPSILON || r2.x + r2.width <= r1.x + OVERLAP_EPSILON;
+				const noOverlapY =
+					r1.y + r1.height <= r2.y + OVERLAP_EPSILON || r2.y + r2.height <= r1.y + OVERLAP_EPSILON;
+				if (!noOverlapX && !noOverlapY) {
+					// Overlap detected - reject this packing
+					return null;
+				}
 			}
 		}
 
-		if (bestOption && bestPlacement) {
-			if (bestPlacement.isNewRow) {
-				rows.push({
-					y: 0, // Will be recalculated
-					currentX: bestOption.dims.width,
-					depth: bestOption.dims.depth
-				});
-			} else {
-				const row = rows[bestPlacement.rowIndex];
-				row.currentX += bestOption.dims.width;
-				row.depth = Math.max(row.depth, bestOption.dims.depth);
-			}
+		// Calculate bounding box and verify fit
+		let maxX = 0;
+		let maxY = 0;
+		for (const rect of packer.usedRectangles) {
+			maxX = Math.max(maxX, rect.x + rect.width);
+			maxY = Math.max(maxY, rect.y + rect.height);
+		}
 
-			placementsWithRow.push({
-				tray: bestOption.tray,
-				dimensions: bestOption.dims,
-				x: bestPlacement.x,
-				rowIndex: bestPlacement.rowIndex,
-				rotated: bestOption.rotated
+		if (maxX > targetWidth || maxY > targetDepth) return null;
+
+		// Convert to placements
+		const placements: TrayPlacement[] = [];
+		for (const rect of packer.usedRectangles) {
+			const trayRect = rect.trayRect;
+			// Check if rotated by comparing dimensions
+			const wasRotated =
+				Math.abs(rect.width - rect.originalHeight) < 0.01 &&
+				Math.abs(rect.height - rect.originalWidth) < 0.01;
+
+			placements.push({
+				tray: trayRect.tray,
+				dimensions: {
+					width: rect.width,
+					depth: rect.height,
+					height: trayRect.height
+				},
+				x: rect.x,
+				y: rect.y,
+				rotated: wasRotated
 			});
 		}
+
+		return placements;
+	};
+
+	// Try combinations of heuristics
+	// RectChoice: 0=BestAreaFit, 1=BestShortSideFit, 2=BestLongSideFit (skip "Worst" variants 3-5)
+	// SplitMethod: all 6 are useful (no "worst" variants)
+	const rectChoices = [0, 1, 2];
+	const splitMethods = [0, 1, 2, 3, 4, 5];
+
+	interface PackResult {
+		placements: TrayPlacement[];
+		area: number;
 	}
 
-	// Recalculate row Y positions based on actual final depths
-	let currentY = 0;
-	for (let i = 0; i < rows.length; i++) {
-		rows[i].y = currentY;
-		currentY += rows[i].depth;
-	}
+	const results: PackResult[] = [];
 
-	// Build final placements with correct Y positions
-	// For row 0 (against south box wall): push smaller trays to north edge of row
-	// so the gap merges with the box wall instead of creating an internal wall
-	const placements: TrayPlacement[] = placementsWithRow.map((p) => {
-		const row = rows[p.rowIndex];
-		let y = row.y;
-
-		// First row: align to north edge (push away from south box wall)
-		if (p.rowIndex === 0 && p.dimensions.depth < row.depth) {
-			y = row.y + (row.depth - p.dimensions.depth);
+	// Try all combinations with and without rotation
+	for (const allowFlip of [true, false]) {
+		for (const rectChoice of rectChoices) {
+			for (const splitMethod of splitMethods) {
+				const placements = tryGuillotine(
+					targetWidth,
+					targetDepth,
+					allowFlip,
+					rectChoice,
+					splitMethod
+				);
+				if (placements) {
+					let maxX = 0;
+					let maxY = 0;
+					for (const p of placements) {
+						maxX = Math.max(maxX, p.x + p.dimensions.width);
+						maxY = Math.max(maxY, p.y + p.dimensions.depth);
+					}
+					results.push({ placements, area: maxX * maxY });
+				}
+			}
 		}
+	}
 
-		return {
-			tray: p.tray,
-			dimensions: p.dimensions,
-			x: p.x,
+	// If we found valid results, return the most compact one
+	if (results.length > 0) {
+		results.sort((a, b) => a.area - b.area);
+		return results[0].placements;
+	}
+
+	// Fallback: stack vertically (trays don't fit within constraints)
+	let y = 0;
+	return trayRects.map((rect) => {
+		const placement: TrayPlacement = {
+			tray: rect.tray,
+			dimensions: { width: rect.width, depth: rect.depth, height: rect.height },
+			x: 0,
 			y,
-			rotated: p.rotated
+			rotated: false
 		};
+		y += rect.depth;
+		return placement;
 	});
-
-	return placements;
 }
 
 // Calculate box interior dimensions from tray placements
@@ -724,7 +813,8 @@ export function createBox(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -791,7 +881,8 @@ export function calculateMinimumBoxDimensions(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const interior = getBoxInteriorDimensions(placements, box.tolerance);
 
@@ -883,7 +974,8 @@ export function calculateTraySpacers(
 		wallThickness: box.wallThickness,
 		tolerance: box.tolerance,
 		cardSizes,
-		counterShapes
+		counterShapes,
+		manualLayout: box.manualLayout
 	});
 	const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 

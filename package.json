@@ -29,6 +29,7 @@
 		"marked": "^17.0.2",
 		"mode-watcher": "^1.1.0",
 		"paneforge": "^1.0.2",
+		"rectangle-packer": "^1.0.4",
 		"svg2pdf.js": "^2.7.0",
 		"three": "^0.170.0"
 	},

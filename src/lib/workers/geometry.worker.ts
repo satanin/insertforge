@@ -12,7 +12,7 @@ import {
 } from '$lib/models/counterTray';
 import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
 import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-import { createCupTray, getCupPositions } from '$lib/models/cupTray';
+import { createCupTray } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import {
 	arrangeTrays,
@@ -198,23 +198,8 @@ function getTrayPositions(
 	spacerHeight: number
 ): CounterStack[] {
 	if (isCupTray(tray)) {
-		// Convert CupPosition to CounterStack format for visualization
-		const cupPositions = getCupPositions(tray.params, maxHeight, spacerHeight);
-		return cupPositions.map((cup, index) => ({
-			shape: 'custom' as const,
-			customShapeName: `Cup ${cup.row + 1}-${cup.column + 1}`,
-			customBaseShape: 'rectangle' as const,
-			// Convert from center to edge position
-			x: cup.x - cup.width / 2,
-			y: cup.y - cup.depth / 2,
-			z: cup.z,
-			width: cup.width,
-			length: cup.depth,
-			thickness: cup.height,
-			count: 1,
-			hexPointyTop: false,
-			color: `hsl(${(index * 60) % 360}, 50%, 55%)`
-		}));
+		// Cup trays don't have counter previews - the cups themselves are the containers
+		return [];
 	}
 	if (isCardDividerTray(tray)) {
 		// Convert CardDividerStackPosition to CounterStack format for visualization
@@ -383,7 +368,8 @@ function handleGenerate(msg: GenerateMessage): void {
 			wallThickness: box.wallThickness,
 			tolerance: box.tolerance,
 			cardSizes,
-			counterShapes
+			counterShapes,
+			manualLayout: box.manualLayout
 		});
 
 		const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
@@ -470,7 +456,8 @@ function handleGenerate(msg: GenerateMessage): void {
 				wallThickness: projectBox.wallThickness,
 				tolerance: projectBox.tolerance,
 				cardSizes,
-				counterShapes
+				counterShapes,
+				manualLayout: projectBox.manualLayout
 			});
 
 			const boxSpacerInfo = calculateTraySpacers(projectBox, cardSizes, counterShapes);

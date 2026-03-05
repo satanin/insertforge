@@ -7,9 +7,13 @@
 		size: number;
 		title?: string;
 		position?: [number, number, number];
+		sizeLabel?: string;
 	}
 
-	let { size, title = '', position = [0, 0, 0] }: Props = $props();
+	let { size, title = '', position = [0, 0, 0], sizeLabel }: Props = $props();
+
+	// Default size label if not provided
+	let displaySizeLabel = $derived(sizeLabel ?? `${size}mm bed`);
 
 	// Make position values reactive
 	let posX = $derived(position[0]);
@@ -116,17 +120,21 @@
 
 	let noiseTexture = $derived.by(() => createNoiseTexture());
 
-	// Calculate label positions relative to bed center
-	let bedSizeLabelPos: [number, number, number] = $derived([
-		posX - size / 2 + 5,
+	// Calculate label positions - outside the bed, under the bottom edge
+	const labelOffset = 8; // Distance below the bed edge
+
+	// Title: bottom left corner (outside)
+	let titleLabelPos: [number, number, number] = $derived([
+		posX - size / 2,
 		posY + 0.5,
-		posZ + size / 2 - 5
+		posZ + size / 2 + labelOffset
 	]);
 
-	let titleLabelPos: [number, number, number] = $derived([
-		posX - size / 2 + 5,
+	// Bed size: bottom right corner (outside)
+	let bedSizeLabelPos: [number, number, number] = $derived([
+		posX + size / 2,
 		posY + 0.5,
-		posZ - size / 2 + 5
+		posZ + size / 2 + labelOffset
 	]);
 </script>
 
@@ -177,18 +185,7 @@
 	<T.LineBasicMaterial color="#c9503c" linewidth={2} />
 </T.LineLoop>
 
-<!-- Bed size label -->
-<Text
-	text={`${size}mm bed`}
-	fontSize={8}
-	position={bedSizeLabelPos}
-	rotation={[-Math.PI / 2, 0, 0]}
-	color="#c9503c"
-	anchorX="left"
-	anchorY="bottom"
-/>
-
-<!-- Title label -->
+<!-- Title label - bottom left corner (outside bed) -->
 {#if title}
 	<Text
 		text={title}
@@ -200,3 +197,14 @@
 		anchorY="top"
 	/>
 {/if}
+
+<!-- Bed size label - bottom right corner (outside bed) -->
+<Text
+	text={displaySizeLabel}
+	fontSize={8}
+	position={bedSizeLabelPos}
+	rotation={[-Math.PI / 2, 0, 0]}
+	color="#c9503c"
+	anchorX="right"
+	anchorY="top"
+/>
