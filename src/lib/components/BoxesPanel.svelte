@@ -3,7 +3,7 @@
 	import { IconX, IconPlus } from '@tabler/icons-svelte';
 	import type { Box, Project } from '$lib/types/project';
 	import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
-	import { getCardSizes } from '$lib/stores/project.svelte';
+	import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
 
 	interface Props {
 		project: Project;
@@ -25,12 +25,13 @@
 		hideList = false
 	}: Props = $props();
 
-	// Get global card sizes (shared across all boxes)
+	// Get global card sizes and counter shapes (shared across all boxes)
 	const customCardSizes = $derived(getCardSizes());
+	const customCounterShapes = $derived(getCounterShapes());
 
 	const minimums = $derived(
 		selectedBox
-			? calculateMinimumBoxDimensions(selectedBox, customCardSizes)
+			? calculateMinimumBoxDimensions(selectedBox, customCardSizes, customCounterShapes)
 			: { minWidth: 0, minDepth: 0, minHeight: 0 }
 	);
 
