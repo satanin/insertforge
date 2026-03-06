@@ -368,6 +368,13 @@
 		generating = true;
 		error = '';
 
+		// Clear stale geometry when forcing regeneration (structural changes)
+		// This prevents showing old geometry from deleted/moved boxes/trays
+		if (force) {
+			allBoxGeometries = [];
+			allTrayGeometries = [];
+		}
+
 		try {
 			// Use web worker for geometry generation (non-blocking)
 			const result = await geometryWorker.generate(project, box.id, tray.id);
