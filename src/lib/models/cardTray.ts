@@ -38,8 +38,8 @@ export const defaultCardDrawTrayParams: CardDrawTrayParams = {
 	floorThickness: 4.0,
 	clearance: 1.5,
 	floorSlopeAngle: 5,
-	magnetHoleDiameter: 3.0,
-	magnetHoleDepth: 2.5
+	magnetHoleDiameter: 6.0,
+	magnetHoleDepth: 3.0
 };
 
 // Legacy alias for backwards compatibility
@@ -304,9 +304,9 @@ export function createCardDrawTray(
 
 	// === MAGNET HOLES ===
 	// 4 cylinder cutouts at bottom corners of side walls
-	const magnetDiameter = 6.1;
-	const magnetRadius = magnetDiameter / 2;
-	const magnetDepth = 3.1;
+	// Add 0.1mm tolerance for printing
+	const magnetRadius = (params.magnetHoleDiameter + 0.1) / 2;
+	const magnetDepth = params.magnetHoleDepth + 0.1;
 	const magnetInset = 2; // 2mm from corner edges
 
 	// Cylinder oriented along X axis (into side walls)
