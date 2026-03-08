@@ -19,6 +19,12 @@
 	let containerWidth = $state(0);
 	let containerHeight = $state(0);
 
+	// Calculate max preview width to fit within 500x500 while maintaining aspect ratio
+	const MAX_PREVIEW_SIZE = 500;
+	let previewMaxWidth = $derived(
+		trayWidth >= trayDepth ? MAX_PREVIEW_SIZE : MAX_PREVIEW_SIZE * (trayWidth / trayDepth)
+	);
+
 	// Fixed pixel gap between cups
 	const GAP_PX = 8;
 	// Inset from container edges to prevent border clipping
@@ -195,7 +201,7 @@
 
 <div
 	class="cupLayoutPreview"
-	style="aspect-ratio: {trayWidth} / {trayDepth};"
+	style="aspect-ratio: {trayWidth} / {trayDepth}; max-width: {previewMaxWidth}px;"
 	bind:clientWidth={containerWidth}
 	bind:clientHeight={containerHeight}
 >
