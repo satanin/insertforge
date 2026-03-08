@@ -13,6 +13,7 @@ export interface CounterShape {
 	baseShape: CounterBaseShape;
 	width: number;
 	length: number;
+	thickness: number; // Counter thickness in mm
 	cornerRadius?: number; // For triangle shapes
 	pointyTop?: boolean; // For hex shapes
 }
@@ -32,6 +33,7 @@ interface BaseTray {
 	name: string;
 	color: string;
 	rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
+	showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
 }
 
 // Counter tray for cardboard counter tokens
@@ -50,6 +52,7 @@ export interface CardDrawTray extends BaseTray {
 export interface CardDividerTray extends BaseTray {
 	type: 'cardDivider';
 	params: CardDividerTrayParams;
+	showStackLabels?: boolean; // Whether to emboss stack labels on floor (default: true)
 }
 
 // Cup tray for loose game components (dice, tokens, meeples) in bowl-shaped cups
@@ -134,10 +137,16 @@ export interface Box {
 	manualLayout?: ManualTrayPlacement[];
 }
 
+// Project-level global settings (used as defaults and shown even without counter trays)
+export interface GlobalSettings {
+	printBedSize: number;
+}
+
 export interface Project {
 	boxes: Box[];
 	counterShapes: CounterShape[];
 	cardSizes: CardSize[];
 	selectedBoxId: string | null;
 	selectedTrayId: string | null;
+	globalSettings?: GlobalSettings;
 }
