@@ -688,6 +688,32 @@ function handleExportStl(msg: ExportStlMessage): void {
 }
 
 /**
+ * Get a unique filename by appending a number suffix if needed
+ */
+function getUniqueFilename(baseFilename: string, usedFilenames: Set<string>): string {
+	if (!usedFilenames.has(baseFilename)) {
+		usedFilenames.add(baseFilename);
+		return baseFilename;
+	}
+
+	// Extract the name and extension
+	const lastDotIndex = baseFilename.lastIndexOf('.');
+	const name = lastDotIndex > 0 ? baseFilename.slice(0, lastDotIndex) : baseFilename;
+	const ext = lastDotIndex > 0 ? baseFilename.slice(lastDotIndex) : '';
+
+	// Find a unique number suffix
+	let counter = 2;
+	let uniqueFilename = `${name}-${counter}${ext}`;
+	while (usedFilenames.has(uniqueFilename)) {
+		counter++;
+		uniqueFilename = `${name}-${counter}${ext}`;
+	}
+
+	usedFilenames.add(uniqueFilename);
+	return uniqueFilename;
+}
+
+/**
  * Export all STLs for all boxes
  */
 async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
@@ -706,6 +732,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
 		const files: StlFile[] = [];
 		const transferables: ArrayBuffer[] = [];
+		const usedFilenames = new Set<string>();
 
 		for (const boxData of cachedAllBoxes) {
 			const boxPrefix = sanitizeFilename(boxData.boxName);
@@ -716,7 +743,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
-				files.push({ filename: `${boxPrefix}-box.stl`, data: buffer });
+				const filename = getUniqueFilename(`${boxPrefix}-box.stl`, usedFilenames);
+				files.push({ filename, data: buffer });
 				transferables.push(buffer);
 			}
 
@@ -726,7 +754,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 				const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
-				files.push({ filename: `${boxPrefix}-lid.stl`, data: buffer });
+				const filename = getUniqueFilename(`${boxPrefix}-lid.stl`, usedFilenames);
+				files.push({ filename, data: buffer });
 				transferables.push(buffer);
 			}
 
@@ -737,7 +766,8 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 				const blob = new Blob(stlData, { type: 'application/octet-stream' });
 				const buffer = await blob.arrayBuffer();
 				const trayName = sanitizeFilename(tray.name);
-				files.push({ filename: `${boxPrefix}-${trayName}.stl`, data: buffer });
+				const filename = getUniqueFilename(`${boxPrefix}-${trayName}.stl`, usedFilenames);
+				files.push({ filename, data: buffer });
 				transferables.push(buffer);
 			}
 		}
@@ -781,6 +811,23 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
 		// Collect all geometries with their names and bounds
 		const namedGeometries: { geom: Geom3; name: string }[] = [];
+		const usedNames = new Set<string>();
+
+		// Helper to get unique name (reusing the same pattern as getUniqueFilename but without extension)
+		const getUniqueName = (baseName: string): string => {
+			if (!usedNames.has(baseName)) {
+				usedNames.add(baseName);
+				return baseName;
+			}
+			let counter = 2;
+			let uniqueName = `${baseName}-${counter}`;
+			while (usedNames.has(uniqueName)) {
+				counter++;
+				uniqueName = `${baseName}-${counter}`;
+			}
+			usedNames.add(uniqueName);
+			return uniqueName;
+		};
 
 		for (const boxData of cachedAllBoxes) {
 			const boxPrefix = sanitizeFilename(boxData.boxName);
@@ -788,20 +835,23 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 			// Add box
 			if (boxData.boxGeom) {
 				const cleanedGeom = cleanGeometryForExport(boxData.boxGeom);
-				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-box` });
+				namedGeometries.push({ geom: cleanedGeom, name: getUniqueName(`${boxPrefix}-box`) });
 			}
 
 			// Add lid
 			if (boxData.lidGeom) {
 				const cleanedGeom = cleanGeometryForExport(boxData.lidGeom);
-				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-lid` });
+				namedGeometries.push({ geom: cleanedGeom, name: getUniqueName(`${boxPrefix}-lid`) });
 			}
 
 			// Add trays
 			for (const tray of boxData.trays) {
 				const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
 				const trayName = sanitizeFilename(tray.name);
-				namedGeometries.push({ geom: cleanedGeom, name: `${boxPrefix}-${trayName}` });
+				namedGeometries.push({
+					geom: cleanedGeom,
+					name: getUniqueName(`${boxPrefix}-${trayName}`)
+				});
 			}
 		}
 
