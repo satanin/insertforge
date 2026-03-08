@@ -24,6 +24,15 @@
 	// Inset from container edges to prevent border clipping
 	const EDGE_INSET = 1;
 
+	// Fractional grid positions for snapping (relative to full tray dimensions)
+	const GRID_FRACTIONS = [
+		{ value: 0.25, label: '1/4' },
+		{ value: 1 / 3, label: '1/3' },
+		{ value: 0.5, label: '1/2' },
+		{ value: 2 / 3, label: '2/3' },
+		{ value: 0.75, label: '3/4' }
+	];
+
 	// Data structure for rendered elements (all in pixels)
 	interface RenderedCup {
 		id: CupId;
@@ -139,19 +148,48 @@
 	// Track which divider is being snapped to
 	let snapTargetKey = $state<string | null>(null);
 
-	// Compute snap targets for a divider (other dividers on same axis)
+	// Track active grid snap for rendering guide line
+	let gridSnapInfo = $state<{
+		position: number;
+		direction: 'horizontal' | 'vertical';
+	} | null>(null);
+
+	// Compute snap targets for a divider (other dividers on same axis + grid fractions)
 	function getSnapTargets(dividerKey: string, direction: 'horizontal' | 'vertical') {
-		return renderedElements.dividers
+		// Existing: other dividers on same axis
+		const dividerTargets = renderedElements.dividers
 			.filter((d) => d.key !== dividerKey && d.direction === direction)
-			.map((d) => ({ key: d.key, absolutePosition: d.absolutePosition }));
+			.map((d) => ({ key: d.key, absolutePosition: d.absolutePosition, isGrid: false }));
+
+		// Fractional grid positions relative to full tray
+		const fullSize =
+			direction === 'vertical' ? containerWidth - 2 * EDGE_INSET : containerHeight - 2 * EDGE_INSET;
+
+		const gridTargets = GRID_FRACTIONS.map(({ value, label }) => ({
+			key: `grid-${label}`,
+			absolutePosition: EDGE_INSET + value * fullSize,
+			isGrid: true
+		}));
+
+		return [...dividerTargets, ...gridTargets];
 	}
 
 	function handleDividerDrag(splitPath: string, newRatio: number) {
 		onUpdateRatio(splitPath, newRatio);
 	}
 
-	function handleSnapChange(key: string | null) {
-		snapTargetKey = key;
+	function handleSnapChange(
+		snapInfo: {
+			key: string;
+			isGrid: boolean;
+			position: number;
+			direction: 'horizontal' | 'vertical';
+		} | null
+	) {
+		snapTargetKey = snapInfo?.key ?? null;
+		gridSnapInfo = snapInfo?.isGrid
+			? { position: snapInfo.position, direction: snapInfo.direction }
+			: null;
 	}
 </script>
 
@@ -187,6 +225,17 @@
 			onSnapChange={handleSnapChange}
 		/>
 	{/each}
+
+	{#if gridSnapInfo}
+		<div
+			class="cupLayoutPreview__gridLine"
+			class:cupLayoutPreview__gridLine--vertical={gridSnapInfo.direction === 'vertical'}
+			class:cupLayoutPreview__gridLine--horizontal={gridSnapInfo.direction === 'horizontal'}
+			style={gridSnapInfo.direction === 'vertical'
+				? `left: ${gridSnapInfo.position}px;`
+				: `bottom: ${gridSnapInfo.position}px;`}
+		></div>
+	{/if}
 </div>
 
 <style>
@@ -194,5 +243,37 @@
 		position: relative;
 		width: 100%;
 		overflow: hidden;
+	}
+
+	.cupLayoutPreview__gridLine {
+		position: absolute;
+		pointer-events: none;
+		z-index: 5;
+	}
+
+	.cupLayoutPreview__gridLine--vertical {
+		width: 1px;
+		top: 0;
+		bottom: 0;
+		background: repeating-linear-gradient(
+			to bottom,
+			var(--fgSuccess) 0,
+			var(--fgSuccess) 4px,
+			transparent 4px,
+			transparent 8px
+		);
+	}
+
+	.cupLayoutPreview__gridLine--horizontal {
+		height: 1px;
+		left: 0;
+		right: 0;
+		background: repeating-linear-gradient(
+			to right,
+			var(--fgSuccess) 0,
+			var(--fgSuccess) 4px,
+			transparent 4px,
+			transparent 8px
+		);
 	}
 </style>

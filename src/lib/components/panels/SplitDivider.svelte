@@ -3,6 +3,7 @@
 	interface SnapTarget {
 		key: string;
 		absolutePosition: number; // Position in container pixels
+		isGrid?: boolean; // Whether this is a grid snap (vs another divider)
 	}
 
 	interface Props {
@@ -15,7 +16,14 @@
 		snapTargets?: SnapTarget[]; // Other dividers to snap to
 		isSnapTarget?: boolean; // Whether another divider is snapping to this one
 		onDrag: (newRatio: number) => void; // Called with new ratio (0-1)
-		onSnapChange?: (snapKey: string | null) => void; // Called when snapping state changes
+		onSnapChange?: (
+			snapInfo: {
+				key: string;
+				isGrid: boolean;
+				position: number;
+				direction: 'horizontal' | 'vertical';
+			} | null
+		) => void; // Called when snapping state changes
 	}
 
 	let {
@@ -32,6 +40,7 @@
 	}: Props = $props();
 
 	let isDragging = $state(false);
+	let isSnappingToGrid = $state(false);
 	let containerRef: HTMLElement | null = $state(null);
 
 	const SNAP_THRESHOLD_PX = 6; // Snap within 6 pixels
@@ -71,7 +80,7 @@
 		}
 
 		// Check for snap targets
-		let snappedKey: string | null = null;
+		let snappedTarget: SnapTarget | null = null;
 		for (const target of snapTargets) {
 			if (Math.abs(absolutePosition - target.absolutePosition) < SNAP_THRESHOLD_PX) {
 				// Snap to this target - convert back to local ratio
@@ -82,18 +91,29 @@
 				}
 				// Clamp to valid range
 				newRatio = Math.max(0.15, Math.min(0.85, newRatio));
-				snappedKey = target.key;
+				snappedTarget = target;
 				break;
 			}
 		}
 
-		onSnapChange?.(snappedKey);
+		isSnappingToGrid = snappedTarget?.isGrid ?? false;
+		onSnapChange?.(
+			snappedTarget
+				? {
+						key: snappedTarget.key,
+						isGrid: snappedTarget.isGrid ?? false,
+						position: snappedTarget.absolutePosition,
+						direction
+					}
+				: null
+		);
 		onDrag(newRatio);
 	}
 
 	function handlePointerUp(e: PointerEvent) {
 		if (!isDragging) return;
 		isDragging = false;
+		isSnappingToGrid = false;
 		onSnapChange?.(null);
 
 		const target = e.currentTarget as HTMLElement;
@@ -122,6 +142,7 @@
 	class:splitDivider--horizontal={direction === 'horizontal'}
 	class:splitDivider--dragging={isDragging}
 	class:splitDivider--snapTarget={isSnapTarget}
+	class:splitDivider--gridSnap={isSnappingToGrid}
 	style={dividerStyle}
 	role="separator"
 	aria-orientation={direction}
@@ -202,5 +223,14 @@
 
 	.splitDivider--snapTarget .splitDivider__line {
 		background: var(--fgPrimary);
+	}
+
+	.splitDivider--gridSnap .splitDivider__line {
+		background: var(--fgSuccess);
+	}
+
+	.splitDivider--gridSnap .splitDivider__handle {
+		opacity: 1;
+		background: var(--fgSuccess);
 	}
 </style>
