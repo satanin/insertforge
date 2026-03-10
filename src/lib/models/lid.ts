@@ -101,7 +101,8 @@ export const defaultLidParams: LidParams = {
 export function createBoxWithLidGrooves(
   box: Box,
   cardSizes: CardSize[] = [],
-  counterShapes: CounterShape[] = []
+  counterShapes: CounterShape[] = [],
+  targetExteriorHeight?: number
 ): Geom3 | null {
   if (box.trays.length === 0) return null;
 
@@ -128,9 +129,19 @@ export function createBoxWithLidGrooves(
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
 
   // Box exterior dimensions (use custom if set, otherwise auto)
+  // If targetExteriorHeight is provided (for layer unification), use it minus lid VISIBLE height for box height
   const extWidth = box.customWidth ?? minimums.minWidth;
   const extDepth = box.customDepth ?? minimums.minDepth;
-  const extHeight = box.customBoxHeight ?? minimums.minHeight;
+  const naturalHeight = box.customBoxHeight ?? minimums.minHeight;
+  // The lid slides into the box - only the flat top (thickness) sticks above
+  // The rails extend down INTO the box walls, so don't subtract the full lid height
+  const lidThickness = box.lidParams?.thickness ?? 2;
+  // Use target height if provided and valid, otherwise use natural height
+  // The target height is the layer exterior height; subtract only lid visible height (thickness) for box body
+  const extHeight =
+    targetExteriorHeight !== undefined && targetExteriorHeight > 0
+      ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
+      : naturalHeight;
 
   // Calculate gaps for fill logic
   const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)

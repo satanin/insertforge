@@ -155,8 +155,16 @@
     const project = getProject();
     let count = 0;
 
-    for (const box of project.boxes) {
-      for (const tray of box.trays) {
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          if (isCounterTray(tray)) {
+            count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+            count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+          }
+        }
+      }
+      for (const tray of layer.looseTrays) {
         if (isCounterTray(tray)) {
           count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
           count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
@@ -202,8 +210,20 @@
     const project = getProject();
     let count = 0;
 
-    for (const box of project.boxes) {
-      for (const tray of box.trays) {
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          if (isCardDrawTray(tray)) {
+            if (tray.params.cardSizeId === cardSizeId) {
+              count++;
+            }
+          }
+          if (isCardDividerTray(tray)) {
+            count += tray.params.stacks.filter((s) => s.cardSizeId === cardSizeId).length;
+          }
+        }
+      }
+      for (const tray of layer.looseTrays) {
         if (isCardDrawTray(tray)) {
           if (tray.params.cardSizeId === cardSizeId) {
             count++;
@@ -255,6 +275,11 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    <Spacer size="0.5rem" />
+    <Text size="0.875rem" color="var(--fgMuted)">
+      Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
+      calculations.
+    </Text>
   </section>
 
   <Hr />

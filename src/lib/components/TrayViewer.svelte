@@ -3,6 +3,7 @@
   import TrayScene from './TrayScene.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '$lib/models/box';
+  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -26,6 +27,17 @@
     boxDimensions: { width: number; depth: number; height: number };
   }
 
+  interface LooseTrayGeometryData {
+    trayId: string;
+    layerId: string;
+    name: string;
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    trayLetter: string;
+  }
+
   interface TrayClickInfo {
     trayId: string;
     name: string;
@@ -34,6 +46,7 @@
     depth: number;
     height: number;
     color: string;
+    type?: 'tray' | 'box'; // Default is 'tray' for backwards compatibility
   }
 
   // Calculate relative luminance for contrast calculation
@@ -57,6 +70,7 @@
     geometry: BufferGeometry | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
+    allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
@@ -79,14 +93,31 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
+    isLayerLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
+    onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
+    showLayerView?: boolean;
+    layerBoxPlacements?: BoxPlacement[];
+    layerLooseTrayPlacements?: LooseTrayPlacement[];
+    // All layers stacked view
+    showAllLayers?: boolean;
+    allLayerArrangements?: Array<{
+      layer: { id: string; name: string };
+      arrangement: {
+        boxes: BoxPlacement[];
+        looseTrays: LooseTrayPlacement[];
+        layerHeight: number;
+      };
+    }>;
+    allLayersExplosionAmount?: number;
   }
 
   let {
     geometry,
     allTrays = [],
     allBoxes = [],
+    allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
     printBedSize: legacyPrintBedSize,
@@ -109,8 +140,16 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
+    isLayerLayoutEditMode = false,
     onTrayDoubleClick,
-    generating = false
+    onBoxDoubleClick,
+    generating = false,
+    showLayerView = false,
+    layerBoxPlacements = [],
+    layerLooseTrayPlacements = [],
+    showAllLayers = false,
+    allLayerArrangements = [],
+    allLayersExplosionAmount = 50
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -144,6 +183,7 @@
       {geometry}
       {allTrays}
       {allBoxes}
+      {allLooseTrays}
       {boxGeometry}
       {lidGeometry}
       {gameContainerWidth}
@@ -165,21 +205,33 @@
       {viewTitle}
       {onCaptureReady}
       {isLayoutEditMode}
+      {isLayerLayoutEditMode}
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
+      {onBoxDoubleClick}
       {generating}
+      {showLayerView}
+      {layerBoxPlacements}
+      {layerLooseTrayPlacements}
+      {showAllLayers}
+      {allLayerArrangements}
+      {allLayersExplosionAmount}
     />
   </Canvas>
 
-  <!-- Tray info overlay when a tray is clicked (non-edit mode only) -->
-  {#if clickedTrayInfo && !isLayoutEditMode && (showAllTrays || showAllBoxes)}
-    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays}>
-      <span
-        class="trayLetter"
-        style="background-color: {clickedTrayInfo.color}; color: {getContrastColor(clickedTrayInfo.color)}"
-      >
-        {clickedTrayInfo.letter}
-      </span>
+  <!-- Tray/Box info overlay when clicked (non-edit mode only) -->
+  {#if clickedTrayInfo && !isLayoutEditMode && !isLayerLayoutEditMode && (showAllTrays || showAllBoxes || showAllLayers || showLayerView)}
+    <div class="trayInfoOverlay" class:belowToolbar={showAllTrays || showAllLayers || showLayerView}>
+      {#if clickedTrayInfo.type === 'box'}
+        <span class="trayLetter trayLetter--box">BOX</span>
+      {:else}
+        <span
+          class="trayLetter"
+          style="background-color: {clickedTrayInfo.color}; color: {getContrastColor(clickedTrayInfo.color)}"
+        >
+          {clickedTrayInfo.letter}
+        </span>
+      {/if}
       <span class="trayName">{clickedTrayInfo.name}</span>
       <span class="trayDims">
         {clickedTrayInfo.width.toFixed(0)} × {clickedTrayInfo.depth.toFixed(0)} × {clickedTrayInfo.height.toFixed(0)}mm
@@ -221,6 +273,11 @@
     border-radius: var(--radius-1);
     font-size: 0.75rem;
     font-weight: 600;
+  }
+
+  .trayLetter--box {
+    background-color: #333333;
+    color: #ffffff;
   }
 
   .trayName {

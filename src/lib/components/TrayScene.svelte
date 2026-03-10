@@ -5,6 +5,9 @@
   import PrintBed from './PrintBed.svelte';
   import CounterMesh from './three/CounterMesh.svelte';
   import SceneLighting from './three/SceneLighting.svelte';
+  import BoxAssembly from './three/BoxAssembly.svelte';
+  import LayerContent from './three/LayerContent.svelte';
+  import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
 
   // Enable interactivity for pointer events on 3D objects
@@ -12,6 +15,7 @@
   import type { BufferGeometry } from 'three';
   import * as THREE from 'three';
   import { arrangeBoxes, type TrayPlacement } from '$lib/models/box';
+  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import { captureSceneToDataUrl, type CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -50,6 +54,17 @@
     boxDimensions: { width: number; depth: number; height: number };
   }
 
+  interface LooseTrayGeometryData {
+    trayId: string;
+    layerId: string;
+    name: string;
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    trayLetter: string;
+  }
+
   interface TrayClickInfo {
     trayId: string;
     name: string;
@@ -58,12 +73,14 @@
     depth: number;
     height: number;
     color: string;
+    type?: 'tray' | 'box';
   }
 
   interface Props {
     geometry: BufferGeometry | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
+    allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
@@ -86,15 +103,32 @@
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
     isLayoutEditMode?: boolean;
+    isLayerLayoutEditMode?: boolean;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
+    onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
+    showLayerView?: boolean;
+    layerBoxPlacements?: BoxPlacement[];
+    layerLooseTrayPlacements?: LooseTrayPlacement[];
+    // All layers stacked view
+    showAllLayers?: boolean;
+    allLayerArrangements?: Array<{
+      layer: { id: string; name: string };
+      arrangement: {
+        boxes: BoxPlacement[];
+        looseTrays: LooseTrayPlacement[];
+        layerHeight: number;
+      };
+    }>;
+    allLayersExplosionAmount?: number;
   }
 
   let {
     geometry,
     allTrays = [],
     allBoxes = [],
+    allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
     printBedSize: legacyPrintBedSize,
@@ -117,9 +151,17 @@
     viewTitle = '',
     onCaptureReady,
     isLayoutEditMode = false,
+    isLayerLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
-    generating = false
+    onBoxDoubleClick,
+    generating = false,
+    showLayerView = false,
+    layerBoxPlacements = [],
+    layerLooseTrayPlacements = [],
+    showAllLayers = false,
+    allLayerArrangements = [],
+    allLayersExplosionAmount = 50
   }: Props = $props();
 
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
@@ -180,6 +222,16 @@
   // This prevents visual jumps during the fade transition
   let visualEditMode = $derived(transitionPhase === 'edit' || transitionPhase === 'fading-to-normal');
 
+  // Layer edit mode transition state (parallel system for layer-level editing)
+  type LayerTransitionPhase = 'normal' | 'fading-to-edit' | 'edit' | 'fading-to-normal';
+  let layerTransitionPhase = $state<LayerTransitionPhase>('normal');
+  let layerNormalSceneOpacity = $state(1);
+  let layerEditSceneOpacity = $state(0);
+  let layerFadeProgress = $state(0);
+  let savedLayerCameraPosition = $state<THREE.Vector3 | null>(null);
+  let savedLayerCameraTarget = $state<THREE.Vector3 | null>(null);
+  let visualLayerEditMode = $derived(layerTransitionPhase === 'edit' || layerTransitionPhase === 'fading-to-normal');
+
   // Fade overlay opacity for transition effect
   // Key insight: overlay must appear IMMEDIATELY when isLayoutEditMode changes,
   // before the effect runs, to hide any scene jumps
@@ -187,10 +239,13 @@
     // If mode is changing but visual hasn't caught up, show overlay immediately
     // This runs synchronously with the prop change, before effects
     if (isLayoutEditMode !== visualEditMode) return 1;
+    if (isLayerLayoutEditMode !== visualLayerEditMode) return 1;
 
     // During fade-in phases (after camera jump), fade out the overlay
     if (transitionPhase === 'edit' && editSceneOpacity < 1) return 1 - editSceneOpacity;
     if (transitionPhase === 'normal' && normalSceneOpacity < 1) return 1 - normalSceneOpacity;
+    if (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) return 1 - layerEditSceneOpacity;
+    if (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1) return 1 - layerNormalSceneOpacity;
     return 0;
   });
 
@@ -344,6 +399,101 @@
       const t = Math.min(fadeProgress, 1);
       const easeT = 1 - Math.pow(1 - t, 2);
       normalSceneOpacity = easeT;
+    }
+  });
+
+  // Track previous layer edit mode state to detect transitions
+  let wasInLayerEditMode = $state(false);
+
+  // Layer edit mode center (center of print bed / game container)
+  let layerEditModeCenter = $derived.by(() => ({
+    x: 0,
+    z: printBedSize / 2
+  }));
+
+  // Start layer edit mode fade transition
+  $effect(() => {
+    const currentLayerEditMode = isLayerLayoutEditMode;
+
+    untrack(() => {
+      if (!camera.current) return;
+      const cam = camera.current as THREE.PerspectiveCamera;
+
+      if (currentLayerEditMode && !wasInLayerEditMode) {
+        // Entering layer edit mode - start fading out normal scene
+        savedLayerCameraPosition = cam.position.clone();
+        savedLayerCameraTarget = new THREE.Vector3(0, 0, printBedSize / 2);
+        layerTransitionPhase = 'fading-to-edit';
+        layerFadeProgress = 0;
+      } else if (!currentLayerEditMode && wasInLayerEditMode) {
+        // Exiting layer edit mode - start fading out edit scene
+        layerTransitionPhase = 'fading-to-normal';
+        layerFadeProgress = 0;
+      }
+
+      wasInLayerEditMode = currentLayerEditMode;
+    });
+  });
+
+  // Layer edit mode fade transition animation task
+  useTask((delta) => {
+    if (layerTransitionPhase === 'normal' || layerTransitionPhase === 'edit') return;
+    if (!camera.current) return;
+
+    const cam = camera.current as THREE.PerspectiveCamera;
+    layerFadeProgress += delta / FADE_DURATION;
+    const t = Math.min(layerFadeProgress, 1);
+    const easeT = 1 - Math.pow(1 - t, 2);
+
+    if (layerTransitionPhase === 'fading-to-edit') {
+      if (layerFadeProgress < 1) {
+        layerNormalSceneOpacity = 1 - easeT;
+        layerEditSceneOpacity = 0;
+      } else {
+        layerNormalSceneOpacity = 0;
+
+        // Position camera above game container center
+        const editModeHeight = Math.max(printBedSize * 1.5, 400);
+        cam.position.set(layerEditModeCenter.x, editModeHeight, layerEditModeCenter.z + 0.01);
+        cam.lookAt(layerEditModeCenter.x, 0, layerEditModeCenter.z);
+
+        layerFadeProgress = 0;
+        layerEditSceneOpacity = 0;
+        layerTransitionPhase = 'edit';
+      }
+    } else if (layerTransitionPhase === 'fading-to-normal') {
+      if (layerFadeProgress < 1) {
+        layerEditSceneOpacity = 1 - easeT;
+        layerNormalSceneOpacity = 0;
+      } else {
+        layerEditSceneOpacity = 0;
+
+        if (savedLayerCameraPosition && savedLayerCameraTarget) {
+          cam.position.copy(savedLayerCameraPosition);
+          cam.lookAt(savedLayerCameraTarget);
+        }
+
+        savedLayerCameraPosition = null;
+        savedLayerCameraTarget = null;
+        layerFadeProgress = 0;
+        layerNormalSceneOpacity = 0;
+        layerTransitionPhase = 'normal';
+      }
+    }
+  });
+
+  // Layer edit mode fade-in task
+  useTask((delta) => {
+    if (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) {
+      layerFadeProgress += delta / FADE_DURATION;
+      const t = Math.min(layerFadeProgress, 1);
+      const easeT = 1 - Math.pow(1 - t, 2);
+      layerEditSceneOpacity = easeT;
+    } else if (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1) {
+      layerFadeProgress += delta / FADE_DURATION;
+      const t = Math.min(layerFadeProgress, 1);
+      const easeT = 1 - Math.pow(1 - t, 2);
+      layerNormalSceneOpacity = easeT;
     }
   });
 
@@ -718,9 +868,13 @@
   // Get live tray color from project store (for reactive updates)
   function getTrayColor(trayId: string, fallbackIndex: number): string {
     const project = getProject();
-    for (const box of project.boxes) {
-      const tray = box.trays.find((t) => t.id === trayId);
-      if (tray?.color) return tray.color;
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        const tray = box.trays.find((t) => t.id === trayId);
+        if (tray?.color) return tray.color;
+      }
+      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+      if (looseTray?.color) return looseTray.color;
     }
     return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
   }
@@ -731,13 +885,23 @@
     transitionPhase === 'fading-to-edit' ||
     transitionPhase === 'fading-to-normal' ||
     (transitionPhase === 'edit' && editSceneOpacity < 1) ||
-    (transitionPhase === 'normal' && normalSceneOpacity < 1)}
+    (transitionPhase === 'normal' && normalSceneOpacity < 1) ||
+    layerTransitionPhase === 'fading-to-edit' ||
+    layerTransitionPhase === 'fading-to-normal' ||
+    (layerTransitionPhase === 'edit' && layerEditSceneOpacity < 1) ||
+    (layerTransitionPhase === 'normal' && layerNormalSceneOpacity < 1)}
+  {@const anyEditMode = visualEditMode || visualLayerEditMode}
+  {@const editTarget: [number, number, number] = visualLayerEditMode
+    ? [layerEditModeCenter.x, 0, layerEditModeCenter.z]
+    : visualEditMode
+      ? [editModeCenter.x, 0, editModeCenter.z]
+      : [0, 0, printBedSize / 2]}
   <OrbitControls
-    target={visualEditMode ? [editModeCenter.x, 0, editModeCenter.z] : [0, 0, printBedSize / 2]}
+    target={editTarget}
     enableDamping={!isTransitioning}
     enabled={!isTransitioning}
-    enableRotate={!visualEditMode && !isTransitioning}
-    enablePan={!visualEditMode && !isTransitioning}
+    enableRotate={!anyEditMode && !isTransitioning}
+    enablePan={!anyEditMode && !isTransitioning}
     enableZoom={!isTransitioning}
   />
   <!-- Fade overlay - positioned in front of camera, fades to black during transitions -->
@@ -757,8 +921,8 @@
 
 <SceneLighting preset="default" />
 
-<!-- Background grid for multi-box view (subtle, at world origin for alignment) -->
-{#if showAllBoxes && !hidePrintBed}
+<!-- Background grid for multi-box/all-layers view (subtle, at world origin for alignment) -->
+{#if (showAllBoxes || showAllLayers) && !hidePrintBed}
   <Grid
     position.y={-0.51}
     cellColor="#2a2a2a"
@@ -789,17 +953,12 @@
 {/if}
 
 <!-- Multi-box view: All boxes arranged side by side with their own bed planes -->
-{#if !generating && showAllBoxes && allBoxes.length > 0}
+{#if !generating && showAllBoxes && !showAllLayers && allBoxes.length > 0}
   {#each allBoxes as boxData, boxIndex (boxData.boxId)}
     {@const boxPos = boxPositions[boxIndex]}
-    {@const boxWidth = boxData.boxDimensions.width}
-    {@const boxDepth = boxData.boxDimensions.depth}
     {@const xOffset = boxPos?.x ?? 0}
     {@const zOffset = printBedSize / 2}
-    <!-- Compute geometry bounds for proper centering -->
-    {@const boxGeomBounds = boxData.boxGeometry ? getGeomBounds(boxData.boxGeometry) : null}
-    {@const boxCenterX = boxGeomBounds ? -(boxGeomBounds.max.x + boxGeomBounds.min.x) / 2 : -boxWidth / 2}
-    {@const boxCenterZ = boxGeomBounds ? (boxGeomBounds.max.y + boxGeomBounds.min.y) / 2 : boxDepth / 2}
+    {@const cumulativeTrayIdx = allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0)}
 
     <!-- Print bed for this box -->
     <PrintBed
@@ -809,178 +968,148 @@
       position={[xOffset, 0, zOffset]}
     />
 
-    <!-- Box geometry (without lid) -->
-    {#if boxData.boxGeometry}
-      <T.Mesh
-        geometry={boxData.boxGeometry}
-        rotation.x={-Math.PI / 2}
-        position.x={xOffset + boxCenterX}
-        position.y={0}
-        position.z={zOffset + boxCenterZ}
-        onclick={() => onTrayClick?.(null)}
-      >
-        <T.MeshStandardMaterial color="#333333" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
-      </T.Mesh>
-    {/if}
-
-    <!-- Trays inside this box - using T.Group so counters rotate with tray -->
-    {#each boxData.trayGeometries as trayData, trayIndex (trayData.trayId)}
-      {@const placement = trayData.placement}
-      {@const isRotated = placement.rotated}
-      {@const groupX =
-        xOffset +
-        boxCenterX +
-        (boxGeomBounds?.min.x ?? 0) +
-        boxWallThickness +
-        boxTolerance +
-        placement.x +
-        (isRotated ? placement.dimensions.width : 0)}
-      {@const groupZ =
-        zOffset + boxCenterZ - (boxGeomBounds?.min.y ?? 0) - boxWallThickness - boxTolerance - placement.y}
-      {@const groupY = boxFloorThickness}
-      {@const cumulativeTrayIdx =
-        allBoxes.slice(0, boxIndex).reduce((sum, b) => sum + b.trayGeometries.length, 0) + trayIndex}
-      <T.Group position.x={groupX} position.y={groupY} position.z={groupZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
-        <T.Mesh
-          geometry={trayData.geometry}
-          rotation.x={-Math.PI / 2}
-          onclick={(e: IntersectionEvent<MouseEvent>) => {
-            e.stopPropagation();
-            const dims = trayData.placement.dimensions;
-            onTrayClick?.({
-              trayId: trayData.trayId,
-              name: trayData.name,
-              letter: trayData.trayLetter ?? getTrayLetter(cumulativeTrayIdx),
-              width: dims.width,
-              depth: dims.depth,
-              height: dims.height,
-              color: getTrayColor(trayData.trayId, trayIndex)
-            });
-          }}
-          ondblclick={() => {
-            if (!isLayoutEditMode) {
-              onTrayDoubleClick?.(trayData.trayId);
-            }
-          }}
-        >
-          <T.MeshStandardMaterial
-            color={getTrayColor(trayData.trayId, trayIndex)}
-            roughness={0.6}
-            metalness={0.1}
-            side={THREE.DoubleSide}
-          />
-        </T.Mesh>
-
-        <!-- Counter previews for this tray - positions are in tray-local coords (hidden in edit mode) -->
-        {#if showCounters && !isLayoutEditMode && trayData.counterStacks}
-          {#each trayData.counterStacks as stack, stackIdx (stackIdx)}
-            {#if stack.isEdgeLoaded}
-              {#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
-                {@const effectiveShape =
-                  stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
-                {@const standingHeight =
-                  stack.isCardDivider && stack.cardDividerHeight
-                    ? stack.cardDividerHeight
-                    : effectiveShape === 'triangle'
-                      ? stack.length
-                      : stack.shape === 'custom'
-                        ? Math.min(stack.width, stack.length)
-                        : Math.max(stack.width, stack.length)}
-                {@const counterY = stack.z + standingHeight / 2}
-                {@const isAlt = counterIdx % 2 === 1}
-                {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-                {@const triGeom =
-                  effectiveShape === 'triangle'
-                    ? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-                    : null}
-                {#if stack.edgeOrientation === 'lengthwise'}
-                  {@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
-                  {@const posX = stack.x + (counterIdx + 0.5) * counterSpacing}
-                  {@const posZ = -stack.y - (stack.slotDepth ?? stack.length) / 2}
-                  <CounterMesh
-                    shape={effectiveShape}
-                    {posX}
-                    posY={counterY}
-                    {posZ}
-                    width={stack.width}
-                    length={stack.length}
-                    thickness={stack.thickness}
-                    color={counterColor}
-                    hexPointyTop={stack.hexPointyTop}
-                    triangleGeometry={triGeom}
-                    isEdgeLoaded={true}
-                    edgeOrientation="lengthwise"
-                    {standingHeight}
-                  />
-                {:else}
-                  {@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
-                  {@const posX = stack.x + (stack.slotWidth ?? stack.length) / 2}
-                  {@const posZ = -stack.y - (counterIdx + 0.5) * counterSpacing}
-                  <CounterMesh
-                    shape={effectiveShape}
-                    {posX}
-                    posY={counterY}
-                    {posZ}
-                    width={stack.width}
-                    length={stack.length}
-                    thickness={stack.thickness}
-                    color={counterColor}
-                    hexPointyTop={stack.hexPointyTop}
-                    triangleGeometry={triGeom}
-                    isEdgeLoaded={true}
-                    edgeOrientation="crosswise"
-                    {standingHeight}
-                  />
-                {/if}
-              {/each}
-            {:else}
-              <!-- Top-loaded counters -->
-              {#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
-                {@const counterZ = stack.z + counterIdx * stack.thickness + stack.thickness / 2}
-                {@const posX = stack.x}
-                {@const posY = counterZ}
-                {@const posZ = -stack.y}
-                {@const isAlt = counterIdx % 2 === 1}
-                {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
-                {@const effectiveShape =
-                  stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
-                {@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
-                {@const sleeveColors = getSleeveColors(isAlt)}
-                {@const triGeom =
-                  effectiveShape === 'triangle'
-                    ? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
-                    : null}
-                <CounterMesh
-                  shape={effectiveShape}
-                  {posX}
-                  {posY}
-                  {posZ}
-                  width={stack.width}
-                  length={stack.length}
-                  thickness={stack.thickness}
-                  color={counterColor}
-                  hexPointyTop={stack.hexPointyTop}
-                  triangleGeometry={triGeom}
-                  isEdgeLoaded={false}
-                  slopeAngle={stack.slopeAngle ?? 0}
-                  rowAssignment={stack.rowAssignment}
-                  {isSleevedCard}
-                  innerWidth={stack.innerWidth}
-                  innerLength={stack.innerLength}
-                  sleeveColor={sleeveColors.sleeve}
-                  innerCardColor={sleeveColors.innerCard}
-                />
-              {/each}
-            {/if}
-          {/each}
-        {/if}
-      </T.Group>
-    {/each}
+    <!-- Box assembly (box + trays, no lid in this view) -->
+    <T.Group position.x={xOffset} position.y={0} position.z={zOffset}>
+      <BoxAssembly
+        boxGeometry={boxData.boxGeometry}
+        lidGeometry={null}
+        trayGeometries={boxData.trayGeometries}
+        boxDimensions={boxData.boxDimensions}
+        wallThickness={boxWallThickness}
+        tolerance={boxTolerance}
+        floorThickness={boxFloorThickness}
+        showCounters={showCounters && !isLayoutEditMode}
+        showLid={false}
+        {triangleCornerRadius}
+        {onTrayClick}
+        onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
+        trayIndexOffset={cumulativeTrayIdx}
+      />
+    </T.Group>
   {/each}
 {/if}
 
+<!-- All layers stacked view: Show all layers stacked vertically with dynamic separation -->
+{#if !generating && showAllLayers && allLayerArrangements.length > 0}
+  <!-- Calculate explosion phases: 0-50% = vertical separation, 50-100% = horizontal explosion -->
+  {@const verticalPhase = Math.min(allLayersExplosionAmount / 50, 1)}
+  {@const horizontalPhase = Math.max((allLayersExplosionAmount - 50) / 50, 0)}
+  {@const layerSeparation = 20 * verticalPhase}
+  <!-- Calculate layer Y offsets (stack from bottom to top) -->
+  {@const layerYOffsets = allLayerArrangements.reduce<number[]>((acc, _entry, i) => {
+    if (i === 0) {
+      acc.push(0);
+    } else {
+      const prevOffset = acc[i - 1];
+      const prevHeight = allLayerArrangements[i - 1].arrangement.layerHeight;
+      acc.push(prevOffset + prevHeight + layerSeparation);
+    }
+    return acc;
+  }, [])}
+
+  <!-- Print bed showing game container bounds -->
+  <PrintBed
+    width={gameContainerWidth}
+    depth={gameContainerDepth}
+    title={viewTitle}
+    position={[0, 0, printBedSize / 2]}
+  />
+
+  {#each allLayerArrangements as { layer, arrangement }, layerIndex (layer.id)}
+    {@const yOffset = layerYOffsets[layerIndex]}
+    {@const layerCount = allLayerArrangements.length}
+    {@const layerMultiplier = layerCount > 1 ? (layerIndex + 1) / layerCount : 1}
+    <T.Group position.y={yOffset}>
+      <LayerContent
+        boxPlacements={arrangement.boxes}
+        looseTrayPlacements={arrangement.looseTrays}
+        allBoxGeometries={allBoxes}
+        allLooseTrayGeometries={allLooseTrays}
+        {gameContainerWidth}
+        {gameContainerDepth}
+        {printBedSize}
+        wallThickness={boxWallThickness}
+        tolerance={boxTolerance}
+        floorThickness={boxFloorThickness}
+        showCounters={showCounters && !isLayoutEditMode}
+        showLid={true}
+        layerName={layer.name}
+        layerHeight={arrangement.layerHeight}
+        showLabel={true}
+        {labelQuaternion}
+        {monoFont}
+        {onTrayClick}
+        onTrayDoubleClick={isLayoutEditMode ? undefined : onTrayDoubleClick}
+        onBoxDoubleClick={isLayoutEditMode ? undefined : onBoxDoubleClick}
+        horizontalExplosion={horizontalPhase * layerMultiplier}
+      />
+    </T.Group>
+  {/each}
+{/if}
+
+<!-- Layer view: Boxes and loose trays arranged on game container -->
+{#if !generating && showLayerView}
+  <!-- Grid background for layer view (large, subtle) -->
+  <Grid
+    position.y={-0.51}
+    cellColor="#2a2a2a"
+    sectionColor="#5a3530"
+    sectionThickness={1}
+    cellSize={10}
+    sectionSize={50}
+    gridSize={[2000, 2000]}
+    fadeDistance={800}
+    fadeStrength={1}
+  />
+
+  <!-- Print bed showing game container bounds -->
+  <PrintBed
+    width={gameContainerWidth}
+    depth={gameContainerDepth}
+    title={viewTitle}
+    position={[0, 0, printBedSize / 2]}
+  />
+
+  {#if visualLayerEditMode}
+    <!-- Layer layout editor scene -->
+    <LayerLayoutEditorScene
+      allBoxGeometries={allBoxes}
+      allLooseTrayGeometries={allLooseTrays}
+      {gameContainerWidth}
+      {gameContainerDepth}
+      {boxWallThickness}
+      {boxTolerance}
+      {boxFloorThickness}
+      {printBedSize}
+    />
+  {:else}
+    <!-- Normal layer content -->
+    <LayerContent
+      boxPlacements={layerBoxPlacements}
+      looseTrayPlacements={layerLooseTrayPlacements}
+      allBoxGeometries={allBoxes}
+      allLooseTrayGeometries={allLooseTrays}
+      {gameContainerWidth}
+      {gameContainerDepth}
+      {printBedSize}
+      wallThickness={boxWallThickness}
+      tolerance={boxTolerance}
+      floorThickness={boxFloorThickness}
+      {showCounters}
+      showLid={true}
+      layerName={viewTitle}
+      showLabel={true}
+      {labelQuaternion}
+      {monoFont}
+      {onTrayClick}
+      {onTrayDoubleClick}
+      {onBoxDoubleClick}
+    />
+  {/if}
+{/if}
+
 <!-- Box geometry (single box view) - hidden during edit mode -->
-{#if !generating && boxGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && boxGeometry && !showAllBoxes && !showLayerView && !visualEditMode}
   {@const boxWidth = boxBounds ? boxBounds.max.x - boxBounds.min.x : 0}
   <T.Mesh
     geometry={boxGeometry}
@@ -1113,7 +1242,7 @@
       </T.Line>
     {/each}
     <!-- All trays with positions (when showAllTrays is true, single box view) -->
-  {:else if showAllTrays && !showAllBoxes && allTrays.length > 0}
+  {:else if showAllTrays && !showAllBoxes && !showLayerView && allTrays.length > 0}
     {@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
     {@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
     {@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
@@ -1158,7 +1287,7 @@
         </T.Mesh>
       </T.Group>
     {/each}
-  {:else if geometry}
+  {:else if geometry && !showLayerView}
     <!-- Single selected tray -->
     <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
@@ -1172,7 +1301,7 @@
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
-{#if !generating && lidGeometry && !showAllBoxes && !visualEditMode}
+{#if !generating && lidGeometry && !showAllBoxes && !showLayerView && !visualEditMode}
   {@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
   {@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}
   {@const lidDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
@@ -1210,7 +1339,7 @@
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
-{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {#each selectedTrayCounters as stack, stackIdx (stackIdx)}
     {#if !isCounterStack(stack)}
       <!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
@@ -1451,7 +1580,7 @@
   {/each}
 {/if}
 
-{#if !hidePrintBed && !showAllBoxes}
+{#if !hidePrintBed && !showAllBoxes && !showAllLayers && !showLayerView}
   <!-- Background grid for single box view (subtle) - hidden in edit mode -->
   {#if !visualEditMode}
     <Grid
@@ -1479,7 +1608,7 @@
 {/if}
 
 <!-- Reference labels for PDF capture - single tray view (hidden in edit mode) -->
-{#if showReferenceLabels && !isLayoutEditMode && !showAllTrays && !showAllBoxes && geometry && selectedTrayCounters.length > 0}
+{#if showReferenceLabels && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {@const counterStacks = selectedTrayCounters.filter(isCounterStack)}
   {@const cardStacks = selectedTrayCounters.filter((s): s is CardStack => !isCounterStack(s))}
   {@const counterMaxHeight =

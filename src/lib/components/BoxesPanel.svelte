@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
-  import type { Box, Project } from '$lib/types/project';
+  import type { Box } from '$lib/types/project';
+  import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
+  import { calculateLayerHeight } from '$lib/models/layer';
   import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
 
   interface Props {
-    project: Project;
     selectedBox: Box | null;
     onSelectBox: (box: Box) => void;
     onAddBox: () => void;
@@ -15,7 +16,45 @@
     hideList?: boolean;
   }
 
-  let { project, selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+
+  // Get all boxes from all layers
+  const allBoxes = $derived(getAllBoxes());
+
+  // Get layer options for move dropdown (includes "New Layer" option)
+  const layerOptions = $derived.by(() => {
+    const project = getProject();
+    const options = project.layers.map((layer) => ({
+      value: layer.id,
+      label: layer.name
+    }));
+    // Always add "New Layer" option
+    options.push({
+      value: 'new',
+      label: '+ New Layer'
+    });
+    return options;
+  });
+
+  // Get current layer for the selected box
+  const currentLayerId = $derived.by(() => {
+    if (!selectedBox) return '';
+    const project = getProject();
+    for (const layer of project.layers) {
+      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
+        return layer.id;
+      }
+    }
+    return '';
+  });
+
+  // Handle layer change (can be existing layer ID or 'new')
+  function handleLayerChange(layerId: string) {
+    if (!selectedBox) return;
+    // Allow 'new' or a different layer
+    if (layerId !== 'new' && layerId === currentLayerId) return;
+    moveBoxToLayer(selectedBox.id, layerId);
+  }
 
   // Get global card sizes and counter shapes (shared across all boxes)
   const customCardSizes = $derived(getCardSizes());
@@ -38,13 +77,32 @@
     selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
   );
 
+  // Get the layer height for the selected box's layer
+  const layerHeight = $derived.by(() => {
+    if (!selectedBox) return 0;
+    const project = getProject();
+    for (const layer of project.layers) {
+      if (layer.boxes.some((b) => b.id === selectedBox.id)) {
+        return calculateLayerHeight(layer, {
+          cardSizes: customCardSizes,
+          counterShapes: customCounterShapes
+        });
+      }
+    }
+    return 0;
+  });
+
+  // Natural box height (without layer adjustment)
+  const naturalBoxHeight = $derived(selectedBox ? (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight : 0);
+
   // Actual box dimensions (custom or auto-calculated)
+  // Height is adjusted to match layer height when box is in a layer with taller items
   const boxDimensions = $derived(
     selectedBox
       ? {
           width: selectedBox.customWidth ?? minimums.minWidth,
           depth: selectedBox.customDepth ?? minimums.minDepth,
-          height: (selectedBox.customBoxHeight ?? minimums.minHeight) + lidHeight
+          height: layerHeight > 0 ? Math.max(naturalBoxHeight, layerHeight) : naturalBoxHeight
         }
       : null
   );
@@ -61,7 +119,7 @@
         </IconButton>
       </div>
       <div class="panelListItems">
-        {#each project.boxes as box (box.id)}
+        {#each allBoxes as box (box.id)}
           <div
             class="listItem {selectedBox?.id === box.id ? 'listItem--selected' : ''}"
             onclick={() => onSelectBox(box)}
@@ -70,7 +128,7 @@
             onkeydown={(e) => e.key === 'Enter' && onSelectBox(box)}
           >
             <span style="overflow: hidden; text-overflow: ellipsis;">{box.name}</span>
-            {#if project.boxes.length > 1}
+            {#if allBoxes.length > 1}
               <IconButton
                 onclick={(e: MouseEvent) => {
                   e.stopPropagation();
@@ -100,6 +158,24 @@
               type="text"
               value={selectedBox.name}
               onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
+            />
+          {/snippet}
+        </FormControl>
+
+        <Spacer size="0.75rem" />
+
+        <!-- Move to Layer -->
+        <FormControl label="Layer" name="moveToLayer">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={currentLayerId ? [currentLayerId] : []}
+              options={layerOptions}
+              onSelectedChange={(selected) => {
+                if (selected[0]) {
+                  handleLayerChange(selected[0]);
+                }
+              }}
             />
           {/snippet}
         </FormControl>

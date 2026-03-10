@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -7,13 +7,15 @@
     getProject,
     getSelectedBox,
     getSelectedTray,
+    getSelectedLayer,
     updateBox,
     updateTray,
     updateTrayParams,
     updateCardTrayParams,
     updateCardDividerTrayParams,
     updateCupTrayParams,
-    getCumulativeTrayLetter,
+    updateLayer,
+    getTrayLetterById,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
@@ -21,6 +23,7 @@
     getGlobalSettings,
     updateGlobalSettings,
     type Box,
+    type Layer,
     type Tray
   } from '$lib/stores/project.svelte';
   import type { CounterTrayParams } from '$lib/models/counterTray';
@@ -29,8 +32,10 @@
   import type { CupTrayParams } from '$lib/models/cupTray';
   import { countCups } from '$lib/types/cupLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
+  import { getTrayDimensionsForTray } from '$lib/models/box';
+  import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
 
-  type SelectionType = 'dimensions' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
 
   interface Props {
     selectionType: SelectionType;
@@ -46,8 +51,15 @@
   let interiorDepth = $derived(layoutEditorState.boundsDepth);
 
   let project = $derived(getProject());
+  let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
   let selectedTray = $derived(getSelectedTray());
+
+  function handleLayerUpdate(updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>) {
+    if (selectedLayer) {
+      updateLayer(selectedLayer.id, updates);
+    }
+  }
 
   function handleBoxUpdate(updates: Partial<Omit<Box, 'id' | 'trays'>>) {
     if (selectedBox) {
@@ -70,8 +82,16 @@
 
   function handleCounterParamsChange(newParams: CounterTrayParams) {
     // Find any counter tray to update (for backwards compatibility with tray-specific params)
-    for (const box of project.boxes) {
-      for (const tray of box.trays) {
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          if (isCounterTray(tray)) {
+            updateTrayParams(tray.id, newParams);
+            return;
+          }
+        }
+      }
+      for (const tray of layer.looseTrays) {
         if (isCounterTray(tray)) {
           updateTrayParams(tray.id, newParams);
           return;
@@ -130,14 +150,10 @@
       isCards = true;
     }
 
-    let letter = 'A';
     const project = getProject();
-    if (selectedBox) {
-      const boxIdx = project.boxes.findIndex((b) => b.id === selectedBox.id);
-      const trayIdx = selectedBox.trays.findIndex((t) => t.id === tray.id);
-      if (boxIdx >= 0 && trayIdx >= 0) {
-        letter = getCumulativeTrayLetter(project.boxes, boxIdx, trayIdx);
-      }
+    let letter = getTrayLetterById(project.layers, tray.id);
+    if (!letter) {
+      letter = 'A';
     }
     return { stacks, counters, letter, isCards, isCups };
   }
@@ -146,6 +162,8 @@
     switch (selectionType) {
       case 'dimensions':
         return 'Dimensions';
+      case 'layer':
+        return selectedLayer?.name ?? 'Layer';
       case 'box':
         return selectedBox?.name ?? 'Box';
       case 'tray':
@@ -161,7 +179,11 @@
       <Title as="h2" size="sm">
         {panelTitle}
       </Title>
-      {#if selectionType === 'box' && selectedBox}
+      {#if selectionType === 'layer' && selectedLayer}
+        {@const boxCount = selectedLayer.boxes.length}
+        {@const looseCount = selectedLayer.looseTrays.length}
+        <span class="headerStats">{boxCount} {boxCount === 1 ? 'box' : 'boxes'}, {looseCount} loose</span>
+      {:else if selectionType === 'box' && selectedBox}
         <span class="headerStats">{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span>
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
@@ -196,10 +218,83 @@
         </div>
       {:else if selectionType === 'dimensions'}
         <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
+      {:else if selectionType === 'layer'}
+        {#if selectedLayer}
+          {@const cardSizes = project.cardSizes ?? []}
+          {@const counterShapes = project.counterShapes ?? []}
+          {@const layerHeight = calculateLayerHeight(selectedLayer, { cardSizes, counterShapes })}
+          <div class="layerSettings">
+            <div class="panelFormSection">
+              <FormControl label="Layer name" name="layerName">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="text"
+                    value={selectedLayer.name}
+                    onchange={(e) => handleLayerUpdate({ name: (e.target as HTMLInputElement).value })}
+                  />
+                {/snippet}
+              </FormControl>
+              <Spacer size="1rem" />
+              <Text size="0.875rem" color="fgMuted">
+                A <Text as="span" size="0.875rem" weight={600}>layer</Text>
+                represents a horizontal slice of your game container. When editing in the layout editor, you can drag and
+                drop boxes and trays to visualize them within a layer, but this has no impact on the print.
+              </Text>
+              <Spacer size="1rem" />
+              <Text size="0.875rem" color="fgMuted">
+                All boxes and loose trays in a layer are normalized to be the same height as the tallest tray. Trays
+                within a box will simlarly normalize to make sure the contents don't spill. If you are targeting
+                specific heights for a layer or box, please edit the stacks and heights individually in their child
+                trays.
+              </Text>
+              <Spacer size="1rem" />
+              <div class="layerContents">
+                <span class="contentsLabel">Layer content dimensions</span>
+                <div class="contentsTree">
+                  {#each selectedLayer.boxes as box (box.id)}
+                    {@const boxDims = getBoxDimensions(box, cardSizes, counterShapes)}
+                    {@const boxInteriorHeight = layerHeight - box.floorThickness}
+                    <div class="treeItem treeItem--box">
+                      <span class="treeItemName">{box.name}</span>
+                      <span class="treeItemDims">
+                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                      </span>
+                    </div>
+                    {#each box.trays as tray (tray.id)}
+                      {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
+                      <div class="treeItem treeItem--tray treeItem--nested">
+                        <span class="treeItemName">{tray.name}</span>
+                        <span class="treeItemDims">
+                          {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {boxInteriorHeight.toFixed(0)}
+                        </span>
+                      </div>
+                    {/each}
+                  {/each}
+                  {#each selectedLayer.looseTrays as tray (tray.id)}
+                    {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
+                    <div class="treeItem treeItem--looseTray">
+                      <span class="treeItemName">{tray.name}</span>
+                      <span class="treeItemDims">
+                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                      </span>
+                    </div>
+                  {/each}
+                  {#if selectedLayer.boxes.length === 0 && selectedLayer.looseTrays.length === 0}
+                    <div class="treeEmpty">No items in layer</div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No layer selected</p>
+          </div>
+        {/if}
       {:else if selectionType === 'box'}
         {#if selectedBox}
           <BoxesPanel
-            {project}
             {selectedBox}
             onSelectBox={() => {}}
             onAddBox={() => {}}
@@ -213,7 +308,7 @@
           </div>
         {/if}
       {:else if selectionType === 'tray'}
-        {#if selectedTray && selectedBox}
+        {#if selectedTray}
           <TraysPanel
             {selectedBox}
             {selectedTray}
@@ -330,5 +425,81 @@
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--fgMuted);
+  }
+
+  .layerSettings {
+    padding: 0.75rem 0;
+  }
+
+  .panelFormSection {
+    padding: 0 0.75rem;
+  }
+
+  .layerContents {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .contentsLabel {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .contentsTree {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background: var(--contrastLowest);
+    border-radius: var(--radius-2);
+  }
+
+  .treeItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+    border-radius: var(--radius-1);
+  }
+
+  .treeItem--box {
+    font-weight: 600;
+  }
+
+  .treeItem--nested {
+    margin-left: 1rem;
+    background: transparent;
+    border-left: 2px solid var(--borderColor);
+  }
+
+  .treeItem--looseTray {
+    background: transparent;
+  }
+
+  .treeItemName {
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .treeItemDims {
+    font-family: var(--font-mono);
+    color: var(--fgMuted);
+    font-size: 0.6875rem;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+  }
+
+  .treeEmpty {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    font-style: italic;
+    padding: 0.5rem;
   }
 </style>
