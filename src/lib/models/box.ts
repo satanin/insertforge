@@ -1,10 +1,11 @@
 import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { getCardDividerTrayDimensions } from './cardDividerTray';
 import { getCardDrawTrayDimensions } from './cardTray';
+import { getCardWellTrayDimensions } from './cardWellTray';
 import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
 
@@ -56,6 +57,9 @@ export function getTrayDimensionsForTray(
   }
   if (isCardDividerTray(tray)) {
     return getCardDividerTrayDimensions(tray.params, cardSizes);
+  }
+  if (isCardWellTray(tray)) {
+    return getCardWellTrayDimensions(tray.params, cardSizes);
   }
   if (isCardTray(tray)) {
     return getCardDrawTrayDimensions(tray.params, cardSizes);

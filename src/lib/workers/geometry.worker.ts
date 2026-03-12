@@ -13,6 +13,7 @@ import {
 } from '$lib/models/box';
 import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
 import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
+import { createCardWellTray, getCardWellPositions } from '$lib/models/cardWellTray';
 import {
   createCounterTray,
   getCounterPositions,
@@ -22,7 +23,7 @@ import {
 import { createCupTray } from '$lib/models/cupTray';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCupTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -302,6 +303,9 @@ function createTrayGeometry(
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
   }
+  if (isCardWellTray(tray)) {
+    return createCardWellTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight, showEmboss);
+  }
   if (isCardDividerTray(tray)) {
     const showStackLabels = tray.showStackLabels ?? true;
     return createCardDividerTray(
@@ -334,6 +338,26 @@ function getTrayPositions(
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
     return [];
+  }
+  if (isCardWellTray(tray)) {
+    // Convert card well positions to CounterStack format for visualization
+    const wellStacks = getCardWellPositions(tray.params, cardSizes, maxHeight, spacerHeight);
+    return wellStacks.map((stack) => ({
+      shape: 'custom' as const,
+      customShapeName: stack.label,
+      customBaseShape: 'rectangle' as const,
+      x: stack.x,
+      y: stack.y,
+      z: stack.z,
+      width: stack.width,
+      length: stack.length,
+      thickness: stack.thickness,
+      count: stack.count,
+      hexPointyTop: false,
+      color: '#5588aa',
+      innerWidth: stack.innerWidth,
+      innerLength: stack.innerLength
+    }));
   }
   if (isCardDividerTray(tray)) {
     // Convert CardDividerStackPosition to CounterStack format for visualization

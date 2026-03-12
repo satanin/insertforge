@@ -1,6 +1,7 @@
 import defaultProjectJson from '$lib/data/defaultProject.json';
 import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
+import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
 import {
   DEFAULT_CARD_SIZE_IDS,
   DEFAULT_SHAPE_IDS,
@@ -16,6 +17,7 @@ import type {
   CardDrawTray,
   CardSize,
   CardTray,
+  CardWellTray,
   CounterShape,
   CounterTray,
   CupTray,
@@ -31,19 +33,30 @@ import {
   isCardDividerTray,
   isCardDrawTray,
   isCardTray,
+  isCardWellTray,
   isCounterTray,
   isCupTray,
   isLooseTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
 
-export { findTrayLocation, isCardDividerTray, isCardDrawTray, isCardTray, isCounterTray, isCupTray, isLooseTray };
+export {
+  findTrayLocation,
+  isCardDividerTray,
+  isCardDrawTray,
+  isCardTray,
+  isCardWellTray,
+  isCounterTray,
+  isCupTray,
+  isLooseTray
+};
 export type {
   Box,
   CardDividerTray,
   CardDrawTray,
   CardSize,
   CardTray,
+  CardWellTray,
   CounterShape,
   CounterTray,
   CupTray,
@@ -298,6 +311,23 @@ function createDefaultCupTray(name: string, color: string): CupTray {
     color,
     rotationOverride: 'auto',
     params: { ...defaultCupTrayParams }
+  };
+}
+
+function createDefaultCardWellTray(name: string, color: string, cardSizes?: CardSize[]): CardWellTray {
+  const params = createDefaultCardWellTrayParams();
+  // Use the first available card size for the initial stack
+  const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+  if (params.stacks.length > 0) {
+    params.stacks[0].cardSizeId = cardSizeId;
+  }
+  return {
+    id: generateId(),
+    type: 'cardWell',
+    name,
+    color,
+    rotationOverride: 'auto',
+    params
   };
 }
 
@@ -559,6 +589,8 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
     tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
   } else if (trayType === 'cup') {
     tray = createDefaultCupTray('Cup Tray 1', color);
+  } else if (trayType === 'cardWell') {
+    tray = createDefaultCardWellTray('Card Well 1', color, project.cardSizes);
   } else {
     tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -657,7 +689,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card';
 
 // Loose tray operations
 export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
@@ -676,6 +708,8 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
     tray = createDefaultCardDividerTray(`Loose Divider ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'cup') {
     tray = createDefaultCupTray(`Loose Cups ${trayNumber}`, color);
+  } else if (trayType === 'cardWell') {
+    tray = createDefaultCardWellTray(`Loose Well ${trayNumber}`, color, project.cardSizes);
   } else {
     tray = createDefaultCounterTray(`Loose Tray ${trayNumber}`, color, project.counterShapes);
     // Inherit global params (including customShapes) from existing counter trays
@@ -732,6 +766,8 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
         tray = createDefaultCardDividerTray(`Card Divider ${trayNumber}`, color, project.cardSizes);
       } else if (trayType === 'cup') {
         tray = createDefaultCupTray(`Cup Tray ${trayNumber}`, color);
+      } else if (trayType === 'cardWell') {
+        tray = createDefaultCardWellTray(`Card Well ${trayNumber}`, color, project.cardSizes);
       } else {
         tray = createDefaultCounterTray(`Tray ${trayNumber}`, color, project.counterShapes);
         // Inherit global params (including customShapes) from existing counter trays
@@ -1084,6 +1120,26 @@ export function updateCupTrayParams(trayId: string, params: CupTrayParams): void
   }
 }
 
+// Update card well tray params
+export function updateCardWellTrayParams(trayId: string, params: CardWellTrayParams): void {
+  for (const layer of project.layers) {
+    for (const box of layer.boxes) {
+      const tray = box.trays.find((t) => t.id === trayId);
+      if (tray && isCardWellTray(tray)) {
+        tray.params = params;
+        autosave();
+        return;
+      }
+    }
+    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isCardWellTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
 // Reset project
 export function resetProject(): void {
   project = createDefaultProject();
@@ -1260,13 +1316,15 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   autosave();
 }
 
-// Move a tray from a box to loose (in the same or specified layer)
+// Move a tray from a box to loose, or move a loose tray to a different layer
 export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
   let sourceTray: Tray | null = null;
   let sourceBox: Box | null = null;
   let sourceLayer: Layer | null = null;
   let sourceIndex = -1;
+  let isLooseTray = false;
 
+  // First, check if tray is in a box
   for (const layer of project.layers) {
     for (const box of layer.boxes) {
       const trayIndex = box.trays.findIndex((t) => t.id === trayId);
@@ -1281,14 +1339,35 @@ export function moveTrayToLoose(trayId: string, targetLayerId?: string): void {
     if (sourceTray) break;
   }
 
-  if (!sourceTray || !sourceBox || !sourceLayer) return;
+  // If not found in a box, check loose trays
+  if (!sourceTray) {
+    for (const layer of project.layers) {
+      const looseIndex = layer.looseTrays.findIndex((t) => t.id === trayId);
+      if (looseIndex !== -1) {
+        sourceTray = layer.looseTrays[looseIndex];
+        sourceLayer = layer;
+        sourceIndex = looseIndex;
+        isLooseTray = true;
+        break;
+      }
+    }
+  }
+
+  if (!sourceTray || !sourceLayer) return;
 
   const targetLayer = targetLayerId ? (project.layers.find((l) => l.id === targetLayerId) ?? sourceLayer) : sourceLayer;
 
-  // Remove from source box
-  sourceBox.trays.splice(sourceIndex, 1);
+  // If already loose and moving to same layer, nothing to do
+  if (isLooseTray && targetLayer.id === sourceLayer.id) return;
 
-  // Add to loose trays
+  // Remove from source
+  if (isLooseTray) {
+    sourceLayer.looseTrays.splice(sourceIndex, 1);
+  } else if (sourceBox) {
+    sourceBox.trays.splice(sourceIndex, 1);
+  }
+
+  // Add to target layer's loose trays
   targetLayer.looseTrays.push(sourceTray);
 
   // Update selection
