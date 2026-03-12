@@ -147,6 +147,97 @@
   let captureTrayLetter = $state<string | null>(null); // Override during PDF export
   let debugExporting = $state(false);
 
+  // Debug mode URL params for Playwright capture
+  interface DebugParams {
+    debugMode: boolean;
+    cameraPreset?: string;
+    cameraPosition?: [number, number, number];
+    cameraLookAt?: [number, number, number];
+    cameraZoom: number;
+    debugMarkers: Array<{ name: string; pos: [number, number, number]; color: string }>;
+    hideUI: boolean;
+  }
+
+  let debugParams = $state<DebugParams>({
+    debugMode: false,
+    cameraZoom: 1,
+    debugMarkers: [],
+    hideUI: false
+  });
+
+  // Parse URL params for debug mode
+  $effect(() => {
+    if (!browser) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.get('debug') === '1';
+
+    if (debug) {
+      const angle = params.get('angle') || undefined;
+      const posStr = params.get('pos');
+      const lookAtStr = params.get('lookAt');
+      const zoomStr = params.get('zoom');
+      const markersStr = params.get('markers');
+      const hideUI = params.get('hideUI') === '1';
+
+      // Parse position "x,y,z"
+      let cameraPosition: [number, number, number] | undefined;
+      if (posStr) {
+        const parts = posStr.split(',').map(Number);
+        if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
+          cameraPosition = parts as [number, number, number];
+        }
+      }
+
+      // Parse lookAt "x,y,z"
+      let cameraLookAt: [number, number, number] | undefined;
+      if (lookAtStr) {
+        const parts = lookAtStr.split(',').map(Number);
+        if (parts.length === 3 && parts.every((n) => !isNaN(n))) {
+          cameraLookAt = parts as [number, number, number];
+        }
+      }
+
+      // Parse zoom
+      const cameraZoom = zoomStr ? parseFloat(zoomStr) : 1;
+
+      // Parse markers (base64 JSON)
+      let debugMarkers: Array<{ name: string; pos: [number, number, number]; color: string }> = [];
+      if (markersStr) {
+        try {
+          const decoded = atob(markersStr);
+          const parsed = JSON.parse(decoded);
+          // Convert object format to array format
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            debugMarkers = Object.entries(parsed).map(([name, value]) => {
+              const v = value as { pos: [number, number, number]; color: string };
+              return { name, pos: v.pos, color: v.color };
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to parse markers:', e);
+        }
+      }
+
+      debugParams = {
+        debugMode: true,
+        cameraPreset: angle,
+        cameraPosition,
+        cameraLookAt,
+        cameraZoom,
+        debugMarkers,
+        hideUI
+      };
+    } else {
+      debugParams = {
+        debugMode: false,
+        cameraZoom: 1,
+        debugMarkers: [],
+        hideUI: false
+      };
+    }
+  });
+
   // Initialize project from localStorage and fetch community projects
   $effect(() => {
     if (browser) {
@@ -593,7 +684,87 @@
         if (currentStateHash === hashAtGenerationStart) {
           isDirty = false;
         }
+
+        // Auto-save project.json in dev mode for Claude debugging
+        if (import.meta.env.DEV) {
+          saveProjectForDebug();
+        }
       }
+    }
+  }
+
+  /** Save project.json with computed layout for Claude debugging (dev only) */
+  async function saveProjectForDebug() {
+    try {
+      const project = getProject();
+
+      // Compute layer arrangements to get global positions
+      const layerArrangements = project.layers.map((layer) =>
+        arrangeLayerContents(layer, {
+          gameContainerWidth,
+          gameContainerDepth,
+          cardSizes: project.cardSizes || [],
+          counterShapes: project.counterShapes || []
+        })
+      );
+
+      const computedLayout = {
+        timestamp: new Date().toISOString(),
+        gameContainer: { width: gameContainerWidth, depth: gameContainerDepth },
+        layers: project.layers.map((layer, layerIdx) => {
+          const arrangement = layerArrangements[layerIdx];
+          return {
+            layerId: layer.id,
+            layerName: layer.name,
+            layerHeight: arrangement.layerHeight,
+            boxes: arrangement.boxes.map((bp) => {
+              const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
+              return {
+                boxId: bp.box.id,
+                boxName: bp.box.name,
+                x: bp.x,
+                y: bp.y,
+                width: bp.dimensions.width,
+                depth: bp.dimensions.depth,
+                height: bp.dimensions.height,
+                rotation: bp.rotation,
+                trays:
+                  boxGeom?.trayGeometries.map((t) => ({
+                    trayId: t.trayId,
+                    name: t.name,
+                    letter: t.trayLetter,
+                    x: t.placement.x,
+                    y: t.placement.y,
+                    width: t.placement.dimensions.width,
+                    depth: t.placement.dimensions.depth
+                  })) ?? []
+              };
+            }),
+            looseTrays: arrangement.looseTrays.map((ltp) => {
+              const looseGeom = allLooseTrayGeometries.find((lg) => lg.trayId === ltp.tray.id);
+              return {
+                trayId: ltp.tray.id,
+                name: ltp.tray.name,
+                letter: looseGeom?.trayLetter ?? '?',
+                x: ltp.x,
+                y: ltp.y,
+                width: ltp.dimensions.width,
+                depth: ltp.dimensions.depth,
+                rotation: ltp.rotation
+              };
+            })
+          };
+        })
+      };
+
+      await fetch('/api/debug/save-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project, computedLayout })
+      });
+    } catch (e) {
+      // Silently ignore - this is just for debugging convenience
+      console.debug('[Debug Save] Failed:', e);
     }
   }
 
@@ -1082,7 +1253,7 @@
     const loadingToast = addToast({
       data: {
         title: 'Debug export',
-        body: 'Analyzing geometry...',
+        body: 'Exporting files...',
         type: 'info'
       }
     });
@@ -1114,31 +1285,77 @@
         stls[`tray_${trayData.trayLetter}_${trayData.name}`] = toBase64(data);
       }
 
-      // Build context with all tray info including counter stacks
-      const context = {
-        box_name: box?.name ?? '(loose tray)',
-        box_id: box?.id ?? null,
-        is_loose_tray: isLoose,
-        selected_tray_name: tray.name,
-        selected_tray_id: tray.id,
-        selected_tray_letter: selectedTrayLetter,
-        trays: allTrayGeometries.map((t) => ({
-          name: t.name,
-          letter: t.trayLetter,
-          id: t.trayId,
-          placement: t.placement,
-          stacks: t.counterStacks.map((stack, idx) => ({
-            ref: `${t.trayLetter}${idx + 1}`,
-            shape: stack.shape === 'custom' ? stack.customShapeName : stack.shape,
-            count: stack.count,
-            x: Math.round(stack.x * 10) / 10,
-            y: Math.round(stack.y * 10) / 10,
-            width: stack.width,
-            length: stack.length,
-            isEdgeLoaded: stack.isEdgeLoaded || false,
-            label: stack.label
-          }))
-        }))
+      // Compute layer arrangements to get global positions
+      const layerArrangements = project.layers.map((layer) =>
+        arrangeLayerContents(layer, {
+          gameContainerWidth,
+          gameContainerDepth,
+          cardSizes: project.cardSizes || [],
+          counterShapes: project.counterShapes || []
+        })
+      );
+
+      // Build computed layout with global positions for ALL items
+      const computedLayout = {
+        timestamp: new Date().toISOString(),
+        selectedBoxId: box?.id ?? null,
+        selectedTrayId: tray.id,
+        gameContainer: {
+          width: gameContainerWidth,
+          depth: gameContainerDepth
+        },
+        layers: project.layers.map((layer, layerIdx) => {
+          const arrangement = layerArrangements[layerIdx];
+          return {
+            layerId: layer.id,
+            layerName: layer.name,
+            layerHeight: arrangement.layerHeight,
+            boxes: arrangement.boxes.map((bp) => {
+              const boxGeom = allBoxGeometries.find((bg) => bg.boxId === bp.box.id);
+              const interiorWidth = bp.dimensions.width - bp.box.wallThickness * 2;
+              const interiorDepth = bp.dimensions.depth - bp.box.wallThickness * 2;
+              return {
+                boxId: bp.box.id,
+                boxName: bp.box.name,
+                x: bp.x,
+                y: bp.y,
+                width: bp.dimensions.width,
+                depth: bp.dimensions.depth,
+                height: bp.dimensions.height,
+                rotation: bp.rotation,
+                interior: { width: interiorWidth, depth: interiorDepth },
+                trays:
+                  boxGeom?.trayGeometries.map((t) => ({
+                    trayId: t.trayId,
+                    name: t.name,
+                    letter: t.trayLetter,
+                    color: t.color,
+                    xInBox: t.placement.x,
+                    yInBox: t.placement.y,
+                    width: t.placement.dimensions.width,
+                    depth: t.placement.dimensions.depth,
+                    height: t.placement.dimensions.height,
+                    rotated: t.placement.rotated
+                  })) ?? []
+              };
+            }),
+            looseTrays: arrangement.looseTrays.map((ltp) => {
+              const looseGeom = allLooseTrayGeometries.find((lg) => lg.trayId === ltp.tray.id);
+              return {
+                trayId: ltp.tray.id,
+                name: ltp.tray.name,
+                letter: looseGeom?.trayLetter ?? '?',
+                color: ltp.tray.color,
+                x: ltp.x,
+                y: ltp.y,
+                width: ltp.dimensions.width,
+                depth: ltp.dimensions.depth,
+                height: ltp.dimensions.height,
+                rotation: ltp.rotation
+              };
+            })
+          };
+        })
       };
 
       // Capture Three.js screenshot if available (use current camera view)
@@ -1164,7 +1381,7 @@
         body: JSON.stringify({
           project,
           stls,
-          context,
+          computedLayout,
           screenshot
         })
       });
@@ -1662,11 +1879,18 @@
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
               {generating}
+              debugMode={debugParams.debugMode}
+              cameraPreset={debugParams.cameraPreset}
+              cameraPosition={debugParams.cameraPosition}
+              cameraLookAt={debugParams.cameraLookAt}
+              cameraZoom={debugParams.cameraZoom}
+              debugMarkers={debugParams.debugMarkers}
+              hideUI={debugParams.hideUI}
             />
           {/await}
         {/if}
 
-        {#if generating}
+        {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
@@ -1790,7 +2014,7 @@
                       isLoading={debugExporting}
                       style="width: 100%; justify-content: flex-start;"
                     >
-                      {debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+                      {debugExporting ? 'Exporting...' : 'Debug for Claude'}
                     </Button>
                   {/if}
                   <Hr />
@@ -1843,15 +2067,17 @@
   </PaneGroup>
 {:else}
   <!-- DESKTOP LAYOUT: PaneGroup with resizable panels -->
-  <NavigationMenu
-    {selectionType}
-    onSelectionChange={handleSelectionChange}
-    onExpandPanel={handleExpandPanel}
-    {isMobile}
-  />
+  {#if !debugParams.hideUI}
+    <NavigationMenu
+      {selectionType}
+      onSelectionChange={handleSelectionChange}
+      onExpandPanel={handleExpandPanel}
+      {isMobile}
+    />
+  {/if}
 
   <PaneGroup direction="horizontal" class="paneGroup">
-    <Pane defaultSize={75} minSize={30}>
+    <Pane defaultSize={debugParams.hideUI ? 100 : 75} minSize={30}>
       <main class="mainView">
         {#if browser}
           {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
@@ -1891,18 +2117,25 @@
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
               {generating}
+              debugMode={debugParams.debugMode}
+              cameraPreset={debugParams.cameraPreset}
+              cameraPosition={debugParams.cameraPosition}
+              cameraLookAt={debugParams.cameraLookAt}
+              cameraZoom={debugParams.cameraZoom}
+              debugMarkers={debugParams.debugMarkers}
+              hideUI={debugParams.hideUI}
             />
           {/await}
         {/if}
 
-        {#if generating}
+        {#if generating && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingText">Generating geometry...</div>
           </div>
         {/if}
 
-        {#if viewMode === 'layer' && !generating}
+        {#if viewMode === 'layer' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             <LayerLayoutEditorOverlay
               onEnterEdit={handleEnterLayerLayoutEdit}
@@ -1915,7 +2148,7 @@
           </div>
         {/if}
 
-        {#if viewMode === 'all-no-lid' && !generating}
+        {#if viewMode === 'all-no-lid' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             <div class="sliderContainer">
               <span class="sliderLabel">Explode</span>
@@ -1924,7 +2157,7 @@
           </div>
         {/if}
 
-        {#if (viewMode === 'exploded' || viewMode === 'all') && !generating}
+        {#if (viewMode === 'exploded' || viewMode === 'all') && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             {#if viewMode === 'exploded' && !isLayoutEditMode}
               <div class="sliderContainer">
@@ -1943,129 +2176,131 @@
           </div>
         {/if}
 
-        <div class="bottomToolbar">
-          <input
-            bind:this={jsonFileInput}
-            type="file"
-            accept=".json"
-            onchange={handleImportJson}
-            style="display: none;"
-          />
-          <Popover positioning={{ placement: 'top-start' }}>
-            {#snippet trigger()}
-              <Button variant="special">
-                Import / Export
-                <Icon Icon={IconChevronDown} />
-              </Button>
-            {/snippet}
-            {#snippet content()}
-              <div class="popoverMenu">
-                {#if communityProjects.length > 0}
-                  <FormControl label="Load community project" name="communityProject">
-                    {#snippet input({ inputProps })}
-                      <Select
-                        selected={[]}
-                        options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
-                        onSelectedChange={(selected) => {
-                          const project = communityProjects.find((p) => p.id === selected[0]);
-                          if (project) {
-                            loadCommunityProject(project);
-                          }
-                        }}
-                        {...inputProps}
-                      />
-                    {/snippet}
-                  </FormControl>
-                  <Hr />
-                {/if}
-                <Button
-                  variant="ghost"
-                  onclick={() => jsonFileInput?.click()}
-                  style="width: 100%; justify-content: flex-start;"
-                >
-                  Import project JSON
+        {#if !debugParams.hideUI}
+          <div class="bottomToolbar">
+            <input
+              bind:this={jsonFileInput}
+              type="file"
+              accept=".json"
+              onchange={handleImportJson}
+              style="display: none;"
+            />
+            <Popover positioning={{ placement: 'top-start' }}>
+              {#snippet trigger()}
+                <Button variant="special">
+                  Import / Export
+                  <Icon Icon={IconChevronDown} />
                 </Button>
-                <Button variant="ghost" onclick={handleExportJson} style="width: 100%; justify-content: flex-start;">
-                  Export project JSON
-                </Button>
-                <Hr />
-                <Button
-                  variant="ghost"
-                  onclick={handleExportAll}
-                  disabled={generating ||
-                    exportingStl ||
-                    (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
-                  isLoading={exportingStl}
-                  style="width: 100%; justify-content: flex-start;"
-                >
-                  {exportingStl ? exportStlProgress : 'Export STLs'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onclick={handleExport3mf}
-                  disabled={generating ||
-                    exporting3mf ||
-                    (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
-                  isLoading={exporting3mf}
-                  style="width: 100%; justify-content: flex-start;"
-                >
-                  {exporting3mf ? 'Generating 3MF...' : 'Export 3MF'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onclick={handleExportPdf}
-                  disabled={(getAllBoxes().length === 0 && getAllLooseTrays().length === 0) || exportingPdf}
-                  isLoading={exportingPdf}
-                  style="width: 100%; justify-content: flex-start;"
-                >
-                  {exportingPdf ? 'Generating PDF...' : 'PDF reference'}
-                </Button>
-                {#if import.meta.env.DEV}
+              {/snippet}
+              {#snippet content()}
+                <div class="popoverMenu">
+                  {#if communityProjects.length > 0}
+                    <FormControl label="Load community project" name="communityProject">
+                      {#snippet input({ inputProps })}
+                        <Select
+                          selected={[]}
+                          options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+                          onSelectedChange={(selected) => {
+                            const project = communityProjects.find((p) => p.id === selected[0]);
+                            if (project) {
+                              loadCommunityProject(project);
+                            }
+                          }}
+                          {...inputProps}
+                        />
+                      {/snippet}
+                    </FormControl>
+                    <Hr />
+                  {/if}
+                  <Button
+                    variant="ghost"
+                    onclick={() => jsonFileInput?.click()}
+                    style="width: 100%; justify-content: flex-start;"
+                  >
+                    Import project JSON
+                  </Button>
+                  <Button variant="ghost" onclick={handleExportJson} style="width: 100%; justify-content: flex-start;">
+                    Export project JSON
+                  </Button>
                   <Hr />
                   <Button
                     variant="ghost"
-                    onclick={handleDebugForClaude}
-                    disabled={!selectedTrayGeometry || debugExporting}
-                    isLoading={debugExporting}
+                    onclick={handleExportAll}
+                    disabled={generating ||
+                      exportingStl ||
+                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                    isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
-                    {debugExporting ? 'Analyzing...' : 'Debug for Claude'}
+                    {exportingStl ? exportStlProgress : 'Export STLs'}
                   </Button>
-                {/if}
-                <Hr />
-                <Button variant="danger" onclick={handleReset} style="width: 100%; justify-content: flex-start;">
-                  Clear current project
-                </Button>
+                  <Button
+                    variant="ghost"
+                    onclick={handleExport3mf}
+                    disabled={generating ||
+                      exporting3mf ||
+                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                    isLoading={exporting3mf}
+                    style="width: 100%; justify-content: flex-start;"
+                  >
+                    {exporting3mf ? 'Generating 3MF...' : 'Export 3MF'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onclick={handleExportPdf}
+                    disabled={(getAllBoxes().length === 0 && getAllLooseTrays().length === 0) || exportingPdf}
+                    isLoading={exportingPdf}
+                    style="width: 100%; justify-content: flex-start;"
+                  >
+                    {exportingPdf ? 'Generating PDF...' : 'PDF reference'}
+                  </Button>
+                  {#if import.meta.env.DEV}
+                    <Hr />
+                    <Button
+                      variant="ghost"
+                      onclick={handleDebugForClaude}
+                      disabled={!selectedTrayGeometry || debugExporting}
+                      isLoading={debugExporting}
+                      style="width: 100%; justify-content: flex-start;"
+                    >
+                      {debugExporting ? 'Exporting...' : 'Debug for Claude'}
+                    </Button>
+                  {/if}
+                  <Hr />
+                  <Button variant="danger" onclick={handleReset} style="width: 100%; justify-content: flex-start;">
+                    Clear current project
+                  </Button>
+                </div>
+              {/snippet}
+            </Popover>
+            {#if !isLayoutEditMode && !isLayerLayoutEditMode}
+              <div class="toolbarRight">
+                <InputCheckbox
+                  checked={showCounters}
+                  onchange={(e) => (showCounters = e.currentTarget.checked)}
+                  label="Preview counters"
+                />
+                <InputCheckbox
+                  checked={showReferenceLabels}
+                  onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
+                  label="Preview labels"
+                />
+                <span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
+                  <Button
+                    variant="primary"
+                    onclick={() => regenerate(true)}
+                    isDisabled={generating}
+                    isLoading={generating}
+                  >
+                    Regenerate
+                  </Button>
+                </span>
               </div>
-            {/snippet}
-          </Popover>
-          {#if !isLayoutEditMode && !isLayerLayoutEditMode}
-            <div class="toolbarRight">
-              <InputCheckbox
-                checked={showCounters}
-                onchange={(e) => (showCounters = e.currentTarget.checked)}
-                label="Preview counters"
-              />
-              <InputCheckbox
-                checked={showReferenceLabels}
-                onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
-                label="Preview labels"
-              />
-              <span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
-                <Button
-                  variant="primary"
-                  onclick={() => regenerate(true)}
-                  isDisabled={generating}
-                  isLoading={generating}
-                >
-                  Regenerate
-                </Button>
-              </span>
-            </div>
-          {/if}
-        </div>
+            {/if}
+          </div>
+        {/if}
 
-        {#if error}
+        {#if error && !debugParams.hideUI}
           <div class="errorBanner">
             {error}
           </div>
@@ -2073,29 +2308,31 @@
       </main>
     </Pane>
 
-    <PaneResizer class="resizer">
-      <button
-        class="resizer__handle"
-        aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-        title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
-        onclick={handleToggleCollapse}
-      >
-        <Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
-      </button>
-    </PaneResizer>
+    {#if !debugParams.hideUI}
+      <PaneResizer class="resizer">
+        <button
+          class="resizer__handle"
+          aria-label={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+          title={isEditorCollapsed ? 'Expand editor panel' : 'Collapse editor panel'}
+          onclick={handleToggleCollapse}
+        >
+          <Icon Icon={isEditorCollapsed ? IconChevronLeft : IconChevronRight} />
+        </button>
+      </PaneResizer>
 
-    <Pane
-      defaultSize={25}
-      minSize={15}
-      maxSize={50}
-      collapsible={true}
-      collapsedSize={0}
-      bind:this={editorPane}
-      onCollapse={() => (isEditorCollapsed = true)}
-      onExpand={() => (isEditorCollapsed = false)}
-    >
-      <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
-    </Pane>
+      <Pane
+        defaultSize={25}
+        minSize={15}
+        maxSize={50}
+        collapsible={true}
+        collapsedSize={0}
+        bind:this={editorPane}
+        onCollapse={() => (isEditorCollapsed = true)}
+        onExpand={() => (isEditorCollapsed = false)}
+      >
+        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+      </Pane>
+    {/if}
   </PaneGroup>
 {/if}
 
