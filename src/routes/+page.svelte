@@ -1937,7 +1937,7 @@
           </div>
         {/if}
 
-        {#if viewMode === 'all-no-lid' && !generating}
+        {#if viewMode === 'all-no-lid' && !generating && allLayerArrangements.length > 1}
           <div class="viewToolbar">
             <div class="sliderContainer">
               <span class="sliderLabel">Explode</span>
