@@ -1,22 +1,37 @@
 <script lang="ts">
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
-  import { IconX, IconPackage, IconRuler, IconStack2 } from '@tabler/icons-svelte';
+  import { IconX, IconPackage, IconRuler, IconStack2, IconRectangle } from '@tabler/icons-svelte';
   import { computePosition, offset, flip, shift } from '@floating-ui/dom';
   import { tick } from 'svelte';
   import TrayTypePreview from './TrayTypePreview.svelte';
   import {
     getProject,
     getSelectedBox,
+    getSelectedBoard,
+    getSelectedLayeredBox,
+    getSelectedLayeredBoxLayer,
+    getSelectedLayeredBoxSection,
     getSelectedTray,
     getSelectedLayer,
     selectBox,
+    selectBoard,
+    selectLayeredBox,
+    selectLayeredBoxLayer,
+    selectLayeredBoxSection,
     selectTray,
     selectLayer,
     addBox,
+    addBoard,
+    addLayeredBox,
+    addSectionToLayeredBoxLayer,
+    deleteLayerFromLayeredBox,
+    deleteSectionFromLayeredBoxLayer,
     deleteBox,
+    deleteLayeredBox,
     addTray,
     deleteTray,
     addLayer,
+    deleteBoard,
     deleteLayer,
     addLooseTray,
     deleteLooseTray,
@@ -25,15 +40,18 @@
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    type Board,
     type Box,
     type Layer,
+    type LayeredBox,
+    type LayeredBoxLayer,
     type Tray,
     type TrayType
   } from '$lib/stores/project.svelte';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
 
   interface Props {
     selectionType: SelectionType;
@@ -47,6 +65,10 @@
   let project = $derived(getProject());
   let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
+  let selectedBoard = $derived(getSelectedBoard());
+  let selectedLayeredBox = $derived(getSelectedLayeredBox());
+  let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
+  let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
   let selectedTray = $derived(getSelectedTray());
 
   // Hover preview state
@@ -101,6 +123,30 @@
     onExpandPanel();
   }
 
+  function handleBoardClick(board: Board) {
+    selectBoard(board.id);
+    onSelectionChange('board');
+    onExpandPanel();
+  }
+
+  function handleLayeredBoxClick(layeredBox: LayeredBox) {
+    selectLayeredBox(layeredBox.id);
+    onSelectionChange('layeredBox');
+    onExpandPanel();
+  }
+
+  function handleLayeredBoxLayerClick(layeredBox: LayeredBox, layer: LayeredBoxLayer) {
+    selectLayeredBoxLayer(layeredBox.id, layer.id);
+    onSelectionChange('layeredBoxLayer');
+    onExpandPanel();
+  }
+
+  function handleLayeredBoxSectionClick(layeredBox: LayeredBox, layer: LayeredBoxLayer, sectionId: string) {
+    selectLayeredBoxSection(layeredBox.id, layer.id, sectionId);
+    onSelectionChange('layeredBoxSection');
+    onExpandPanel();
+  }
+
   function handleTrayClick(tray: Tray, box: Box | null) {
     if (box) {
       selectBox(box.id);
@@ -120,6 +166,34 @@
     addBox(layerId, trayType);
     onSelectionChange('tray');
     onExpandPanel();
+  }
+
+  function handleAddBoard(layerId: string) {
+    addBoard(layerId);
+    onSelectionChange('board');
+    onExpandPanel();
+  }
+
+  function handleAddLayeredBox(layerId: string) {
+    addLayeredBox(layerId);
+    onSelectionChange('layeredBox');
+    onExpandPanel();
+  }
+
+  function handleAddLayeredBoxSection(layeredBox: LayeredBox, layer: LayeredBoxLayer, type: 'counter' | 'cardWell' | 'playerBoard') {
+    addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
+    onSelectionChange('layeredBoxSection');
+    onExpandPanel();
+  }
+
+  function handleDeleteLayeredBoxLayer(layeredBox: LayeredBox, layer: LayeredBoxLayer) {
+    deleteLayerFromLayeredBox(layeredBox.id, layer.id);
+    onSelectionChange('layeredBoxLayer');
+  }
+
+  function handleDeleteLayeredBoxSection(layeredBox: LayeredBox, layer: LayeredBoxLayer, sectionId: string) {
+    deleteSectionFromLayeredBoxLayer(layeredBox.id, layer.id, sectionId);
+    onSelectionChange(layer.sections.length <= 1 ? 'layeredBoxLayer' : 'layeredBoxSection');
   }
 
   function handleAddTray(boxId: string, trayType: TrayType) {
@@ -146,6 +220,20 @@
     deleteBox(boxId);
     // If we deleted the selected box, switch to layer view
     if (selectedBox?.id === boxId) {
+      onSelectionChange('layer');
+    }
+  }
+
+  function handleDeleteBoard(boardId: string) {
+    deleteBoard(boardId);
+    if (selectedBoard?.id === boardId) {
+      onSelectionChange('layer');
+    }
+  }
+
+  function handleDeleteLayeredBox(layeredBoxId: string) {
+    deleteLayeredBox(layeredBoxId);
+    if (selectedLayeredBox?.id === layeredBoxId) {
       onSelectionChange('layer');
     }
   }
@@ -244,7 +332,7 @@
   <div class="navTree">
     {#each project.layers as layer (layer.id)}
       {@const isLayerSelected = selectedLayer?.id === layer.id && selectionType === 'layer'}
-      {@const totalItems = layer.boxes.length + layer.looseTrays.length}
+      {@const totalItems = layer.boxes.length + layer.layeredBoxes.length + layer.looseTrays.length + layer.boards.length}
 
       <div class="navLayerGroup">
         <!-- Layer Item -->
@@ -456,6 +544,170 @@
             </div>
           {/each}
 
+          <!-- Layered Boxes within Layer -->
+          {#each layer.layeredBoxes as layeredBox (layeredBox.id)}
+            {@const isLayeredBoxSelected = selectedLayeredBox?.id === layeredBox.id && selectionType === 'layeredBox'}
+
+            <div class="navBoxGroup">
+              <button
+                class="navItem navItem--box {isLayeredBoxSelected ? 'navItem--selected' : ''}"
+                onclick={() => handleLayeredBoxClick(layeredBox)}
+              >
+                <span class="navItemIcon">
+                  <Icon Icon={IconPackage} size="1rem" />
+                </span>
+                <span class="navItemLabel">
+                  {layeredBox.name}
+                  <span class="looseBadge">layered</span>
+                </span>
+                {#if totalItems > 1}
+                  <span
+                    class="navItemDelete"
+                    role="none"
+                    onclick={(e) => e.stopPropagation()}
+                    onkeydown={(e) => e.stopPropagation()}
+                  >
+                    <ConfirmActionButton
+                      action={() => handleDeleteLayeredBox(layeredBox.id)}
+                      actionButtonText="Delete layered box"
+                      positioning={{ placement: 'right' }}
+                      portal=".appContainer"
+                    >
+                      {#snippet trigger({ triggerProps })}
+                        <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layered box">
+                          <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                        </IconButton>
+                      {/snippet}
+                      {#snippet actionMessage()}
+                        <p>Delete this layered box?</p>
+                      {/snippet}
+                    </ConfirmActionButton>
+                  </span>
+                {/if}
+              </button>
+
+              <div class="navTrayList">
+                {#each layeredBox.layers as layeredBoxLayer (layeredBoxLayer.id)}
+                  {@const isLayeredBoxLayerSelected = selectedLayeredBoxLayer?.id === layeredBoxLayer.id && selectionType === 'layeredBoxLayer'}
+                  <button
+                    class="navItem navItem--tray {isLayeredBoxLayerSelected ? 'navItem--selected' : ''}"
+                    onclick={() => handleLayeredBoxLayerClick(layeredBox, layeredBoxLayer)}
+                  >
+                    <span class="navItemLabel">
+                      <span class="trayLetter">L</span>
+                      {layeredBoxLayer.name}
+                    </span>
+                    {#if layeredBox.layers.length > 1}
+                      <span
+                        class="navItemDelete"
+                        role="none"
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => e.stopPropagation()}
+                      >
+                        <ConfirmActionButton
+                          action={() => handleDeleteLayeredBoxLayer(layeredBox, layeredBoxLayer)}
+                          actionButtonText="Delete internal layer"
+                          positioning={{ placement: 'right' }}
+                          portal=".appContainer"
+                        >
+                          {#snippet trigger({ triggerProps })}
+                            <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete internal layer">
+                              <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                            </IconButton>
+                          {/snippet}
+                          {#snippet actionMessage()}
+                            <p>Delete this internal layer?</p>
+                          {/snippet}
+                        </ConfirmActionButton>
+                      </span>
+                    {/if}
+                  </button>
+
+                  {#each layeredBoxLayer.sections as section (section.id)}
+                    {@const isLayeredBoxSectionSelected = selectedLayeredBoxSection?.id === section.id && selectionType === 'layeredBoxSection'}
+                    <button
+                      class="navItem navItem--looseTray {isLayeredBoxSectionSelected ? 'navItem--selected' : ''}"
+                      onclick={() => handleLayeredBoxSectionClick(layeredBox, layeredBoxLayer, section.id)}
+                    >
+                      <span class="navItemLabel">
+                        <span class="trayLetter">S</span>
+                        {section.name}
+                        <span class="looseBadge">{section.type}</span>
+                      </span>
+                      <span
+                        class="navItemDelete"
+                        role="none"
+                        onclick={(e) => e.stopPropagation()}
+                        onkeydown={(e) => e.stopPropagation()}
+                      >
+                        <ConfirmActionButton
+                          action={() => handleDeleteLayeredBoxSection(layeredBox, layeredBoxLayer, section.id)}
+                          actionButtonText="Delete section"
+                          positioning={{ placement: 'right' }}
+                          portal=".appContainer"
+                        >
+                          {#snippet trigger({ triggerProps })}
+                            <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete section">
+                              <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                            </IconButton>
+                          {/snippet}
+                          {#snippet actionMessage()}
+                            <p>Delete this section?</p>
+                          {/snippet}
+                        </ConfirmActionButton>
+                      </span>
+                    </button>
+                  {/each}
+
+                  <Popover
+                    positioning={{ placement: 'right-start' }}
+                    portal=".appContainer"
+                    contentClass="trayTypePopover"
+                  >
+                    {#snippet trigger()}
+                      <button class="navItem navItem--add navItem--tray">
+                        <span class="addIcon">+</span>
+                        <span class="addLabel">Add tray</span>
+                      </button>
+                    {/snippet}
+                    {#snippet content({ contentProps })}
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'counter');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Counter tray</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for tokens and counters</Text>
+                      </button>
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'cardWell');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Card well</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for flat stacks of cards</Text>
+                      </button>
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'playerBoard');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Player board</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for oversized player boards</Text>
+                      </button>
+                    {/snippet}
+                  </Popover>
+                {/each}
+              </div>
+            </div>
+          {/each}
+
           <!-- Loose Trays within Layer -->
           {#each layer.looseTrays as tray (tray.id)}
             {@const isTraySelected = selectedTray?.id === tray.id && selectionType === 'tray'}
@@ -500,6 +752,47 @@
                     {/snippet}
                     {#snippet actionMessage()}
                       <p>Delete this loose tray?</p>
+                    {/snippet}
+                  </ConfirmActionButton>
+                </span>
+              {/if}
+            </button>
+          {/each}
+
+          {#each layer.boards as board (board.id)}
+            {@const isBoardSelected = selectedBoard?.id === board.id && selectionType === 'board'}
+            <button
+              class="navItem navItem--looseTray {isBoardSelected ? 'navItem--selected' : ''}"
+              onclick={() => handleBoardClick(board)}
+              title="{board.name} ({board.width} × {board.depth} × {board.height}mm)"
+            >
+              <span class="navItemLabel">
+                <span class="navItemIcon">
+                  <Icon Icon={IconRectangle} size="1rem" />
+                </span>
+                {board.name}
+                <span class="looseBadge">board</span>
+              </span>
+              {#if totalItems > 1}
+                <span
+                  class="navItemDelete"
+                  role="none"
+                  onclick={(e) => e.stopPropagation()}
+                  onkeydown={(e) => e.stopPropagation()}
+                >
+                  <ConfirmActionButton
+                    action={() => handleDeleteBoard(board.id)}
+                    actionButtonText="Delete board"
+                    positioning={{ placement: 'right' }}
+                    portal=".appContainer"
+                  >
+                    {#snippet trigger({ triggerProps })}
+                      <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete board">
+                        <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                      </IconButton>
+                    {/snippet}
+                    {#snippet actionMessage()}
+                      <p>Delete this board?</p>
                     {/snippet}
                   </ConfirmActionButton>
                 </span>
@@ -578,6 +871,16 @@
               </button>
             {/snippet}
           </Popover>
+
+          <button class="navItem navItem--add navItem--looseTray" onclick={() => handleAddBoard(layer.id)}>
+            <span class="addIcon">+</span>
+            <span class="addLabel">Add board</span>
+          </button>
+
+          <button class="navItem navItem--add navItem--box" onclick={() => handleAddLayeredBox(layer.id)}>
+            <span class="addIcon">+</span>
+            <span class="addLabel">Add layered box</span>
+          </button>
 
           <!-- Add Loose Tray Button with Popover -->
           <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">

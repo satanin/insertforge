@@ -9,7 +9,7 @@
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import TrayInBox from './TrayInBox.svelte';
-  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
+  import type { BoardPlacement, BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { TrayPlacement } from '$lib/models/box';
   import type { CounterStack } from '$lib/models/counterTray';
   import { TRAY_COLORS, getProject } from '$lib/stores/project.svelte';
@@ -44,6 +44,37 @@
     trayLetter: string;
   }
 
+  interface LayeredBoxSectionGeometryData {
+    sectionId: string;
+    name: string;
+    type: 'counter' | 'cardWell' | 'playerBoard';
+    color: string;
+    geometry: THREE.BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    x: number;
+    y: number;
+    z: number;
+  }
+
+  interface LayeredBoxGeometryData {
+    internalLayers: Array<{
+      id: string;
+      geometry: THREE.BufferGeometry;
+      width: number;
+      depth: number;
+      height: number;
+      z: number;
+      color: string;
+    }>;
+    layeredBoxId: string;
+    proxyBoardId: string;
+    name: string;
+    color: string;
+    dimensions: { width: number; depth: number; height: number };
+    sections: LayeredBoxSectionGeometryData[];
+  }
+
   interface TrayClickInfo {
     trayId: string;
     name: string;
@@ -58,6 +89,8 @@
   interface Props {
     boxPlacements: BoxPlacement[];
     looseTrayPlacements: LooseTrayPlacement[];
+    boardPlacements: BoardPlacement[];
+    layeredBoxes: LayeredBoxGeometryData[];
     allBoxGeometries: BoxGeometryData[];
     allLooseTrayGeometries: LooseTrayGeometryData[];
     gameContainerWidth: number;
@@ -83,6 +116,8 @@
   let {
     boxPlacements,
     looseTrayPlacements,
+    boardPlacements,
+    layeredBoxes,
     allBoxGeometries,
     allLooseTrayGeometries,
     gameContainerWidth,
@@ -237,6 +272,65 @@
       font={monoFont}
       fontSize={6}
       position={[baseX, boxHeight + 5, baseZ]}
+      quaternion={labelQuaternion}
+      color="#ffffff"
+      anchorX="center"
+      anchorY="bottom"
+    />
+  {/if}
+{/each}
+
+<!-- Render visual-only boards -->
+{#each boardPlacements as boardPlacement (boardPlacement.board.id)}
+  {@const boardHeight = boardPlacement.dimensions.height}
+  {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
+  {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2}
+  {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2}
+  {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
+
+  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+    <T.Mesh position.y={boardHeight / 2}>
+      <T.BoxGeometry args={[boardPlacement.dimensions.width, boardHeight, boardPlacement.dimensions.depth]} />
+      <T.MeshStandardMaterial
+        color={boardPlacement.board.color}
+        roughness={0.9}
+        metalness={0.05}
+        transparent
+        opacity={layeredBoxGeometry ? 0.2 : 0.75}
+      />
+    </T.Mesh>
+
+    {#if layeredBoxGeometry}
+      {#each layeredBoxGeometry.internalLayers as internalLayer (internalLayer.id)}
+        <T.Group
+          position.x={-layeredBoxGeometry.dimensions.width / 2 + internalLayer.width / 2}
+          position.y={internalLayer.z}
+          position.z={layeredBoxGeometry.dimensions.depth / 2 - internalLayer.depth / 2}
+        >
+          <TrayInBox
+            geometry={internalLayer.geometry}
+            color={internalLayer.color}
+            counterStacks={[]}
+            showCounters={false}
+            trayId={internalLayer.id}
+            trayName={layeredBoxGeometry.name}
+            trayLetter="L"
+            onClick={onTrayClick}
+            width={internalLayer.width}
+            depth={internalLayer.depth}
+            height={internalLayer.height}
+          />
+        </T.Group>
+      {/each}
+    {/if}
+  </T.Group>
+
+  {#if showLabel}
+    <Text
+      text={boardPlacement.board.name}
+      font={monoFont}
+      fontSize={6}
+      position={[baseX, boardHeight + 5, baseZ]}
       quaternion={labelQuaternion}
       color="#ffffff"
       anchorX="center"

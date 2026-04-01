@@ -3,12 +3,26 @@
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
+  import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
+  import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
     getSelectedBox,
+    getSelectedBoard,
+    getSelectedLayeredBox,
+    getSelectedLayeredBoxLayer,
+    getSelectedLayeredBoxSection,
+    addSectionToLayeredBoxLayer,
+    deleteSectionFromLayeredBoxLayer,
     getSelectedTray,
     getSelectedLayer,
+    addLayerToLayeredBox,
+    deleteLayerFromLayeredBox,
+    updateBoard,
     updateBox,
+    updateLayeredBox,
+    updateLayeredBoxLayer,
+    updateLayeredBoxSection,
     updateTray,
     updateTrayParams,
     updateCardTrayParams,
@@ -24,8 +38,14 @@
     isCupTray,
     getGlobalSettings,
     updateGlobalSettings,
+    type Board,
     type Box,
     type Layer,
+    type LayeredBox,
+    type LayeredBoxLayer,
+    type LayeredBoxSection,
+    type LayeredBoxSectionType,
+    type CounterTray,
     type Tray
   } from '$lib/stores/project.svelte';
   import type { CounterTrayParams } from '$lib/models/counterTray';
@@ -39,7 +59,7 @@
   import { getTrayDimensionsForTray } from '$lib/models/box';
   import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
 
   interface Props {
     selectionType: SelectionType;
@@ -57,6 +77,10 @@
   let project = $derived(getProject());
   let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
+  let selectedBoard = $derived(getSelectedBoard());
+  let selectedLayeredBox = $derived(getSelectedLayeredBox());
+  let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
+  let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
   let selectedTray = $derived(getSelectedTray());
 
   function handleLayerUpdate(updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>) {
@@ -68,6 +92,58 @@
   function handleBoxUpdate(updates: Partial<Omit<Box, 'id' | 'trays'>>) {
     if (selectedBox) {
       updateBox(selectedBox.id, updates);
+    }
+  }
+
+  function handleBoardUpdate(updates: Partial<Omit<Board, 'id'>>) {
+    if (selectedBoard) {
+      updateBoard(selectedBoard.id, updates);
+    }
+  }
+
+  function handleLayeredBoxUpdate(updates: Partial<Omit<LayeredBox, 'id' | 'layers'>>) {
+    if (selectedLayeredBox) {
+      updateLayeredBox(selectedLayeredBox.id, updates);
+    }
+  }
+
+  function handleLayeredBoxLayerRename(name: string) {
+    if (selectedLayeredBox && selectedLayeredBoxLayer) {
+      updateLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, name);
+    }
+  }
+
+  function handleAddLayeredBoxLayer() {
+    if (selectedLayeredBox) {
+      addLayerToLayeredBox(selectedLayeredBox.id);
+    }
+  }
+
+  function handleDeleteSelectedLayeredBoxLayer() {
+    if (selectedLayeredBox && selectedLayeredBoxLayer) {
+      deleteLayerFromLayeredBox(selectedLayeredBox.id, selectedLayeredBoxLayer.id);
+    }
+  }
+
+  function handleAddLayeredBoxSection(type: LayeredBoxSectionType) {
+    if (selectedLayeredBox && selectedLayeredBoxLayer) {
+      addSectionToLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, type);
+    }
+  }
+
+  function handleLayeredBoxSectionUpdate(updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>) {
+    if (selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection) {
+      updateLayeredBoxSection(selectedLayeredBox.id, selectedLayeredBoxLayer.id, selectedLayeredBoxSection.id, updates);
+    }
+  }
+
+  function handleLayeredBoxSectionCounterParamsChange(newParams: CounterTrayParams) {
+    handleLayeredBoxSectionUpdate({ counterParams: newParams });
+  }
+
+  function handleDeleteSelectedLayeredBoxSection() {
+    if (selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection) {
+      deleteSectionFromLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, selectedLayeredBoxSection.id);
     }
   }
 
@@ -166,8 +242,16 @@
         return selectedLayer?.name ?? 'Layer';
       case 'box':
         return selectedBox?.name ?? 'Box';
+      case 'layeredBox':
+        return selectedLayeredBox?.name ?? 'Layered Box';
+      case 'layeredBoxLayer':
+        return selectedLayeredBoxLayer?.name ?? 'Layered Box Layer';
+      case 'layeredBoxSection':
+        return selectedLayeredBoxSection?.name ?? 'Layered Box Section';
       case 'tray':
         return selectedTray?.name ?? 'Tray';
+      case 'board':
+        return selectedBoard?.name ?? 'Board';
     }
   });
 </script>
@@ -180,11 +264,21 @@
         {panelTitle}
       </Title>
       {#if selectionType === 'layer' && selectedLayer}
-        {@const boxCount = selectedLayer.boxes.length}
-        {@const looseCount = selectedLayer.looseTrays.length}
+        {@const boxCount = selectedLayer.boxes.length + selectedLayer.layeredBoxes.length}
+        {@const looseCount = selectedLayer.looseTrays.length + selectedLayer.boards.length}
         <span class="headerStats">{boxCount} {boxCount === 1 ? 'box' : 'boxes'}, {looseCount} loose</span>
       {:else if selectionType === 'box' && selectedBox}
         <span class="headerStats">{selectedBox.trays.length} {selectedBox.trays.length === 1 ? 'tray' : 'trays'}</span>
+      {:else if selectionType === 'layeredBox' && selectedLayeredBox}
+        <span class="headerStats">{selectedLayeredBox.layers.length} {selectedLayeredBox.layers.length === 1 ? 'layer' : 'layers'}</span>
+      {:else if selectionType === 'layeredBoxLayer' && selectedLayeredBoxLayer}
+        <span class="headerStats">Part of {selectedLayeredBox?.name ?? 'layered box'}</span>
+      {:else if selectionType === 'layeredBoxSection' && selectedLayeredBoxSection}
+        <span class="headerStats">{selectedLayeredBoxSection.type}</span>
+      {:else if selectionType === 'board' && selectedBoard}
+        <span class="headerStats">
+          {selectedBoard.width} × {selectedBoard.depth} × {selectedBoard.height}mm
+        </span>
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
         <span class="headerStats">
@@ -271,6 +365,12 @@
                       </div>
                     {/each}
                   {/each}
+                  {#each selectedLayer.layeredBoxes as layeredBox (layeredBox.id)}
+                    <div class="treeItem treeItem--box">
+                      <span class="treeItemName">{layeredBox.name}</span>
+                      <span class="treeItemDims">{layeredBox.layers.length} {layeredBox.layers.length === 1 ? 'layer' : 'layers'}</span>
+                    </div>
+                  {/each}
                   {#each selectedLayer.looseTrays as tray (tray.id)}
                     {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
                     <div class="treeItem treeItem--looseTray">
@@ -280,7 +380,15 @@
                       </span>
                     </div>
                   {/each}
-                  {#if selectedLayer.boxes.length === 0 && selectedLayer.looseTrays.length === 0}
+                  {#each selectedLayer.boards as board (board.id)}
+                    <div class="treeItem treeItem--looseTray">
+                      <span class="treeItemName">{board.name}</span>
+                      <span class="treeItemDims">
+                        {board.width.toFixed(0)} × {board.depth.toFixed(0)} × {board.height.toFixed(0)}
+                      </span>
+                    </div>
+                  {/each}
+                  {#if selectedLayer.boxes.length === 0 && selectedLayer.layeredBoxes.length === 0 && selectedLayer.looseTrays.length === 0 && selectedLayer.boards.length === 0}
                     <div class="treeEmpty">No items in layer</div>
                   {/if}
                 </div>
@@ -305,6 +413,290 @@
         {:else}
           <div class="emptyState">
             <p>No box selected</p>
+          </div>
+        {/if}
+      {:else if selectionType === 'layeredBox'}
+        {#if selectedLayeredBox}
+          <div class="panelFormSection">
+            <FormControl label="Layered box name" name="layeredBoxName">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  value={selectedLayeredBox.name}
+                  onchange={(e) => handleLayeredBoxUpdate({ name: (e.target as HTMLInputElement).value })}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            <div class="formGrid">
+              <FormControl label="Tolerance" name="layeredBoxTolerance">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={selectedLayeredBox.tolerance}
+                    onchange={(e) =>
+                      handleLayeredBoxUpdate({
+                        tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+                      })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <FormControl label="Wall" name="layeredBoxWallThickness">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    value={selectedLayeredBox.wallThickness}
+                    onchange={(e) =>
+                      handleLayeredBoxUpdate({
+                        wallThickness: parseFloat((e.target as HTMLInputElement).value) || 3
+                      })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <FormControl label="Floor" name="layeredBoxFloorThickness">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    value={selectedLayeredBox.floorThickness}
+                    onchange={(e) =>
+                      handleLayeredBoxUpdate({
+                        floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2
+                      })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+            </div>
+            <Spacer size="1rem" />
+            <div class="layerContents">
+              <div class="sectionHeader">
+                <span class="contentsLabel">Internal layers</span>
+              </div>
+              <div class="contentsTree">
+                {#each selectedLayeredBox.layers as boxLayer (boxLayer.id)}
+                  <div class="treeItem treeItem--box">
+                    <span class="treeItemName">{boxLayer.name}</span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+            <Spacer size="1rem" />
+            <Text size="0.875rem" color="fgMuted">
+              Phase 1 only includes the layered box structure. Internal layer contents and geometry come next.
+            </Text>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No layered box selected</p>
+          </div>
+        {/if}
+      {:else if selectionType === 'layeredBoxLayer'}
+        {#if selectedLayeredBox && selectedLayeredBoxLayer}
+          <div class="panelFormSection">
+            <FormControl label="Layer name" name="layeredBoxLayerName">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  value={selectedLayeredBoxLayer.name}
+                  onchange={(e) => handleLayeredBoxLayerRename((e.target as HTMLInputElement).value)}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={handleAddLayeredBoxLayer}>Add internal layer</button>
+              <button
+                class="secondaryButton"
+                onclick={handleDeleteSelectedLayeredBoxLayer}
+                disabled={selectedLayeredBox.layers.length <= 1}
+              >
+                Delete layer
+              </button>
+            </div>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('counter')}>Add counter tray</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardWell')}>Add card well</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('playerBoard')}>Add player board</button>
+            </div>
+            <Spacer size="1rem" />
+            <div class="layerContents">
+              <span class="contentsLabel">Layer sections</span>
+              <div class="contentsTree">
+                {#if selectedLayeredBoxLayer.sections.length > 0}
+                  {#each selectedLayeredBoxLayer.sections as section (section.id)}
+                    <div class="treeItem treeItem--looseTray">
+                      <span class="treeItemName">{section.name}</span>
+                      <span class="treeItemDims">{section.type}</span>
+                    </div>
+                  {/each}
+                {:else}
+                  <div class="treeEmpty">No sections yet</div>
+                {/if}
+              </div>
+            </div>
+            <Spacer size="1rem" />
+            <Text size="0.875rem" color="fgMuted">
+              Sections can now be added to an internal layer. Geometry and parameter editing for these sections come next.
+            </Text>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No layered box layer selected</p>
+          </div>
+        {/if}
+      {:else if selectionType === 'layeredBoxSection'}
+        {#if selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection}
+          <div class="panelFormSection">
+            <FormControl label="Section name" name="layeredBoxSectionName">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  value={selectedLayeredBoxSection.name}
+                  onchange={(e) => handleLayeredBoxSectionUpdate({ name: (e.target as HTMLInputElement).value })}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={handleDeleteSelectedLayeredBoxSection}>Delete section</button>
+            </div>
+            <Spacer size="1rem" />
+            {#if (selectedLayeredBoxSection.type === 'counter' || selectedLayeredBoxSection.type === 'playerBoard') && selectedLayeredBoxSection.counterParams}
+              {@const virtualCounterTray = {
+                id: selectedLayeredBoxSection.id,
+                type: 'counter',
+                name: selectedLayeredBoxSection.name,
+                color: selectedLayeredBoxSection.color ?? '#c9503c',
+                rotationOverride: 'auto',
+                params: selectedLayeredBoxSection.counterParams
+              } satisfies CounterTray}
+              <CounterTrayEditor
+                tray={virtualCounterTray}
+                trayLetter="S"
+                onUpdateParams={handleLayeredBoxSectionCounterParamsChange}
+                displayDimensions={getTrayDimensions(selectedLayeredBoxSection.counterParams, project.counterShapes)}
+              />
+            {:else}
+              <Text size="0.875rem" color="fgMuted">
+                Editor for {selectedLayeredBoxSection.type} sections comes next. This iteration only wires up counter-style sections.
+              </Text>
+            {/if}
+          </div>
+        {:else if selectedLayeredBox && selectedLayeredBoxLayer}
+          <div class="panelFormSection">
+            <Text size="0.875rem" color="fgMuted">
+              This internal layer has no selected section. You can add a new section from here or delete the layer.
+            </Text>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('counter')}>Add counter tray</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardWell')}>Add card well</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('playerBoard')}>Add player board</button>
+            </div>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button
+                class="secondaryButton"
+                onclick={handleDeleteSelectedLayeredBoxLayer}
+                disabled={selectedLayeredBox.layers.length <= 1}
+              >
+                Delete layer
+              </button>
+            </div>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No layered box section selected</p>
+          </div>
+        {/if}
+      {:else if selectionType === 'board'}
+        {#if selectedBoard}
+          <div class="panelFormSection">
+            <FormControl label="Board name" name="boardName">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  value={selectedBoard.name}
+                  onchange={(e) => handleBoardUpdate({ name: (e.target as HTMLInputElement).value })}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            <div class="formGrid">
+              <FormControl label="Width" name="boardWidth">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={selectedBoard.width}
+                    onchange={(e) => handleBoardUpdate({ width: parseFloat((e.target as HTMLInputElement).value) })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <FormControl label="Depth" name="boardDepth">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={selectedBoard.depth}
+                    onchange={(e) => handleBoardUpdate({ depth: parseFloat((e.target as HTMLInputElement).value) })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <FormControl label="Height" name="boardHeight">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={selectedBoard.height}
+                    onchange={(e) => handleBoardUpdate({ height: parseFloat((e.target as HTMLInputElement).value) })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <FormControl label="Color" name="boardColor">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="color"
+                    value={selectedBoard.color}
+                    onchange={(e) => handleBoardUpdate({ color: (e.target as HTMLInputElement).value })}
+                  />
+                {/snippet}
+              </FormControl>
+            </div>
+            <Spacer size="1rem" />
+            <Text size="0.875rem" color="fgMuted">
+              Boards are visual-only planning blocks for checking whether the full game contents fit within a layer.
+            </Text>
+          </div>
+        {:else}
+          <div class="emptyState">
+            <p>No board selected</p>
           </div>
         {/if}
       {:else if selectionType === 'tray'}
@@ -502,5 +894,26 @@
     color: var(--fgMuted);
     font-style: italic;
     padding: 0.5rem;
+  }
+
+  .buttonRow {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .secondaryButton {
+    border: var(--borderThin);
+    background: var(--contrastLowest);
+    color: var(--fg);
+    border-radius: var(--radius-2);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .secondaryButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

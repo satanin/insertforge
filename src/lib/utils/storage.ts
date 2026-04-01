@@ -15,7 +15,16 @@ import {
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
 import { gridToSplitLayout } from '$lib/types/cupLayout';
-import type { Box, CardSize, CounterShape, Layer, LegacyProject, LidParams, Project, Tray } from '$lib/types/project';
+import type {
+  Box,
+  CardSize,
+  CounterShape,
+  Layer,
+  LegacyProject,
+  LidParams,
+  Project,
+  Tray
+} from '$lib/types/project';
 import { isLegacyProject } from '$lib/types/project';
 const STORAGE_KEY = 'counter-tray-project';
 
@@ -547,7 +556,9 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
       id: layerId,
       name: 'Layer 1',
       boxes: migratedBoxes,
-      looseTrays: []
+      layeredBoxes: [],
+      looseTrays: [],
+      boards: []
     };
 
     return {
@@ -558,6 +569,8 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
       selectedLayerId: layerId,
       selectedBoxId: project.selectedBoxId,
       selectedTrayId: project.selectedTrayId,
+      selectedBoardId: null,
+      selectedLayeredBoxSectionId: null,
       globalSettings
     };
   }
@@ -579,8 +592,17 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
     return {
       ...layer,
+      layeredBoxes:
+        layer.layeredBoxes?.map((layeredBox) => ({
+          ...layeredBox,
+          layers: layeredBox.layers.map((entry) => ({
+            ...entry,
+            sections: entry.sections ?? []
+          }))
+        })) ?? [],
       boxes: migratedBoxes,
-      looseTrays: migratedLooseTrays
+      looseTrays: migratedLooseTrays,
+      boards: layer.boards ?? []
     };
   });
 
@@ -590,6 +612,10 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     layers: migratedLayers,
     counterShapes,
     cardSizes,
+    selectedLayeredBoxId: project.selectedLayeredBoxId ?? null,
+    selectedLayeredBoxLayerId: project.selectedLayeredBoxLayerId ?? null,
+    selectedLayeredBoxSectionId: project.selectedLayeredBoxSectionId ?? null,
+    selectedBoardId: project.selectedBoardId ?? null,
     globalSettings
   };
 }

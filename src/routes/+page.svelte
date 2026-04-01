@@ -22,7 +22,13 @@
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
-  import { arrangeLayerContents, type BoxPlacement, type LooseTrayPlacement } from '$lib/models/layer';
+  import {
+    arrangeLayerContents,
+    getLayeredBoxRenderLayout,
+    type BoardPlacement,
+    type BoxPlacement,
+    type LooseTrayPlacement
+  } from '$lib/models/layer';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
   import {
     getGeometryWorker,
@@ -37,6 +43,7 @@
   import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
   import {
     initProject,
+    getSelectedBoard,
     getSelectedTray,
     getSelectedBox,
     getSelectedLayer,
@@ -58,6 +65,8 @@
   import type { Project } from '$lib/types/project';
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
+  import jscad from '@jscad/modeling';
+  import type { Geom3 } from '@jscad/modeling/src/geometries/types';
   import LayoutEditorOverlay from '$lib/components/LayoutEditorOverlay.svelte';
   import LayerLayoutEditorOverlay from '$lib/components/LayerLayoutEditorOverlay.svelte';
   import {
@@ -83,7 +92,7 @@
   import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
 
   interface CommunityProject {
     id: string;
@@ -91,6 +100,40 @@
     author: string;
     file: string;
   }
+
+  interface LayeredBoxSectionGeometryData {
+    sectionId: string;
+    name: string;
+    type: 'counter' | 'cardWell' | 'playerBoard';
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    x: number;
+    y: number;
+    z: number;
+  }
+
+  interface LayeredBoxGeometryData {
+    internalLayers: Array<{
+      id: string;
+      geometry: BufferGeometry;
+      width: number;
+      depth: number;
+      height: number;
+      z: number;
+      color: string;
+    }>;
+    layeredBoxId: string;
+    proxyBoardId: string;
+    name: string;
+    color: string;
+    dimensions: { width: number; depth: number; height: number };
+    sections: LayeredBoxSectionGeometryData[];
+  }
+
+  const { union } = jscad.booleans;
+  const { translate } = jscad.transforms;
 
   // Mobile detection
   $effect(() => {
@@ -107,8 +150,9 @@
     }
   });
 
-  let viewMode = $state<ViewMode>('all-no-lid');
   let selectionType = $state<SelectionType>('dimensions');
+  let viewModeOverride = $state<ViewMode | null>(null);
+  let viewMode = $derived(viewModeOverride ?? getViewModeForSelection(selectionType));
   let isEditorCollapsed = $state(false);
   let editorPane = $state<PaneAPI>();
   let mobileNavPane = $state<PaneAPI>();
@@ -123,6 +167,106 @@
   let allTrayGeometries = $state<TrayGeometryData[]>([]);
   let allBoxGeometries = $state<BoxGeometryData[]>([]);
   let allLooseTrayGeometries = $state<LooseTrayGeometryData[]>([]);
+  let allLayeredBoxGeometries = $derived.by(() => {
+    const project = getProject();
+    const counterShapes = project.counterShapes || [];
+    const cardSizes = project.cardSizes || [];
+    const geometries: LayeredBoxGeometryData[] = [];
+
+    for (const layer of project.layers) {
+      for (const layeredBox of layer.layeredBoxes) {
+        const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+        const sections: LayeredBoxSectionGeometryData[] = [];
+        const layerGeometrySources = new Map<string, Geom3[]>();
+
+        for (const placement of layout.sections) {
+          if (
+            (placement.section.type !== 'counter' && placement.section.type !== 'playerBoard') ||
+            !placement.section.counterParams
+          ) {
+            continue;
+          }
+
+          try {
+            const jscadGeometry = createCounterTray(
+              placement.section.counterParams,
+              counterShapes,
+              placement.section.name,
+              placement.dimensions.height,
+              0,
+              false
+            );
+
+            const translatedGeometry = translate([placement.x, -placement.y, 0], jscadGeometry);
+            const currentLayerGeometries = layerGeometrySources.get(placement.internalLayerId) ?? [];
+            currentLayerGeometries.push(translatedGeometry);
+            layerGeometrySources.set(placement.internalLayerId, currentLayerGeometries);
+
+            sections.push({
+              sectionId: placement.section.id,
+              name: placement.section.name,
+              type: placement.section.type,
+              color: placement.section.color ?? '#c9503c',
+              geometry: jscadToBufferGeometry(jscadGeometry),
+              dimensions: placement.dimensions,
+              counterStacks: getCounterPositions(
+                placement.section.counterParams,
+                counterShapes,
+                placement.dimensions.height,
+                0
+              ),
+              x: placement.x,
+              y: placement.y,
+              z: placement.z
+            });
+          } catch (error) {
+            console.warn('Failed to build layered box section geometry', {
+              layeredBoxId: layeredBox.id,
+              sectionId: placement.section.id,
+              error
+            });
+          }
+        }
+
+        const internalLayers = layout.internalLayers
+          .map((internalLayer) => {
+            const layerGeometries = layerGeometrySources.get(internalLayer.id) ?? [];
+            if (layerGeometries.length === 0) {
+              return null;
+            }
+
+            const mergedGeometry = layerGeometries.length === 1 ? layerGeometries[0] : union(...layerGeometries);
+
+            return {
+              id: internalLayer.id,
+              geometry: jscadToBufferGeometry(mergedGeometry),
+              width: internalLayer.width,
+              depth: internalLayer.depth,
+              height: internalLayer.height,
+              z: internalLayer.z,
+              color: '#c9503c'
+            };
+          })
+          .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+        geometries.push({
+          internalLayers,
+          layeredBoxId: layeredBox.id,
+          proxyBoardId: `layered-box-${layeredBox.id}`,
+          name: layeredBox.name,
+          color: '#6b7f95',
+          dimensions: {
+            width: layout.width,
+            depth: layout.depth,
+            height: layout.height
+          },
+          sections
+        });
+      }
+    }
+
+    return geometries;
+  });
   let boxGeometry = $state<BufferGeometry | null>(null);
   let lidGeometry = $state<BufferGeometry | null>(null);
   let generating = $state(false);
@@ -167,6 +311,23 @@
     hideUI: false
   });
 
+  function getViewModeForSelection(type: SelectionType): ViewMode {
+    switch (type) {
+      case 'dimensions':
+        return 'all-no-lid';
+      case 'layer':
+      case 'board':
+      case 'layeredBox':
+      case 'layeredBoxLayer':
+      case 'layeredBoxSection':
+        return 'layer';
+      case 'box':
+        return 'exploded';
+      case 'tray':
+        return 'tray';
+    }
+  }
+
   // Parse URL params for debug mode
   $effect(() => {
     if (!browser) return;
@@ -189,16 +350,16 @@
       // Select specific items by ID from URL params
       if (trayIdParam) {
         selectTray(trayIdParam);
-        viewMode = 'tray';
+        viewModeOverride = 'tray';
       } else if (boxIdParam) {
         selectBox(boxIdParam);
-        viewMode = 'exploded';
+        viewModeOverride = 'exploded';
       } else if (layerIdParam) {
         selectLayer(layerIdParam);
-        viewMode = 'layer';
+        viewModeOverride = 'layer';
       } else if (viewParam && ['tray', 'layer', 'exploded', 'all', 'all-no-lid'].includes(viewParam)) {
         // Set view mode from URL parameter
-        viewMode = viewParam;
+        viewModeOverride = viewParam;
       }
 
       // Parse position "x,y,z"
@@ -290,6 +451,7 @@
 
   let selectedTray = $derived(getSelectedTray());
   let selectedBox = $derived(getSelectedBox());
+  let selectedBoard = $derived(getSelectedBoard());
   let selectedLayer = $derived(getSelectedLayer());
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
@@ -308,7 +470,7 @@
       return selectedTray?.name ?? '';
     }
     if (viewMode === 'layer') {
-      return selectedLayer?.name ?? '';
+      return selectedBoard?.name ?? selectedLayer?.name ?? '';
     }
     // For box views (all, exploded), show box name
     return selectedBox?.name ?? '';
@@ -356,6 +518,8 @@
       showLayerView: boolean;
       layerBoxPlacements: BoxPlacement[];
       layerLooseTrayPlacements: LooseTrayPlacement[];
+      layerBoardPlacements: BoardPlacement[];
+      layeredBoxes: LayeredBoxGeometryData[];
       // All layers stacked view
       showAllLayers: boolean;
       allLayerArrangements: Array<{
@@ -363,6 +527,7 @@
         arrangement: {
           boxes: BoxPlacement[];
           looseTrays: LooseTrayPlacement[];
+          boards: BoardPlacement[];
           layerHeight: number;
         };
       }>;
@@ -379,6 +544,8 @@
       showLayerView: false,
       layerBoxPlacements: [],
       layerLooseTrayPlacements: [],
+      layerBoardPlacements: [],
+      layeredBoxes: [],
       showAllLayers: false,
       allLayerArrangements: []
     };
@@ -402,6 +569,7 @@
         result.allLayerArrangements = allLayerArrangements;
         result.allBoxes = allBoxGeometries;
         result.allLooseTrays = allLooseTrayGeometries;
+        result.layeredBoxes = allLayeredBoxGeometries;
         break;
       case 'exploded':
         result.allTrays = allTrayGeometries;
@@ -416,9 +584,11 @@
           result.showLayerView = true;
           result.layerBoxPlacements = layerArrangement.boxes;
           result.layerLooseTrayPlacements = layerArrangement.looseTrays;
+          result.layerBoardPlacements = layerArrangement.boards;
           // Include allBoxes and allLooseTrays so we can render actual geometry
           result.allBoxes = allBoxGeometries;
           result.allLooseTrays = allLooseTrayGeometries;
+          result.layeredBoxes = allLayeredBoxGeometries;
         }
         break;
     }
@@ -428,20 +598,7 @@
   // Handle selection type changes - update view mode accordingly
   function handleSelectionChange(type: SelectionType) {
     selectionType = type;
-    switch (type) {
-      case 'dimensions':
-        viewMode = 'all-no-lid';
-        break;
-      case 'layer':
-        viewMode = 'layer';
-        break;
-      case 'box':
-        viewMode = 'exploded';
-        break;
-      case 'tray':
-        viewMode = 'tray';
-        break;
-    }
+    viewModeOverride = null;
   }
 
   // Handle double-click on tray to navigate to it
@@ -456,7 +613,7 @@
           project.selectedBoxId = box.id;
           project.selectedTrayId = trayId;
           selectionType = 'tray';
-          viewMode = 'tray';
+          viewModeOverride = null;
           return;
         }
       }
@@ -467,7 +624,7 @@
         project.selectedBoxId = null;
         project.selectedTrayId = trayId;
         selectionType = 'tray';
-        viewMode = 'tray';
+        viewModeOverride = null;
         return;
       }
     }
@@ -485,7 +642,7 @@
           project.selectedTrayId = box.trays[0].id;
         }
         selectionType = 'box';
-        viewMode = 'exploded';
+        viewModeOverride = null;
         return;
       }
     }
@@ -541,20 +698,50 @@
     if (!browser) return;
 
     const project = getProject();
-    const box = getSelectedBox();
-    const tray = getSelectedTray();
+    const selectedBox = getSelectedBox();
+    const selectedTray = getSelectedTray();
 
-    if (!tray) {
-      error = 'No tray selected';
+    let generationTray = selectedTray;
+    let generationBox = selectedBox;
+
+    if (!generationTray) {
+      for (const layer of project.layers) {
+        if (layer.looseTrays.length > 0) {
+          generationTray = layer.looseTrays[0];
+          generationBox = null;
+          break;
+        }
+        for (const box of layer.boxes) {
+          if (box.trays.length > 0) {
+            generationTray = box.trays[0];
+            generationBox = box;
+            break;
+          }
+        }
+        if (generationTray) break;
+      }
+    }
+
+    if (!generationTray) {
+      selectedTrayGeometry = null;
+      selectedTrayCounters = [];
+      allTrayGeometries = [];
+      allBoxGeometries = [];
+      allLooseTrayGeometries = [];
+      boxGeometry = null;
+      lidGeometry = null;
+      error = '';
+      generating = false;
+      generationProgress = null;
       return;
     }
 
     // Check if this is a loose tray (not in a box)
-    const trayLocation = findTrayLocation(project, tray.id);
+    const trayLocation = findTrayLocation(project, generationTray.id);
     const isLoose = trayLocation && trayLocation.boxId === null;
 
     // For boxed trays, we need a box
-    if (!isLoose && !box) {
+    if (!isLoose && !generationBox) {
       error = 'No box selected';
       return;
     }
@@ -568,8 +755,8 @@
     // If cache valid and not forced, try to use cached geometry
     if (cacheValid && !force) {
       // Handle loose trays
-      if (isLoose && allLooseTrayGeometries.length > 0) {
-        const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === tray.id);
+      if (selectedTray && isLoose && allLooseTrayGeometries.length > 0) {
+        const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === generationTray.id);
         if (cachedLooseTray) {
           selectedTrayGeometry = cachedLooseTray.geometry;
           selectedTrayCounters = cachedLooseTray.counterStacks;
@@ -581,7 +768,7 @@
               color: cachedLooseTray.color,
               geometry: cachedLooseTray.geometry,
               placement: {
-                tray,
+                tray: generationTray,
                 x: 0,
                 y: 0,
                 rotated: false,
@@ -593,23 +780,23 @@
           ];
           boxGeometry = null;
           lidGeometry = null;
-          console.debug('[Geometry Cache] Hit for loose tray:', tray.id);
+          console.debug('[Geometry Cache] Hit for loose tray:', generationTray.id);
           return;
         } else {
           console.debug('[Geometry Cache] Loose tray not found in cache:', {
-            lookingFor: tray.id,
+            lookingFor: generationTray.id,
             availableLooseTrays: allLooseTrayGeometries.map((t) => t.trayId)
           });
         }
       }
 
       // Handle boxed trays
-      if (!isLoose && allBoxGeometries.length > 0 && box) {
+      if (selectedTray && !isLoose && allBoxGeometries.length > 0 && generationBox) {
         // Find the selected box in the all-boxes cache
-        const cachedBox = allBoxGeometries.find((b) => b.boxId === box.id);
+        const cachedBox = allBoxGeometries.find((b) => b.boxId === generationBox.id);
         if (cachedBox) {
           // Verify the cached tray count matches current state (detects tray moves)
-          const currentTrayCount = box.trays.length;
+          const currentTrayCount = generationBox.trays.length;
           const cachedTrayCount = cachedBox.trayGeometries.length;
           if (currentTrayCount !== cachedTrayCount) {
             // Tray count mismatch - cache is stale, force regeneration
@@ -617,7 +804,7 @@
             console.debug('[Geometry Cache] Tray count mismatch:', { currentTrayCount, cachedTrayCount });
           } else {
             // Find the selected tray within this box
-            const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === tray.id);
+            const cachedTray = cachedBox.trayGeometries.find((t) => t.trayId === generationTray.id);
             if (cachedTray) {
               // Use cached data for this box
               selectedTrayGeometry = cachedTray.geometry;
@@ -625,19 +812,19 @@
               allTrayGeometries = cachedBox.trayGeometries;
               boxGeometry = cachedBox.boxGeometry;
               lidGeometry = cachedBox.lidGeometry;
-              console.debug('[Geometry Cache] Hit for boxed tray:', tray.id);
+              console.debug('[Geometry Cache] Hit for boxed tray:', generationTray.id);
               return;
             } else {
               // Tray not found in cache - this shouldn't happen normally
               console.debug('[Geometry Cache] Tray not found in cache:', {
-                lookingFor: tray.id,
+                lookingFor: generationTray.id,
                 availableTrays: cachedBox.trayGeometries.map((t) => t.trayId)
               });
             }
           }
         } else {
           console.debug('[Geometry Cache] Box not found in cache:', {
-            lookingFor: box.id,
+            lookingFor: generationBox.id,
             availableBoxes: allBoxGeometries.map((b) => b.boxId)
           });
         }
@@ -649,15 +836,15 @@
         isLoose,
         hasBoxGeometries: allBoxGeometries.length > 0,
         hasLooseTrayGeometries: allLooseTrayGeometries.length > 0,
-        hasBox: !!box,
+        hasBox: !!generationBox,
         hashMatch: lastGeneratedHash === hashAtGenerationStart
       });
     }
 
     console.debug('[Geometry Worker] Calling worker:', {
       force,
-      trayId: tray.id,
-      boxId: box?.id ?? '(loose)',
+      trayId: generationTray.id,
+      boxId: generationBox?.id ?? '(loose)',
       cacheValid,
       hashMatch: lastGeneratedHash === hashAtGenerationStart
     });
@@ -677,15 +864,15 @@
     try {
       // Use web worker for geometry generation (handles both boxed and loose trays)
       // Pass empty string for boxId if it's a loose tray - worker handles this case
-      const result = await geometryWorker.generate(project, box?.id ?? '', tray.id, (progress) => {
+      const result = await geometryWorker.generate(project, generationBox?.id ?? '', generationTray.id, (progress) => {
         generationProgress = progress;
       });
 
-      selectedTrayGeometry = result.selectedTrayGeometry;
-      selectedTrayCounters = result.selectedTrayCounters;
+      selectedTrayGeometry = selectedTray ? result.selectedTrayGeometry : null;
+      selectedTrayCounters = selectedTray ? result.selectedTrayCounters : [];
       allTrayGeometries = result.allTrayGeometries;
-      boxGeometry = result.boxGeometry;
-      lidGeometry = result.lidGeometry;
+      boxGeometry = selectedBox ? result.boxGeometry : null;
+      lidGeometry = selectedBox ? result.lidGeometry : null;
       allBoxGeometries = result.allBoxGeometries;
       allLooseTrayGeometries = result.allLooseTrayGeometries;
     } catch (e) {
@@ -949,7 +1136,7 @@
       const screenshots: TrayScreenshot[] = [];
 
       // Save current state
-      const savedViewMode = viewMode;
+      const savedViewModeOverride = viewModeOverride;
       const savedShowCounters = showCounters;
       const savedShowReferenceLabels = showReferenceLabels;
       const savedHidePrintBed = hidePrintBed;
@@ -957,7 +1144,7 @@
       const savedCounters = selectedTrayCounters;
 
       // Set up for capture mode
-      viewMode = 'tray';
+      viewModeOverride = 'tray';
       showCounters = true;
       showReferenceLabels = true;
       hidePrintBed = true;
@@ -1190,7 +1377,7 @@
 
       // Restore original state
       captureFunction.setCaptureMode?.(false);
-      viewMode = savedViewMode;
+      viewModeOverride = savedViewModeOverride;
       showCounters = savedShowCounters;
       showReferenceLabels = savedShowReferenceLabels;
       hidePrintBed = savedHidePrintBed;
@@ -1517,8 +1704,13 @@
   let selectionHash = $derived.by(() => {
     const project = getProject();
     return JSON.stringify({
+      selectedLayerId: project.selectedLayerId,
       selectedBoxId: project.selectedBoxId,
-      selectedTrayId: project.selectedTrayId
+      selectedLayeredBoxId: project.selectedLayeredBoxId ?? null,
+      selectedLayeredBoxLayerId: project.selectedLayeredBoxLayerId ?? null,
+      selectedLayeredBoxSectionId: project.selectedLayeredBoxSectionId ?? null,
+      selectedTrayId: project.selectedTrayId,
+      selectedBoardId: project.selectedBoardId
     });
   });
 
@@ -1534,7 +1726,12 @@
           boxId: b.id,
           trayIds: b.trays.map((t) => t.id)
         })),
-        looseTrayIds: l.looseTrays.map((t) => t.id)
+        looseTrayIds: l.looseTrays.map((t) => t.id),
+        boardIds: l.boards.map((b) => b.id),
+        layeredBoxes: l.layeredBoxes.map((b) => ({
+          layeredBoxId: b.id,
+          layerIds: b.layers.map((entry) => entry.id)
+        }))
       }))
     });
   });
@@ -1552,13 +1749,10 @@
       // This avoids potential timing issues with derived values
       const project = untrack(() => getProject());
 
-      // Verify the selected tray exists in the selected box (or is a loose tray)
-      let _selectedBox = null;
       let selectedTray = null;
       for (const layer of project.layers) {
         const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
         if (box) {
-          _selectedBox = box;
           selectedTray = box.trays.find((t) => t.id === project.selectedTrayId);
           break;
         }
@@ -1570,9 +1764,10 @@
         }
       }
 
-      // Valid selection: either a tray in a box, or a loose tray
-      // For loose trays, selectedBox is null but selectedTray is set
-      if (selectedTray) {
+      const hasSelectedLayer = project.layers.some((layer) => layer.id === project.selectedLayerId);
+      const canRenderCurrentSelection = Boolean(selectedTray || hasSelectedLayer);
+
+      if (canRenderCurrentSelection) {
         const selectionChanged = selHash !== lastSelectionHash;
         const structureChanged = strHash !== lastStructureHash;
         lastSelectionHash = selHash;
@@ -1904,6 +2099,8 @@
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
+              layerBoardPlacements={visibleGeometries.layerBoardPlacements}
+              layeredBoxes={visibleGeometries.layeredBoxes}
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
@@ -1944,7 +2141,10 @@
               onCancel={handleCancelLayerLayout}
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+              canEdit={
+                ((layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1) &&
+                (selectedLayer?.boards.length ?? 0) === 0
+              }
             />
           </div>
         {/if}
@@ -2152,6 +2352,8 @@
               showLayerView={visibleGeometries.showLayerView}
               layerBoxPlacements={visibleGeometries.layerBoxPlacements}
               layerLooseTrayPlacements={visibleGeometries.layerLooseTrayPlacements}
+              layerBoardPlacements={visibleGeometries.layerBoardPlacements}
+              layeredBoxes={visibleGeometries.layeredBoxes}
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
@@ -2192,7 +2394,10 @@
               onCancel={handleCancelLayerLayout}
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
-              canEdit={(layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1}
+              canEdit={
+                ((layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1) &&
+                (selectedLayer?.boards.length ?? 0) === 0
+              }
             />
           </div>
         {/if}

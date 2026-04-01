@@ -37,6 +37,46 @@ interface BaseTray {
   showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
 }
 
+// Visual-only board item for layer planning
+export interface Board {
+  id: string;
+  name: string;
+  color: string;
+  width: number;
+  depth: number;
+  height: number;
+}
+
+export interface LayeredBoxLayer {
+  id: string;
+  name: string;
+  sections: LayeredBoxSection[];
+}
+
+export type LayeredBoxSectionType = 'counter' | 'cardWell' | 'playerBoard';
+
+export interface LayeredBoxSection {
+  id: string;
+  type: LayeredBoxSectionType;
+  name: string;
+  color?: string;
+  counterParams?: CounterTrayParams;
+}
+
+export interface LayeredBox {
+  id: string;
+  name: string;
+  layers: LayeredBoxLayer[];
+  tolerance: number;
+  wallThickness: number;
+  floorThickness: number;
+  lidParams: LidParams;
+  customWidth?: number;
+  customDepth?: number;
+  customBoxHeight?: number;
+  fillSolidEmpty?: boolean;
+}
+
 // Counter tray for cardboard counter tokens
 export interface CounterTray extends BaseTray {
   type: 'counter';
@@ -156,7 +196,9 @@ export interface Layer {
   id: string;
   name: string;
   boxes: Box[];
+  layeredBoxes: LayeredBox[];
   looseTrays: Tray[];
+  boards: Board[];
   manualLayout?: {
     boxes: ManualBoxPlacement[];
     looseTrays: ManualLooseTrayPlacement[];
@@ -196,7 +238,11 @@ export interface Project {
   cardSizes: CardSize[];
   selectedLayerId: string | null;
   selectedBoxId: string | null;
+  selectedLayeredBoxId?: string | null;
+  selectedLayeredBoxLayerId?: string | null;
+  selectedLayeredBoxSectionId?: string | null;
   selectedTrayId: string | null;
+  selectedBoardId?: string | null;
   globalSettings?: GlobalSettings;
 }
 

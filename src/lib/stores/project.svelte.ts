@@ -12,6 +12,7 @@ import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
+  Board,
   Box,
   CardDividerTray,
   CardDrawTray,
@@ -22,6 +23,10 @@ import type {
   CounterTray,
   CupTray,
   Layer,
+  LayeredBox,
+  LayeredBoxLayer,
+  LayeredBoxSection,
+  LayeredBoxSectionType,
   LidParams,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
@@ -51,6 +56,7 @@ export {
   isLooseTray
 };
 export type {
+  Board,
   Box,
   CardDividerTray,
   CardDrawTray,
@@ -61,6 +67,10 @@ export type {
   CounterTray,
   CupTray,
   Layer,
+  LayeredBox,
+  LayeredBoxLayer,
+  LayeredBoxSection,
+  LayeredBoxSectionType,
   LidParams,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
@@ -348,18 +358,80 @@ function createDefaultBox(name: string): Box {
   };
 }
 
+function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: string): LayeredBoxSection {
+  const color = getNextTrayColor(project.layers);
+  const counterTray = createDefaultCounterTray(name, color, project.counterShapes);
+  return {
+    id: generateId(),
+    type,
+    name,
+    color,
+    counterParams: type === 'counter' || type === 'playerBoard' ? counterTray.params : undefined
+  };
+}
+
+function createDefaultLayeredBoxLayer(name: string): LayeredBoxLayer {
+  return {
+    id: generateId(),
+    name,
+    sections: []
+  };
+}
+
+function createDefaultLayeredBox(name: string): LayeredBox {
+  return {
+    id: generateId(),
+    name,
+    layers: [createDefaultLayeredBoxLayer('Layer 1')],
+    tolerance: 0.5,
+    wallThickness: 3.0,
+    floorThickness: 2.0,
+    fillSolidEmpty: true,
+    lidParams: { ...defaultLidParams }
+  };
+}
+
+function createDefaultBoard(name: string): Board {
+  return {
+    id: generateId(),
+    name,
+    color: '#6f7f92',
+    width: 200,
+    depth: 200,
+    height: 2
+  };
+}
+
 function createDefaultLayer(name: string): Layer {
   return {
     id: generateId(),
     name,
     boxes: [],
-    looseTrays: []
+    layeredBoxes: [],
+    looseTrays: [],
+    boards: []
   };
 }
 
 function createDefaultProject(): Project {
-  // Deep clone the JSON to avoid mutations affecting the original
-  return JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
+  const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
+  project.selectedBoardId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.layers = project.layers.map((layer) => ({
+    ...layer,
+    layeredBoxes:
+      layer.layeredBoxes?.map((layeredBox) => ({
+        ...layeredBox,
+        layers: layeredBox.layers.map((entry) => ({
+          ...entry,
+          sections: entry.sections ?? []
+        }))
+      })) ?? [],
+    boards: layer.boards ?? []
+  }));
+  return project;
 }
 
 // Reactive state
@@ -419,6 +491,22 @@ export function getAllLooseTrays(): Tray[] {
   return looseTrays;
 }
 
+export function getAllLayeredBoxes(): LayeredBox[] {
+  const layeredBoxes: LayeredBox[] = [];
+  for (const layer of project.layers) {
+    layeredBoxes.push(...(layer.layeredBoxes ?? []));
+  }
+  return layeredBoxes;
+}
+
+export function getAllBoards(): Board[] {
+  const boards: Board[] = [];
+  for (const layer of project.layers) {
+    boards.push(...layer.boards);
+  }
+  return boards;
+}
+
 /**
  * Legacy: Get all boxes (backwards compatibility).
  * @deprecated Use getAllBoxes instead
@@ -435,6 +523,27 @@ export function getSelectedBox(): Box | null {
     if (box) return box;
   }
   return null;
+}
+
+export function getSelectedLayeredBox(): LayeredBox | null {
+  if (!project.selectedLayeredBoxId) return null;
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === project.selectedLayeredBoxId);
+    if (layeredBox) return layeredBox;
+  }
+  return null;
+}
+
+export function getSelectedLayeredBoxLayer(): LayeredBoxLayer | null {
+  const selectedLayeredBox = getSelectedLayeredBox();
+  if (!selectedLayeredBox || !project.selectedLayeredBoxLayerId) return null;
+  return selectedLayeredBox.layers.find((layer) => layer.id === project.selectedLayeredBoxLayerId) ?? null;
+}
+
+export function getSelectedLayeredBoxSection(): LayeredBoxSection | null {
+  const selectedLayeredBoxLayer = getSelectedLayeredBoxLayer();
+  if (!selectedLayeredBoxLayer || !project.selectedLayeredBoxSectionId) return null;
+  return selectedLayeredBoxLayer.sections.find((section) => section.id === project.selectedLayeredBoxSectionId) ?? null;
 }
 
 export function getSelectedTray(): Tray | null {
@@ -464,9 +573,22 @@ export function getSelectedTray(): Tray | null {
   return null;
 }
 
+export function getSelectedBoard(): Board | null {
+  if (!project.selectedBoardId) return null;
+  for (const layer of project.layers) {
+    const board = layer.boards.find((b) => b.id === project.selectedBoardId);
+    if (board) return board;
+  }
+  return null;
+}
+
 // Selection
 export function selectLayer(layerId: string): void {
   project.selectedLayerId = layerId;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedBoardId = null;
   const layer = project.layers.find((l) => l.id === layerId);
   if (layer) {
     // Select first box if available, otherwise first loose tray
@@ -480,6 +602,16 @@ export function selectLayer(layerId: string): void {
     } else if (layer.looseTrays.length > 0) {
       project.selectedBoxId = null;
       project.selectedTrayId = layer.looseTrays[0].id;
+    } else if ((layer.layeredBoxes?.length ?? 0) > 0) {
+      project.selectedBoxId = null;
+      project.selectedTrayId = null;
+      project.selectedLayeredBoxId = layer.layeredBoxes[0].id;
+      project.selectedLayeredBoxLayerId = layer.layeredBoxes[0].layers[0]?.id ?? null;
+      project.selectedLayeredBoxSectionId = layer.layeredBoxes[0].layers[0]?.sections[0]?.id ?? null;
+    } else if (layer.boards.length > 0) {
+      project.selectedBoxId = null;
+      project.selectedTrayId = null;
+      project.selectedBoardId = layer.boards[0].id;
     } else {
       project.selectedBoxId = null;
       project.selectedTrayId = null;
@@ -490,6 +622,10 @@ export function selectLayer(layerId: string): void {
 
 export function selectBox(boxId: string): void {
   project.selectedBoxId = boxId;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedBoardId = null;
   // Find the layer containing this box
   for (const layer of project.layers) {
     const box = layer.boxes.find((b) => b.id === boxId);
@@ -506,13 +642,68 @@ export function selectBox(boxId: string): void {
   autosave();
 }
 
+export function selectLayeredBox(layeredBoxId: string): void {
+  project.selectedLayeredBoxId = layeredBoxId;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedBoardId = null;
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (layeredBox) {
+      project.selectedLayerId = layer.id;
+      project.selectedLayeredBoxLayerId = layeredBox.layers[0]?.id ?? null;
+      project.selectedLayeredBoxSectionId = layeredBox.layers[0]?.sections[0]?.id ?? null;
+      break;
+    }
+  }
+  autosave();
+}
+
+export function selectLayeredBoxLayer(layeredBoxId: string, layeredBoxLayerId: string): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    if (!layeredBox.layers.some((boxLayer) => boxLayer.id === layeredBoxLayerId)) continue;
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = layeredBoxId;
+    project.selectedLayeredBoxLayerId = layeredBoxLayerId;
+    project.selectedLayeredBoxSectionId = layeredBox.layers.find((boxLayer) => boxLayer.id === layeredBoxLayerId)?.sections[0]?.id ?? null;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+    autosave();
+    return;
+  }
+}
+
 export function selectTray(trayId: string): void {
   project.selectedTrayId = trayId;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedBoardId = null;
   // Find and update selected layer and box based on tray location
   const location = findTrayLocation(project, trayId);
   if (location) {
     project.selectedLayerId = location.layerId;
     project.selectedBoxId = location.boxId;
+  }
+  autosave();
+}
+
+export function selectBoard(boardId: string): void {
+  project.selectedBoardId = boardId;
+  project.selectedBoxId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedTrayId = null;
+  for (const layer of project.layers) {
+    if (layer.boards.some((b) => b.id === boardId)) {
+      project.selectedLayerId = layer.id;
+      break;
+    }
   }
   autosave();
 }
@@ -524,7 +715,11 @@ export function addLayer(): Layer {
   project.layers.push(layer);
   project.selectedLayerId = layer.id;
   project.selectedBoxId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
   project.selectedTrayId = null;
+  project.selectedBoardId = null;
   autosave();
   return layer;
 }
@@ -547,22 +742,283 @@ export function deleteLayer(layerId: string): void {
     if (newLayer.boxes.length > 0) {
       project.selectedBoxId = newLayer.boxes[0].id;
       project.selectedTrayId = newLayer.boxes[0].trays[0]?.id ?? null;
+      project.selectedLayeredBoxId = null;
+      project.selectedLayeredBoxLayerId = null;
+      project.selectedLayeredBoxSectionId = null;
+      project.selectedBoardId = null;
     } else if (newLayer.looseTrays.length > 0) {
       project.selectedBoxId = null;
       project.selectedTrayId = newLayer.looseTrays[0].id;
-    } else {
+      project.selectedLayeredBoxId = null;
+      project.selectedLayeredBoxLayerId = null;
+      project.selectedLayeredBoxSectionId = null;
+      project.selectedBoardId = null;
+    } else if ((newLayer.layeredBoxes?.length ?? 0) > 0) {
       project.selectedBoxId = null;
       project.selectedTrayId = null;
+      project.selectedLayeredBoxId = newLayer.layeredBoxes[0].id;
+      project.selectedLayeredBoxLayerId = newLayer.layeredBoxes[0].layers[0]?.id ?? null;
+      project.selectedLayeredBoxSectionId = newLayer.layeredBoxes[0].layers[0]?.sections[0]?.id ?? null;
+      project.selectedBoardId = null;
+    } else if (newLayer.boards.length > 0) {
+      project.selectedBoxId = null;
+      project.selectedTrayId = null;
+      project.selectedLayeredBoxId = null;
+      project.selectedLayeredBoxLayerId = null;
+      project.selectedLayeredBoxSectionId = null;
+      project.selectedBoardId = newLayer.boards[0].id;
+    } else {
+      project.selectedBoxId = null;
+      project.selectedLayeredBoxId = null;
+      project.selectedLayeredBoxLayerId = null;
+      project.selectedLayeredBoxSectionId = null;
+      project.selectedTrayId = null;
+      project.selectedBoardId = null;
     }
   }
   autosave();
 }
 
-export function updateLayer(layerId: string, updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>): void {
+export function updateLayer(layerId: string, updates: Partial<Omit<Layer, 'id' | 'boxes' | 'layeredBoxes' | 'looseTrays'>>): void {
   const layer = project.layers.find((l) => l.id === layerId);
   if (layer) {
     Object.assign(layer, updates);
     autosave();
+  }
+}
+
+// Board operations
+export function addBoard(layerId?: string): Board | null {
+  const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
+  const layer = project.layers.find((l) => l.id === targetLayerId);
+  if (!layer) return null;
+
+  const boardNumber = getAllBoards().length + 1;
+  const board = createDefaultBoard(`Board ${boardNumber}`);
+  layer.boards.push(board);
+  project.selectedLayerId = layer.id;
+  project.selectedBoxId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedTrayId = null;
+  project.selectedBoardId = board.id;
+  autosave();
+  return board;
+}
+
+export function updateBoard(boardId: string, updates: Partial<Omit<Board, 'id'>>): void {
+  for (const layer of project.layers) {
+    const board = layer.boards.find((b) => b.id === boardId);
+    if (board) {
+      Object.assign(board, updates);
+      autosave();
+      return;
+    }
+  }
+}
+
+export function deleteBoard(boardId: string): void {
+  for (const layer of project.layers) {
+    const index = layer.boards.findIndex((b) => b.id === boardId);
+    if (index === -1) continue;
+
+    layer.boards.splice(index, 1);
+    if (project.selectedBoardId === boardId) {
+      project.selectedBoardId = null;
+    }
+    autosave();
+    return;
+  }
+}
+
+export function addLayeredBox(layerId?: string): LayeredBox | null {
+  const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
+  const layer = project.layers.find((l) => l.id === targetLayerId);
+  if (!layer) return null;
+
+  const layeredBoxNumber = getAllLayeredBoxes().length + 1;
+  const layeredBox = createDefaultLayeredBox(`Layered Box ${layeredBoxNumber}`);
+  layer.layeredBoxes.push(layeredBox);
+  project.selectedLayerId = layer.id;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedBoardId = null;
+  project.selectedLayeredBoxId = layeredBox.id;
+  project.selectedLayeredBoxLayerId = layeredBox.layers[0]?.id ?? null;
+  project.selectedLayeredBoxSectionId = layeredBox.layers[0]?.sections[0]?.id ?? null;
+  autosave();
+  return layeredBox;
+}
+
+export function updateLayeredBox(
+  layeredBoxId: string,
+  updates: Partial<Omit<LayeredBox, 'id' | 'layers'>>
+): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    Object.assign(layeredBox, updates);
+    autosave();
+    return;
+  }
+}
+
+export function deleteLayeredBox(layeredBoxId: string): void {
+  for (const layer of project.layers) {
+    const index = layer.layeredBoxes?.findIndex((b) => b.id === layeredBoxId) ?? -1;
+    if (index === -1) continue;
+
+    layer.layeredBoxes.splice(index, 1);
+    if (project.selectedLayeredBoxId === layeredBoxId) {
+      project.selectedLayeredBoxId = null;
+      project.selectedLayeredBoxLayerId = null;
+      project.selectedLayeredBoxSectionId = null;
+    }
+    autosave();
+    return;
+  }
+}
+
+export function addLayerToLayeredBox(layeredBoxId: string): LayeredBoxLayer | null {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const nextIndex = layeredBox.layers.length + 1;
+    const boxLayer = createDefaultLayeredBoxLayer(`Layer ${nextIndex}`);
+    layeredBox.layers.push(boxLayer);
+    project.selectedLayeredBoxId = layeredBox.id;
+    project.selectedLayeredBoxLayerId = boxLayer.id;
+    project.selectedLayeredBoxSectionId = null;
+    project.selectedLayerId = layer.id;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+    autosave();
+    return boxLayer;
+  }
+  return null;
+}
+
+export function updateLayeredBoxLayer(layeredBoxId: string, layeredBoxLayerId: string, name: string): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer) continue;
+    boxLayer.name = name;
+    autosave();
+    return;
+  }
+}
+
+export function addSectionToLayeredBoxLayer(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  type: LayeredBoxSectionType
+): LayeredBoxSection | null {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer) continue;
+
+    const sectionCountOfType = boxLayer.sections.filter((section) => section.type === type).length + 1;
+    const sectionName =
+      type === 'counter'
+        ? `Counter Tray ${sectionCountOfType}`
+        : type === 'cardWell'
+          ? `Card Well ${sectionCountOfType}`
+          : `Player Board ${sectionCountOfType}`;
+    const section = createDefaultLayeredBoxSection(type, sectionName);
+    boxLayer.sections.push(section);
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = layeredBox.id;
+    project.selectedLayeredBoxLayerId = boxLayer.id;
+    project.selectedLayeredBoxSectionId = section.id;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+    autosave();
+    return section;
+  }
+  return null;
+}
+
+export function selectLayeredBoxSection(layeredBoxId: string, layeredBoxLayerId: string, sectionId: string): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer || !boxLayer.sections.some((section) => section.id === sectionId)) continue;
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = layeredBox.id;
+    project.selectedLayeredBoxLayerId = boxLayer.id;
+    project.selectedLayeredBoxSectionId = sectionId;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+    autosave();
+    return;
+  }
+}
+
+export function updateLayeredBoxSection(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  sectionId: string,
+  updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>
+): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer) continue;
+    const section = boxLayer.sections.find((entry) => entry.id === sectionId);
+    if (!section) continue;
+    Object.assign(section, updates);
+    autosave();
+    return;
+  }
+}
+
+export function deleteSectionFromLayeredBoxLayer(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  sectionId: string
+): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer) continue;
+    const index = boxLayer.sections.findIndex((section) => section.id === sectionId);
+    if (index === -1) continue;
+    boxLayer.sections.splice(index, 1);
+    if (project.selectedLayeredBoxSectionId === sectionId) {
+      const nextSection = boxLayer.sections[Math.min(index, boxLayer.sections.length - 1)] ?? boxLayer.sections[0] ?? null;
+      project.selectedLayeredBoxSectionId = nextSection?.id ?? null;
+    }
+    autosave();
+    return;
+  }
+}
+
+export function deleteLayerFromLayeredBox(layeredBoxId: string, layeredBoxLayerId: string): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox || layeredBox.layers.length <= 1) continue;
+    const index = layeredBox.layers.findIndex((entry) => entry.id === layeredBoxLayerId);
+    if (index === -1) continue;
+
+    layeredBox.layers.splice(index, 1);
+    if (project.selectedLayeredBoxLayerId === layeredBoxLayerId) {
+      const nextLayer = layeredBox.layers[Math.min(index, layeredBox.layers.length - 1)] ?? layeredBox.layers[0] ?? null;
+      project.selectedLayeredBoxLayerId = nextLayer?.id ?? null;
+      project.selectedLayeredBoxSectionId = nextLayer?.sections[0]?.id ?? null;
+    }
+    autosave();
+    return;
   }
 }
 
@@ -603,6 +1059,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   project.selectedLayerId = layer.id;
   project.selectedBoxId = box.id;
   project.selectedTrayId = tray.id;
+  project.selectedBoardId = null;
   autosave();
   return box;
 }
@@ -721,6 +1178,7 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   project.selectedLayerId = layer.id;
   project.selectedBoxId = null;
   project.selectedTrayId = tray.id;
+  project.selectedBoardId = null;
 
   autosave();
   return tray;
@@ -779,6 +1237,7 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
       project.selectedLayerId = layer.id;
       project.selectedBoxId = boxId;
       project.selectedTrayId = tray.id;
+      project.selectedBoardId = null;
 
       // Clear manual layout and custom dimensions so auto layout takes over
       box.manualLayout = undefined;
@@ -1391,6 +1850,25 @@ export function importProject(data: Project): void {
     }
     const layer = project.layers.find((l) => l.id === project.selectedLayerId);
     if (layer) {
+      if (project.selectedLayeredBoxId) {
+        const selectedLayeredBox = layer.layeredBoxes.find((b) => b.id === project.selectedLayeredBoxId);
+        if (!selectedLayeredBox) {
+          project.selectedLayeredBoxId = null;
+          project.selectedLayeredBoxLayerId = null;
+          project.selectedLayeredBoxSectionId = null;
+        } else if (project.selectedLayeredBoxLayerId) {
+          const selectedInternalLayer = selectedLayeredBox.layers.find((entry) => entry.id === project.selectedLayeredBoxLayerId);
+          if (!selectedInternalLayer) {
+            project.selectedLayeredBoxLayerId = selectedLayeredBox.layers[0]?.id ?? null;
+            project.selectedLayeredBoxSectionId = selectedLayeredBox.layers[0]?.sections[0]?.id ?? null;
+          } else if (project.selectedLayeredBoxSectionId) {
+            const selectedSection = selectedInternalLayer.sections.find((entry) => entry.id === project.selectedLayeredBoxSectionId);
+            if (!selectedSection) {
+              project.selectedLayeredBoxSectionId = selectedInternalLayer.sections[0]?.id ?? null;
+            }
+          }
+        }
+      }
       // Ensure selectedBoxId is valid
       if (project.selectedBoxId) {
         const selectedBox = layer.boxes.find((b) => b.id === project.selectedBoxId);
@@ -1408,19 +1886,49 @@ export function importProject(data: Project): void {
         // Find first available tray
         if (layer.boxes.length > 0 && layer.boxes[0].trays.length > 0) {
           project.selectedBoxId = layer.boxes[0].id;
+          project.selectedLayeredBoxId = null;
+          project.selectedLayeredBoxLayerId = null;
+          project.selectedLayeredBoxSectionId = null;
           project.selectedTrayId = layer.boxes[0].trays[0].id;
+          project.selectedBoardId = null;
         } else if (layer.looseTrays.length > 0) {
           project.selectedBoxId = null;
+          project.selectedLayeredBoxId = null;
+          project.selectedLayeredBoxLayerId = null;
+          project.selectedLayeredBoxSectionId = null;
           project.selectedTrayId = layer.looseTrays[0].id;
-        } else {
+          project.selectedBoardId = null;
+        } else if (layer.layeredBoxes.length > 0) {
+          project.selectedBoxId = null;
+          project.selectedLayeredBoxId = layer.layeredBoxes[0].id;
+          project.selectedLayeredBoxLayerId = layer.layeredBoxes[0].layers[0]?.id ?? null;
+          project.selectedLayeredBoxSectionId = layer.layeredBoxes[0].layers[0]?.sections[0]?.id ?? null;
           project.selectedTrayId = null;
+          project.selectedBoardId = null;
+        } else if (layer.boards.length > 0) {
+          project.selectedBoxId = null;
+          project.selectedLayeredBoxId = null;
+          project.selectedLayeredBoxLayerId = null;
+          project.selectedLayeredBoxSectionId = null;
+          project.selectedTrayId = null;
+          project.selectedBoardId = layer.boards[0].id;
+        } else {
+          project.selectedLayeredBoxId = null;
+          project.selectedLayeredBoxLayerId = null;
+          project.selectedLayeredBoxSectionId = null;
+          project.selectedTrayId = null;
+          project.selectedBoardId = null;
         }
       }
     }
   } else {
     project.selectedLayerId = null;
     project.selectedBoxId = null;
+    project.selectedLayeredBoxId = null;
+    project.selectedLayeredBoxLayerId = null;
+    project.selectedLayeredBoxSectionId = null;
     project.selectedTrayId = null;
+    project.selectedBoardId = null;
   }
   autosave();
 }

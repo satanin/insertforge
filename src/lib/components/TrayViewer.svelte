@@ -4,7 +4,7 @@
   import ViewCube from './ViewCube.svelte';
   import type { BufferGeometry } from 'three';
   import type { TrayPlacement } from '$lib/models/box';
-  import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
+  import type { BoardPlacement, BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { CounterStack } from '$lib/models/counterTray';
   import type { CardStack } from '$lib/models/cardTray';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -44,6 +44,37 @@
     dimensions: { width: number; depth: number; height: number };
     counterStacks: CounterStack[];
     trayLetter: string;
+  }
+
+  interface LayeredBoxSectionGeometryData {
+    sectionId: string;
+    name: string;
+    type: 'counter' | 'cardWell' | 'playerBoard';
+    color: string;
+    geometry: BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    x: number;
+    y: number;
+    z: number;
+  }
+
+  interface LayeredBoxGeometryData {
+    internalLayers: Array<{
+      id: string;
+      geometry: BufferGeometry;
+      width: number;
+      depth: number;
+      height: number;
+      z: number;
+      color: string;
+    }>;
+    layeredBoxId: string;
+    proxyBoardId: string;
+    name: string;
+    color: string;
+    dimensions: { width: number; depth: number; height: number };
+    sections: LayeredBoxSectionGeometryData[];
   }
 
   interface TrayClickInfo {
@@ -108,6 +139,8 @@
     showLayerView?: boolean;
     layerBoxPlacements?: BoxPlacement[];
     layerLooseTrayPlacements?: LooseTrayPlacement[];
+    layerBoardPlacements?: BoardPlacement[];
+    layeredBoxes?: LayeredBoxGeometryData[];
     // All layers stacked view
     showAllLayers?: boolean;
     allLayerArrangements?: Array<{
@@ -115,6 +148,7 @@
       arrangement: {
         boxes: BoxPlacement[];
         looseTrays: LooseTrayPlacement[];
+        boards: BoardPlacement[];
         layerHeight: number;
       };
     }>;
@@ -163,6 +197,8 @@
     showLayerView = false,
     layerBoxPlacements = [],
     layerLooseTrayPlacements = [],
+    layerBoardPlacements = [],
+    layeredBoxes = [],
     showAllLayers = false,
     allLayerArrangements = [],
     allLayersExplosionAmount = 50,
@@ -255,6 +291,8 @@
       {showLayerView}
       {layerBoxPlacements}
       {layerLooseTrayPlacements}
+      {layerBoardPlacements}
+      {layeredBoxes}
       {showAllLayers}
       {allLayerArrangements}
       {allLayersExplosionAmount}
