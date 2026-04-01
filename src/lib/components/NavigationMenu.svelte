@@ -186,6 +186,17 @@
     onExpandPanel();
   }
 
+  function getLayeredBoxSectionTypeLabel(type: 'counter' | 'cardWell' | 'playerBoard'): string {
+    switch (type) {
+      case 'counter':
+        return 'counter';
+      case 'cardWell':
+        return 'cardWell';
+      case 'playerBoard':
+        return 'player board';
+    }
+  }
+
   function handleDeleteLayeredBoxLayer(layeredBox: LayeredBox, layer: LayeredBoxLayer) {
     deleteLayerFromLayeredBox(layeredBox.id, layer.id);
     onSelectionChange('layeredBoxLayer');
@@ -632,7 +643,7 @@
                       <span class="navItemLabel">
                         <span class="trayLetter">S</span>
                         {section.name}
-                        <span class="looseBadge">{section.type}</span>
+                        <span class="looseBadge">{getLayeredBoxSectionTypeLabel(section.type)}</span>
                       </span>
                       <span
                         class="navItemDelete"

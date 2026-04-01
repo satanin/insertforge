@@ -86,6 +86,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
   {
     id: DEFAULT_SHAPE_IDS.square,
     name: 'Square',
+    category: 'counter',
     baseShape: 'square',
     width: 15.9,
     length: 15.9,
@@ -94,6 +95,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
   {
     id: DEFAULT_SHAPE_IDS.hex,
     name: 'Hex',
+    category: 'counter',
     baseShape: 'hex',
     width: 15.9,
     length: 15.9,
@@ -103,6 +105,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
   {
     id: DEFAULT_SHAPE_IDS.circle,
     name: 'Circle',
+    category: 'counter',
     baseShape: 'circle',
     width: 15.9,
     length: 15.9,
@@ -111,6 +114,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
   {
     id: DEFAULT_SHAPE_IDS.triangle,
     name: 'Triangle',
+    category: 'counter',
     baseShape: 'triangle',
     width: 15.9,
     length: 15.9,
@@ -281,6 +285,26 @@ function createDefaultCounterTray(name: string, color: string, counterShapes?: C
   };
 }
 
+function createDefaultPlayerBoardParams(counterShapes?: CounterShape[]): CounterTrayParams {
+  const defaultCounterParams = createDefaultCounterTray('Player Board', '#6f7f92', counterShapes).params;
+  const preferredShape =
+    counterShapes?.find((shape) => (shape.category ?? 'counter') === 'playerBoard' && shape.name.toLowerCase() === 'personal board')?.id ??
+    counterShapes
+      ?.filter((shape) => (shape.category ?? 'counter') === 'playerBoard' && (shape.baseShape ?? 'rectangle') === 'rectangle')
+      .sort((a, b) => Math.max(b.width, b.length) * Math.min(b.width, b.length) - Math.max(a.width, a.length) * Math.min(a.width, a.length))[0]
+      ?.id ??
+    counterShapes?.find((shape) => (shape.category ?? 'counter') === 'playerBoard')?.id ??
+    counterShapes?.[0]?.id ??
+    DEFAULT_SHAPE_IDS.square;
+
+  return {
+    ...defaultCounterParams,
+    topLoadedStacks: [[preferredShape, 1, 'Board']],
+    edgeLoadedStacks: [],
+    trayWidthOverride: 0
+  };
+}
+
 function createDefaultCardDrawTray(name: string, color: string, cardSizes?: CardSize[]): CardDrawTray {
   // Use the first available card size, falling back to default ID
   const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
@@ -361,12 +385,19 @@ function createDefaultBox(name: string): Box {
 function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: string): LayeredBoxSection {
   const color = getNextTrayColor(project.layers);
   const counterTray = createDefaultCounterTray(name, color, project.counterShapes);
+  const cardWellTray = createDefaultCardWellTray(name, color, project.cardSizes);
   return {
     id: generateId(),
     type,
     name,
     color,
-    counterParams: type === 'counter' || type === 'playerBoard' ? counterTray.params : undefined
+    counterParams:
+      type === 'counter'
+        ? counterTray.params
+        : type === 'playerBoard'
+          ? createDefaultPlayerBoardParams(project.counterShapes)
+          : undefined,
+    cardWellParams: type === 'cardWell' ? cardWellTray.params : undefined
   };
 }
 
@@ -1363,7 +1394,7 @@ export function getCounterShape(id: string): CounterShape | null {
 }
 
 export function addCounterShape(shape: Omit<CounterShape, 'id'>): CounterShape {
-  const newShape: CounterShape = { ...shape, id: generateId() };
+  const newShape: CounterShape = { ...shape, category: shape.category ?? 'counter', id: generateId() };
   project.counterShapes.push(newShape);
   autosave();
   return newShape;
@@ -1373,6 +1404,7 @@ export function updateCounterShape(id: string, updates: Partial<Omit<CounterShap
   const shape = project.counterShapes.find((s) => s.id === id);
   if (shape) {
     Object.assign(shape, updates);
+    shape.category = shape.category ?? 'counter';
     autosave();
   }
 }

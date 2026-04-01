@@ -17,6 +17,7 @@ import type {
 } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import { getBoxExteriorDimensions, getCounterTrayDimensions, getTrayDimensionsForTray } from './box';
+import { getCardWellTrayDimensions } from './cardWellTray';
 
 export interface BoxDimensions {
   width: number;
@@ -89,14 +90,8 @@ export function getLayeredBoxSectionDimensions(
     return getCounterTrayDimensions(section.counterParams, counterShapes);
   }
 
-  if (section.type === 'cardWell') {
-    // Placeholder until card well sections get their own params/editor.
-    const firstCard = cardSizes[0];
-    return {
-      width: firstCard ? firstCard.width + 12 : 72,
-      depth: firstCard ? firstCard.length + 12 : 103,
-      height: 20
-    };
+  if (section.type === 'cardWell' && section.cardWellParams) {
+    return getCardWellTrayDimensions(section.cardWellParams, cardSizes);
   }
 
   return { width: 40, depth: 40, height: 10 };
@@ -118,7 +113,9 @@ export function getLayeredBoxRenderLayout(
       getLayeredBoxSectionDimensions(section, cardSizes, counterShapes)
     );
 
-    const layerWidth = sectionDimensions.reduce((sum, dims, index) => sum + dims.width + (index > 0 ? layeredBox.tolerance : 0), 0);
+    const layerWidth =
+      sectionDimensions.reduce((sum, dims) => sum + dims.width, 0) +
+      Math.max(sectionDimensions.length - 1, 0) * layeredBox.wallThickness;
     const layerDepth = sectionDimensions.reduce((max, dims) => Math.max(max, dims.depth), 0);
     const layerHeight = sectionDimensions.reduce((max, dims) => Math.max(max, dims.height), 0);
     let currentX = 0;
@@ -142,7 +139,7 @@ export function getLayeredBoxRenderLayout(
         z: totalHeight,
         internalLayerId: layer.id
       });
-      currentX += dimensions.width + layeredBox.tolerance;
+      currentX += dimensions.width + layeredBox.wallThickness;
     }
 
     maxWidth = Math.max(maxWidth, layerWidth);
@@ -150,11 +147,18 @@ export function getLayeredBoxRenderLayout(
     totalHeight += layerHeight;
   }
 
+  const finalWidth = Math.max(maxWidth, layeredBox.tolerance * 2, 20);
+  const finalDepth = Math.max(maxDepth, layeredBox.tolerance * 2, 20);
+
   return {
-    width: Math.max(maxWidth, layeredBox.wallThickness * 2 + layeredBox.tolerance * 2, 20),
-    depth: Math.max(maxDepth, layeredBox.wallThickness * 2 + layeredBox.tolerance * 2, 20),
+    width: finalWidth,
+    depth: finalDepth,
     height: Math.max(totalHeight, layeredBox.floorThickness, 5),
-    internalLayers,
+    internalLayers: internalLayers.map((internalLayer) => ({
+      ...internalLayer,
+      width: finalWidth,
+      depth: finalDepth
+    })),
     sections
   };
 }

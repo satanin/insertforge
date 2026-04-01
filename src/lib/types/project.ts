@@ -6,11 +6,13 @@ import type { CupTrayParams } from '$lib/models/cupTray';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
+export type CounterShapeCategory = 'counter' | 'playerBoard';
 
 // Counter shape definition (global, referenced by ID)
 export interface CounterShape {
   id: string;
   name: string;
+  category?: CounterShapeCategory;
   baseShape: CounterBaseShape;
   width: number;
   length: number;
@@ -61,6 +63,7 @@ export interface LayeredBoxSection {
   name: string;
   color?: string;
   counterParams?: CounterTrayParams;
+  cardWellParams?: CardWellTrayParams;
 }
 
 export interface LayeredBox {

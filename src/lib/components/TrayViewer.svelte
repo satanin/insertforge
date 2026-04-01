@@ -48,6 +48,7 @@
 
   interface LayeredBoxSectionGeometryData {
     sectionId: string;
+    internalLayerId: string;
     name: string;
     type: 'counter' | 'cardWell' | 'playerBoard';
     color: string;
@@ -73,6 +74,7 @@
     proxyBoardId: string;
     name: string;
     color: string;
+    floorThickness: number;
     dimensions: { width: number; depth: number; height: number };
     sections: LayeredBoxSectionGeometryData[];
   }
@@ -126,6 +128,10 @@
     selectedTrayCounters?: (CounterStack | CardStack)[];
     selectedTrayLetter?: string;
     selectedTrayId?: string;
+    selectionType?: string;
+    selectedLayeredBoxId?: string;
+    selectedLayeredBoxLayerId?: string;
+    selectedLayeredBoxSectionId?: string;
     triangleCornerRadius?: number;
     showReferenceLabels?: boolean;
     hidePrintBed?: boolean;
@@ -184,6 +190,10 @@
     selectedTrayCounters = [],
     selectedTrayLetter = 'A',
     selectedTrayId = '',
+    selectionType = 'dimensions',
+    selectedLayeredBoxId = '',
+    selectedLayeredBoxLayerId = '',
+    selectedLayeredBoxSectionId = '',
     triangleCornerRadius = 1.5,
     showReferenceLabels = false,
     hidePrintBed = false,
@@ -277,6 +287,10 @@
       {selectedTrayCounters}
       {selectedTrayLetter}
       {selectedTrayId}
+      {selectionType}
+      {selectedLayeredBoxId}
+      {selectedLayeredBoxLayerId}
+      {selectedLayeredBoxSectionId}
       {triangleCornerRadius}
       {showReferenceLabels}
       {hidePrintBed}

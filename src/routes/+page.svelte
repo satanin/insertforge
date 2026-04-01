@@ -20,6 +20,7 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+  import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
   import {
@@ -103,6 +104,7 @@
 
   interface LayeredBoxSectionGeometryData {
     sectionId: string;
+    internalLayerId: string;
     name: string;
     type: 'counter' | 'cardWell' | 'playerBoard';
     color: string;
@@ -128,12 +130,17 @@
     proxyBoardId: string;
     name: string;
     color: string;
+    floorThickness: number;
     dimensions: { width: number; depth: number; height: number };
     sections: LayeredBoxSectionGeometryData[];
   }
 
-  const { union } = jscad.booleans;
-  const { translate } = jscad.transforms;
+  const { intersect, subtract, union } = jscad.booleans;
+  const { expand } = jscad.expansions;
+  const { extrudeLinear, project: projectFootprint } = jscad.extrusions;
+  const { measureArea } = jscad.measurements;
+  const { mirror, translate } = jscad.transforms;
+  const { cuboid, rectangle } = jscad.primitives;
 
   // Mobile detection
   $effect(() => {
@@ -177,44 +184,50 @@
       for (const layeredBox of layer.layeredBoxes) {
         const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
         const sections: LayeredBoxSectionGeometryData[] = [];
-        const layerGeometrySources = new Map<string, Geom3[]>();
+        const sectionGeometryMap = new Map<string, Geom3>();
 
         for (const placement of layout.sections) {
-          if (
-            (placement.section.type !== 'counter' && placement.section.type !== 'playerBoard') ||
-            !placement.section.counterParams
-          ) {
-            continue;
-          }
-
           try {
-            const jscadGeometry = createCounterTray(
-              placement.section.counterParams,
-              counterShapes,
-              placement.section.name,
-              placement.dimensions.height,
-              0,
-              false
-            );
+            let jscadGeometry: Geom3 | null = null;
 
-            const translatedGeometry = translate([placement.x, -placement.y, 0], jscadGeometry);
-            const currentLayerGeometries = layerGeometrySources.get(placement.internalLayerId) ?? [];
-            currentLayerGeometries.push(translatedGeometry);
-            layerGeometrySources.set(placement.internalLayerId, currentLayerGeometries);
+            if ((placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams) {
+              jscadGeometry = createCounterTray(
+                placement.section.counterParams,
+                counterShapes,
+                placement.section.name,
+                placement.dimensions.height,
+                0,
+                false
+              );
+            } else if (placement.section.type === 'cardWell' && placement.section.cardWellParams) {
+              jscadGeometry = createCardWellTray(
+                placement.section.cardWellParams,
+                cardSizes,
+                placement.section.name,
+                placement.dimensions.height,
+                0,
+                false
+              );
+            }
+
+            if (!jscadGeometry) {
+              continue;
+            }
+
+            sectionGeometryMap.set(placement.section.id, jscadGeometry);
 
             sections.push({
               sectionId: placement.section.id,
+              internalLayerId: placement.internalLayerId,
               name: placement.section.name,
               type: placement.section.type,
               color: placement.section.color ?? '#c9503c',
               geometry: jscadToBufferGeometry(jscadGeometry),
               dimensions: placement.dimensions,
-              counterStacks: getCounterPositions(
-                placement.section.counterParams,
-                counterShapes,
-                placement.dimensions.height,
-                0
-              ),
+              counterStacks:
+                (placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams
+                  ? getCounterPositions(placement.section.counterParams, counterShapes, placement.dimensions.height, 0)
+                  : [],
               x: placement.x,
               y: placement.y,
               z: placement.z
@@ -230,12 +243,139 @@
 
         const internalLayers = layout.internalLayers
           .map((internalLayer) => {
-            const layerGeometries = layerGeometrySources.get(internalLayer.id) ?? [];
-            if (layerGeometries.length === 0) {
+            const layerSections = layout.sections.filter((section) => section.internalLayerId === internalLayer.id);
+            if (layerSections.length === 0) {
               return null;
             }
 
-            const mergedGeometry = layerGeometries.length === 1 ? layerGeometries[0] : union(...layerGeometries);
+            const outerBlock = cuboid({
+              size: [internalLayer.width, internalLayer.depth, internalLayer.height],
+              center: [internalLayer.width / 2, -internalLayer.depth / 2, internalLayer.height / 2]
+            });
+
+            const cavityCuts = layerSections.map((section) => {
+              const cavityHeight = Math.max(internalLayer.height, 0.1);
+              const rectangularCavity = translate(
+                [
+                  section.x + section.dimensions.width / 2,
+                  -(section.y + section.dimensions.depth / 2),
+                  cavityHeight / 2
+                ],
+                cuboid({
+                  size: [section.dimensions.width, section.dimensions.depth, cavityHeight],
+                  center: [0, 0, 0]
+                })
+              );
+
+              const sourceGeometry = sectionGeometryMap.get(section.section.id);
+              if (!sourceGeometry) {
+                return [rectangularCavity];
+              }
+
+              try {
+                const footprint = projectFootprint({}, sourceGeometry);
+                const footprintBounds = rectangle({
+                  size: [section.dimensions.width, section.dimensions.depth],
+                  center: [section.dimensions.width / 2, section.dimensions.depth / 2]
+                });
+                const footprintDeficit = subtract(footprintBounds, footprint);
+                const reliefDepth =
+                  section.section.type === 'counter' || section.section.type === 'playerBoard'
+                    ? Math.max(section.section.counterParams?.cutoutMax ?? 12, 4)
+                    : 16;
+                const edgeProbe = 0.5;
+
+                const sideReliefs = [
+                  section.x <= 0.01
+                    ? {
+                      probe: rectangle({
+                        size: [edgeProbe, section.dimensions.depth],
+                        center: [edgeProbe / 2, section.dimensions.depth / 2]
+                      }),
+                      band: rectangle({
+                        size: [reliefDepth, section.dimensions.depth],
+                        center: [reliefDepth / 2, section.dimensions.depth / 2]
+                      }),
+                      origin: [0, 0, 0] as [number, number, number],
+                      normal: [1, 0, 0] as [number, number, number]
+                    }
+                    : null,
+                  section.x + section.dimensions.width >= internalLayer.width - 0.01
+                    ? {
+                      probe: rectangle({
+                        size: [edgeProbe, section.dimensions.depth],
+                        center: [section.dimensions.width - edgeProbe / 2, section.dimensions.depth / 2]
+                      }),
+                      band: rectangle({
+                        size: [reliefDepth, section.dimensions.depth],
+                        center: [section.dimensions.width - reliefDepth / 2, section.dimensions.depth / 2]
+                      }),
+                      origin: [section.dimensions.width, 0, 0] as [number, number, number],
+                      normal: [1, 0, 0] as [number, number, number]
+                    }
+                    : null,
+                  section.y <= 0.01
+                    ? {
+                      probe: rectangle({
+                        size: [section.dimensions.width, edgeProbe],
+                        center: [section.dimensions.width / 2, edgeProbe / 2]
+                      }),
+                      band: rectangle({
+                        size: [section.dimensions.width, reliefDepth],
+                        center: [section.dimensions.width / 2, reliefDepth / 2]
+                      }),
+                      origin: [0, 0, 0] as [number, number, number],
+                      normal: [0, 1, 0] as [number, number, number]
+                    }
+                    : null,
+                  section.y + section.dimensions.depth >= internalLayer.depth - 0.01
+                    ? {
+                      probe: rectangle({
+                        size: [section.dimensions.width, edgeProbe],
+                        center: [section.dimensions.width / 2, section.dimensions.depth - edgeProbe / 2]
+                      }),
+                      band: rectangle({
+                        size: [section.dimensions.width, reliefDepth],
+                        center: [section.dimensions.width / 2, section.dimensions.depth - reliefDepth / 2]
+                      }),
+                      origin: [0, section.dimensions.depth, 0] as [number, number, number],
+                      normal: [0, 1, 0] as [number, number, number]
+                    }
+                    : null
+                ]
+                  .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+                  .map(({ probe, band, origin, normal }) => {
+                    const edgeTouch = intersect(footprintDeficit, probe);
+                    if (measureArea(edgeTouch) <= 0.001) {
+                      return null;
+                    }
+                    const sideDeficit = intersect(footprintDeficit, band);
+                    if (measureArea(sideDeficit) <= 0.01) {
+                      return null;
+                    }
+                    const touchMask = expand({ delta: reliefDepth, corners: 'round', segments: 16 }, edgeTouch);
+                    const touchingDeficit = intersect(sideDeficit, touchMask);
+                    return measureArea(touchingDeficit) > 0.01 ? mirror({ origin, normal }, touchingDeficit) : null;
+                  })
+                  .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+                if (sideReliefs.length === 0) {
+                  return [rectangularCavity];
+                }
+
+                return [
+                  rectangularCavity,
+                  translate(
+                    [section.x, -(section.y + section.dimensions.depth), 0],
+                    extrudeLinear({ height: cavityHeight }, union(...sideReliefs))
+                  )
+                ];
+              } catch {
+                return [rectangularCavity];
+              }
+            }).flat();
+
+            const mergedGeometry = cavityCuts.length > 0 ? subtract(outerBlock, ...cavityCuts) : outerBlock;
 
             return {
               id: internalLayer.id,
@@ -255,6 +395,7 @@
           proxyBoardId: `layered-box-${layeredBox.id}`,
           name: layeredBox.name,
           color: '#6b7f95',
+          floorThickness: layeredBox.floorThickness,
           dimensions: {
             width: layout.width,
             depth: layout.depth,
@@ -2087,6 +2228,10 @@
               {selectedTrayCounters}
               {selectedTrayLetter}
               selectedTrayId={selectedTray?.id ?? ''}
+              {selectionType}
+              selectedLayeredBoxId={getProject().selectedLayeredBoxId ?? ''}
+              selectedLayeredBoxLayerId={getProject().selectedLayeredBoxLayerId ?? ''}
+              selectedLayeredBoxSectionId={getProject().selectedLayeredBoxSectionId ?? ''}
               triangleCornerRadius={1.5}
               {showReferenceLabels}
               {hidePrintBed}
@@ -2340,6 +2485,10 @@
               {selectedTrayCounters}
               {selectedTrayLetter}
               selectedTrayId={selectedTray?.id ?? ''}
+              {selectionType}
+              selectedLayeredBoxId={getProject().selectedLayeredBoxId ?? ''}
+              selectedLayeredBoxLayerId={getProject().selectedLayeredBoxLayerId ?? ''}
+              selectedLayeredBoxSectionId={getProject().selectedLayeredBoxSectionId ?? ''}
               triangleCornerRadius={1.5}
               {showReferenceLabels}
               {hidePrintBed}

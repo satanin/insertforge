@@ -14,7 +14,7 @@
     Text
   } from '@tableslayer/ui';
   import { IconSquare, IconCircle, IconHexagon, IconTriangle, IconRectangle, IconCards } from '@tabler/icons-svelte';
-  import type { CounterShape, CounterBaseShape, CardSize } from '$lib/types/project';
+  import type { CounterShape, CounterBaseShape, CardSize, CounterShapeCategory } from '$lib/types/project';
   import {
     getProject,
     isCounterTray,
@@ -39,12 +39,15 @@
   let { globalSettings, onGlobalSettingsChange }: Props = $props();
 
   // Track which counter is expanded (null = none)
-  let expandedIndex: number | null = $state(null);
+  let expandedCounterIndex: number | null = $state(null);
+  let expandedPlayerBoardIndex: number | null = $state(null);
   // Track which card size is expanded (null = none)
   let expandedCardIndex: number | null = $state(null);
 
   // Get shapes and card sizes from project level
   let counterShapes = $derived(getCounterShapes());
+  let counterTokenShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'counter'));
+  let playerBoardShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'playerBoard'));
   let cardSizes = $derived(getCardSizes());
 
   // Get the shape icon component for a base shape
@@ -65,8 +68,9 @@
   }
 
   // Calculate icon scale relative to max size (with clamping)
-  function getRelativeIconScale(shape: CounterShape): number {
-    const maxWidth = Math.max(...counterShapes.map((s) => Math.max(s.width, s.length)));
+  function getRelativeIconScale(shape: CounterShape, shapes: CounterShape[]): number {
+    if (shapes.length === 0) return 1;
+    const maxWidth = Math.max(...shapes.map((s) => Math.max(s.width, s.length)));
     const shapeSize = Math.max(shape.width, shape.length);
     const minScale = 0.6;
     const maxScale = 1.4;
@@ -92,18 +96,26 @@
   ];
 
   // Custom shape handlers - now using project-level store functions
-  function handleAddShape() {
-    const newName = `Custom ${counterShapes.length + 1}`;
+  function handleAddShape(category: CounterShapeCategory) {
+    const sourceShapes = category === 'playerBoard' ? playerBoardShapes : counterTokenShapes;
+    const newName = category === 'playerBoard' ? `Player Board ${sourceShapes.length + 1}` : `Custom ${sourceShapes.length + 1}`;
     const newShape = addCounterShape({
       name: newName,
+      category,
       baseShape: 'rectangle',
-      width: 20,
-      length: 30,
+      width: category === 'playerBoard' ? 114 : 20,
+      length: category === 'playerBoard' ? 280 : 30,
       thickness: DEFAULT_COUNTER_THICKNESS
     });
-    // Find the index of the newly added shape
-    const newIndex = getCounterShapes().findIndex((s) => s.id === newShape.id);
-    expandedIndex = newIndex;
+    const newShapes = getCounterShapes().filter((s) => (s.category ?? 'counter') === category);
+    const newIndex = newShapes.findIndex((s) => s.id === newShape.id);
+    if (category === 'playerBoard') {
+      expandedPlayerBoardIndex = newIndex;
+      expandedCounterIndex = null;
+    } else {
+      expandedCounterIndex = newIndex;
+      expandedPlayerBoardIndex = null;
+    }
   }
 
   function handleUpdateShape(
@@ -170,6 +182,16 @@
           count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
         }
       }
+      for (const layeredBox of layer.layeredBoxes) {
+        for (const layeredBoxLayer of layeredBox.layers) {
+          for (const section of layeredBoxLayer.sections) {
+            if (section.counterParams) {
+              count += section.counterParams.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+              count += section.counterParams.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+            }
+          }
+        }
+      }
     }
 
     return count;
@@ -177,7 +199,8 @@
 
   function handleRemoveShape(shapeId: string) {
     deleteCounterShape(shapeId);
-    expandedIndex = null;
+    expandedCounterIndex = null;
+    expandedPlayerBoardIndex = null;
   }
 
   // Card size handlers - now using project-level store functions
@@ -288,9 +311,9 @@
     <h3 class="sectionTitle">Counters</h3>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
-      {#each counterShapes as shape, index (shape.id)}
+      {#each counterTokenShapes as shape, index (shape.id)}
         {@const baseShape = shape.baseShape ?? 'rectangle'}
-        {@const isExpanded = expandedIndex === index}
+        {@const isExpanded = expandedCounterIndex === index}
         {#if isExpanded}
           <!-- Expanded view: full form in Panel -->
           <Panel class="shapePanel">
@@ -437,7 +460,7 @@
             <Hr />
             {@const stackCount = countStacksUsingShape(shape.id)}
             <div class="shapePanelActions">
-              <Button size="sm" onclick={() => (expandedIndex = null)}>Save</Button>
+              <Button size="sm" onclick={() => (expandedCounterIndex = null)}>Save</Button>
               <ConfirmActionButton action={() => handleRemoveShape(shape.id)} actionButtonText="Delete counter">
                 {#snippet trigger({ triggerProps })}
                   <Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
@@ -464,10 +487,10 @@
             </div>
           </Panel>
         {:else}
-          {@const iconScale = getRelativeIconScale(shape)}
+          {@const iconScale = getRelativeIconScale(shape, counterTokenShapes)}
           <div class="shapeCard">
             <!-- Collapsed view: compact summary -->
-            <button class="shapeSummary" onclick={() => (expandedIndex = index)} title="Click to edit {shape.name}">
+            <button class="shapeSummary" onclick={() => (expandedCounterIndex = index)} title="Click to edit {shape.name}">
               <span class="shapeIcon" style="transform: scale({iconScale}); --stroke-width: {2 / iconScale};">
                 <Icon Icon={getShapeIcon(baseShape)} size={16} />
               </span>
@@ -479,7 +502,209 @@
       {/each}
     </div>
     <Spacer />
-    <Link as="button" onclick={handleAddShape}>+ New counter</Link>
+    <Link as="button" onclick={() => handleAddShape('counter')}>+ New counter</Link>
+  </section>
+
+  <Hr />
+
+  <section class="section">
+    <h3 class="sectionTitle">Player Boards</h3>
+    <Spacer size="0.5rem" />
+    <div class="customShapesList">
+      {#each playerBoardShapes as shape, index (shape.id)}
+        {@const baseShape = shape.baseShape ?? 'rectangle'}
+        {@const isExpanded = expandedPlayerBoardIndex === index}
+        {#if isExpanded}
+          <Panel class="shapePanel">
+            <div class="shapePanelContent">
+              <div class="shapeFormGrid">
+                <FormControl label="Name" name="playerBoardName-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="text"
+                      value={shape.name}
+                      onchange={(e) => handleUpdateShape(shape.id, 'name', e.currentTarget.value)}
+                      placeholder="Name"
+                    />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Shape" name="playerBoardBaseShape-{index}">
+                  {#snippet input({ inputProps })}
+                    <Select
+                      selected={[baseShape]}
+                      onSelectedChange={(selected) => handleUpdateShape(shape.id, 'baseShape', selected[0])}
+                      options={baseShapeOptions}
+                      {...inputProps}
+                    />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Thickness" name="playerBoardThickness-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={shape.thickness}
+                      onchange={(e) => handleUpdateShape(shape.id, 'thickness', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                {#if baseShape === 'rectangle'}
+                  <FormControl label="Width" name="playerBoardWidth-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Length" name="playerBoardLength-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.length}
+                        onchange={(e) => handleUpdateShape(shape.id, 'length', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'square'}
+                  <FormControl label="Size" name="playerBoardSize-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'circle'}
+                  <FormControl label="Diameter" name="playerBoardDiameter-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'hex'}
+                  <FormControl label="Flat-to-flat" name="playerBoardFlatToFlat-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <InputCheckbox
+                    checked={shape.pointyTop ?? false}
+                    onchange={(e) => handleUpdateShape(shape.id, 'pointyTop', e.currentTarget.checked ? 1 : 0)}
+                    label="Pointy top"
+                  />
+                {:else if baseShape === 'triangle'}
+                  <FormControl label="Side" name="playerBoardSide-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Radius" name="playerBoardCornerRadius-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={shape.cornerRadius ?? 1.5}
+                        onchange={(e) => handleUpdateShape(shape.id, 'cornerRadius', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {/if}
+              </div>
+            </div>
+            <Hr />
+            {@const stackCount = countStacksUsingShape(shape.id)}
+            <div class="shapePanelActions">
+              <Button size="sm" onclick={() => (expandedPlayerBoardIndex = null)}>Save</Button>
+              <ConfirmActionButton action={() => handleRemoveShape(shape.id)} actionButtonText="Delete player board">
+                {#snippet trigger({ triggerProps })}
+                  <Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
+                {/snippet}
+                {#snippet actionMessage()}
+                  <div style="max-width: 15rem;">
+                    <Text weight={600} color="var(--fgDanger)">Warning</Text>
+                    <Spacer size="0.5rem" />
+                    {#if stackCount > 0}
+                      <Text size="0.875rem">
+                        Deleting "{shape.name}" will also remove
+                        <Text as="span" color="var(--fgDanger)">
+                          {stackCount}
+                          use{stackCount === 1 ? '' : 's'}
+                        </Text> of this player board.
+                      </Text>
+                    {:else}
+                      <Text size="0.875rem">Delete the "{shape.name}" player board?</Text>
+                    {/if}
+                    <Spacer size="0.5rem" />
+                  </div>
+                {/snippet}
+              </ConfirmActionButton>
+            </div>
+          </Panel>
+        {:else}
+          {@const iconScale = getRelativeIconScale(shape, playerBoardShapes)}
+          <div class="shapeCard">
+            <button
+              class="shapeSummary"
+              onclick={() => (expandedPlayerBoardIndex = index)}
+              title="Click to edit {shape.name}"
+            >
+              <span class="shapeIcon" style="transform: scale({iconScale}); --stroke-width: {2 / iconScale};">
+                <Icon Icon={getShapeIcon(baseShape)} size={16} />
+              </span>
+              <span class="shapeName">{shape.name}</span>
+              <span class="shapeSize">{getSizeDisplay(shape)} mm</span>
+            </button>
+          </div>
+        {/if}
+      {/each}
+    </div>
+    <Spacer />
+    <Link as="button" onclick={() => handleAddShape('playerBoard')}>+ New player board</Link>
   </section>
 
   <Hr />

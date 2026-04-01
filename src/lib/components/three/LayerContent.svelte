@@ -46,6 +46,7 @@
 
   interface LayeredBoxSectionGeometryData {
     sectionId: string;
+    internalLayerId: string;
     name: string;
     type: 'counter' | 'cardWell' | 'playerBoard';
     color: string;
@@ -71,6 +72,7 @@
     proxyBoardId: string;
     name: string;
     color: string;
+    floorThickness: number;
     dimensions: { width: number; depth: number; height: number };
     sections: LayeredBoxSectionGeometryData[];
   }
@@ -101,6 +103,10 @@
     floorThickness?: number;
     showCounters?: boolean;
     showLid?: boolean;
+    selectionType?: string;
+    selectedLayeredBoxId?: string;
+    selectedLayeredBoxLayerId?: string;
+    selectedLayeredBoxSectionId?: string;
     layerName?: string;
     layerHeight?: number;
     showLabel?: boolean;
@@ -128,6 +134,10 @@
     floorThickness = 2,
     showCounters = false,
     showLid = true,
+    selectionType = 'dimensions',
+    selectedLayeredBoxId = '',
+    selectedLayeredBoxLayerId = '',
+    selectedLayeredBoxSectionId = '',
     layerName = '',
     layerHeight = 0,
     showLabel = false,
@@ -287,25 +297,46 @@
   {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2}
   {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2}
   {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
+  {@const isSelectedLayeredBox = layeredBoxGeometry && selectedLayeredBoxId === layeredBoxGeometry.layeredBoxId}
+  {@const visibleInternalLayers =
+    layeredBoxGeometry
+      ? selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
+        ? layeredBoxGeometry.internalLayers.filter((internalLayer) => internalLayer.id === selectedLayeredBoxLayerId)
+        : selectionType === 'layeredBox' && isSelectedLayeredBox
+          ? layeredBoxGeometry.internalLayers
+          : []
+      : []}
+  {@const visibleSections =
+    layeredBoxGeometry
+      ? selectionType === 'layeredBoxSection' && isSelectedLayeredBox
+        ? layeredBoxGeometry.sections.filter((section) => section.sectionId === selectedLayeredBoxSectionId)
+        : selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
+          ? layeredBoxGeometry.sections.filter((section) => section.internalLayerId === selectedLayeredBoxLayerId)
+          : selectionType === 'layeredBox' && isSelectedLayeredBox
+            ? layeredBoxGeometry.sections
+            : []
+      : []}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
-    <T.Mesh position.y={boardHeight / 2}>
-      <T.BoxGeometry args={[boardPlacement.dimensions.width, boardHeight, boardPlacement.dimensions.depth]} />
-      <T.MeshStandardMaterial
-        color={boardPlacement.board.color}
-        roughness={0.9}
-        metalness={0.05}
-        transparent
-        opacity={layeredBoxGeometry ? 0.2 : 0.75}
-      />
-    </T.Mesh>
+    {#if !layeredBoxGeometry || (selectionType === 'layeredBox' && isSelectedLayeredBox)}
+      <T.Mesh position.y={boardHeight / 2}>
+        <T.BoxGeometry args={[boardPlacement.dimensions.width, boardHeight, boardPlacement.dimensions.depth]} />
+        <T.MeshStandardMaterial
+          color={boardPlacement.board.color}
+          roughness={0.9}
+          metalness={0.05}
+          transparent
+          opacity={layeredBoxGeometry ? 0.2 : 0.75}
+        />
+      </T.Mesh>
+    {/if}
 
     {#if layeredBoxGeometry}
-      {#each layeredBoxGeometry.internalLayers as internalLayer (internalLayer.id)}
+      {#each visibleInternalLayers as internalLayer (internalLayer.id)}
         <T.Group
           position.x={-layeredBoxGeometry.dimensions.width / 2}
           position.y={internalLayer.z}
-          position.z={layeredBoxGeometry.dimensions.depth / 2}
+          position.z={-layeredBoxGeometry.dimensions.depth / 2}
         >
           <TrayInBox
             geometry={internalLayer.geometry}
@@ -320,8 +351,54 @@
             depth={internalLayer.depth}
             height={internalLayer.height}
           />
+          {#each visibleSections.filter((section) => section.internalLayerId === internalLayer.id) as section (section.sectionId)}
+            <T.Group
+              position.x={section.x}
+              position.y={0.05}
+              position.z={section.y + section.dimensions.depth}
+            >
+              <TrayInBox
+                geometry={section.geometry}
+                color={section.color}
+                counterStacks={[]}
+                showCounters={false}
+                trayId={section.sectionId}
+                trayName={section.name}
+                trayLetter="S"
+                onClick={onTrayClick}
+                width={section.dimensions.width}
+                depth={section.dimensions.depth}
+                height={section.dimensions.height}
+                opacity={0.78}
+              />
+            </T.Group>
+          {/each}
         </T.Group>
       {/each}
+
+      {#if selectionType === 'layeredBoxSection' && isSelectedLayeredBox}
+        {#each visibleSections as section (section.sectionId)}
+          <T.Group
+            position.x={-layeredBoxGeometry.dimensions.width / 2 + section.x}
+            position.y={section.z + 0.05}
+            position.z={-layeredBoxGeometry.dimensions.depth / 2 + section.y + section.dimensions.depth}
+          >
+            <TrayInBox
+              geometry={section.geometry}
+              color={section.color}
+              counterStacks={[]}
+              showCounters={false}
+              trayId={section.sectionId}
+              trayName={section.name}
+              trayLetter="S"
+              onClick={onTrayClick}
+              width={section.dimensions.width}
+              depth={section.dimensions.depth}
+              height={section.dimensions.height}
+            />
+          </T.Group>
+        {/each}
+      {/if}
     {/if}
   </T.Group>
 

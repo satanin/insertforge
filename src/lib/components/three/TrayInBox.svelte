@@ -32,6 +32,7 @@
     triangleCornerRadius?: number;
     onClick?: (info: TrayClickInfo) => void;
     onDoubleClick?: (trayId: string) => void;
+    opacity?: number;
     // Dimensions for click info
     width?: number;
     depth?: number;
@@ -49,6 +50,7 @@
     triangleCornerRadius = 1.5,
     onClick,
     onDoubleClick,
+    opacity = 1,
     width = 0,
     depth = 0,
     height = 0
@@ -129,7 +131,14 @@
 
 <!-- Tray mesh with -90° X rotation (JSCAD to Three.js transform) -->
 <T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
-  <T.MeshStandardMaterial {color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
+  <T.MeshStandardMaterial
+    {color}
+    roughness={0.6}
+    metalness={0.1}
+    side={THREE.DoubleSide}
+    transparent={opacity < 1}
+    {opacity}
+  />
 </T.Mesh>
 
 <!-- Counter previews in tray-local coordinates -->

@@ -309,6 +309,7 @@
     {
       "id": "shape-square",
       "name": "Square",
+      "category": "counter",
       "baseShape": "square",
       "width": 15.9,
       "length": 15.9,
@@ -317,6 +318,7 @@
     {
       "id": "shape-hex",
       "name": "Hex",
+      "category": "counter",
       "baseShape": "hex",
       "width": 15.9,
       "length": 15.9,
@@ -326,6 +328,7 @@
     {
       "id": "shape-circle",
       "name": "Circle",
+      "category": "counter",
       "baseShape": "circle",
       "width": 15.9,
       "length": 15.9,
@@ -334,6 +337,7 @@
     {
       "id": "shape-triangle",
       "name": "Triangle",
+      "category": "counter",
       "baseShape": "triangle",
       "width": 15.9,
       "length": 15.9,

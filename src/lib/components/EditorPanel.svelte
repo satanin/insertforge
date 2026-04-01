@@ -4,6 +4,7 @@
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
   import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
+  import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
@@ -83,6 +84,17 @@
   let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
   let selectedTray = $derived(getSelectedTray());
 
+  function getLayeredBoxSectionTypeLabel(type: LayeredBoxSectionType): string {
+    switch (type) {
+      case 'counter':
+        return 'Counter tray';
+      case 'cardWell':
+        return 'Card well';
+      case 'playerBoard':
+        return 'Player board';
+    }
+  }
+
   function handleLayerUpdate(updates: Partial<Omit<Layer, 'id' | 'boxes' | 'looseTrays'>>) {
     if (selectedLayer) {
       updateLayer(selectedLayer.id, updates);
@@ -139,6 +151,10 @@
 
   function handleLayeredBoxSectionCounterParamsChange(newParams: CounterTrayParams) {
     handleLayeredBoxSectionUpdate({ counterParams: newParams });
+  }
+
+  function handleLayeredBoxSectionCardWellParamsChange(newParams: CardWellTrayParams) {
+    handleLayeredBoxSectionUpdate({ cardWellParams: newParams });
   }
 
   function handleDeleteSelectedLayeredBoxSection() {
@@ -540,7 +556,7 @@
                   {#each selectedLayeredBoxLayer.sections as section (section.id)}
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{section.name}</span>
-                      <span class="treeItemDims">{section.type}</span>
+                      <span class="treeItemDims">{getLayeredBoxSectionTypeLabel(section.type)}</span>
                     </div>
                   {/each}
                 {:else}
@@ -585,15 +601,36 @@
                 rotationOverride: 'auto',
                 params: selectedLayeredBoxSection.counterParams
               } satisfies CounterTray}
+              {#if selectedLayeredBoxSection.type === 'playerBoard'}
+                <Text size="0.875rem" color="fgMuted">
+                  Player board sections reuse the counter tray generator with a single oversized board slot by default.
+                </Text>
+                <Spacer size="1rem" />
+              {/if}
               <CounterTrayEditor
                 tray={virtualCounterTray}
                 trayLetter="S"
                 onUpdateParams={handleLayeredBoxSectionCounterParamsChange}
                 displayDimensions={getTrayDimensions(selectedLayeredBoxSection.counterParams, project.counterShapes)}
+                allowedShapeCategory={selectedLayeredBoxSection.type === 'playerBoard' ? 'playerBoard' : 'counter'}
+              />
+            {:else if selectedLayeredBoxSection.type === 'cardWell' && selectedLayeredBoxSection.cardWellParams}
+              {@const virtualCardWellTray = {
+                id: selectedLayeredBoxSection.id,
+                type: 'cardWell',
+                name: selectedLayeredBoxSection.name,
+                color: selectedLayeredBoxSection.color ?? '#c9503c',
+                rotationOverride: 'auto',
+                params: selectedLayeredBoxSection.cardWellParams
+              } as const}
+              <CardWellTrayEditor
+                tray={virtualCardWellTray}
+                trayLetter="S"
+                onUpdateParams={handleLayeredBoxSectionCardWellParamsChange}
               />
             {:else}
               <Text size="0.875rem" color="fgMuted">
-                Editor for {selectedLayeredBoxSection.type} sections comes next. This iteration only wires up counter-style sections.
+                Editor for {selectedLayeredBoxSection.type} sections comes next.
               </Text>
             {/if}
           </div>

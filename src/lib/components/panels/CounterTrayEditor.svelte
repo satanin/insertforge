@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Input, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
-  import type { CounterTray } from '$lib/types/project';
+  import type { CounterTray, CounterShapeCategory } from '$lib/types/project';
   import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
   import { getTrayDimensions } from '$lib/models/box';
   import { getCounterShapes } from '$lib/stores/project.svelte';
@@ -13,9 +13,10 @@
     onUpdateParams: (params: CounterTrayParams) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
+    allowedShapeCategory?: CounterShapeCategory;
   }
 
-  let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+  let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions, allowedShapeCategory = 'counter' }: Props = $props();
 
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
@@ -23,7 +24,8 @@
   let dragOverIndex: number | null = $state(null);
 
   // Get shape options from project-level counterShapes
-  let shapeOptions = $derived(getCounterShapes().map((s) => ({ id: s.id, name: s.name })));
+  let availableShapes = $derived(getCounterShapes().filter((s) => (s.category ?? 'counter') === allowedShapeCategory));
+  let shapeOptions = $derived(availableShapes.map((s) => ({ id: s.id, name: s.name })));
 
   const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
@@ -114,7 +116,7 @@
   }
 
   function addTopLoadedStack() {
-    const shapeId = getCounterShapes()[0]?.id ?? DEFAULT_SHAPE_IDS.square;
+    const shapeId = availableShapes[0]?.id ?? DEFAULT_SHAPE_IDS.square;
     onUpdateParams({
       ...tray.params,
       topLoadedStacks: [...tray.params.topLoadedStacks, [shapeId, 10, undefined]]
@@ -147,7 +149,7 @@
   }
 
   function addEdgeLoadedStack() {
-    const shapeId = getCounterShapes()[0]?.id ?? DEFAULT_SHAPE_IDS.square;
+    const shapeId = availableShapes[0]?.id ?? DEFAULT_SHAPE_IDS.square;
     onUpdateParams({
       ...tray.params,
       edgeLoadedStacks: [...tray.params.edgeLoadedStacks, [shapeId, 10, 'lengthwise', undefined]]
