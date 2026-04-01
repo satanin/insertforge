@@ -303,9 +303,9 @@
     {#if layeredBoxGeometry}
       {#each layeredBoxGeometry.internalLayers as internalLayer (internalLayer.id)}
         <T.Group
-          position.x={-layeredBoxGeometry.dimensions.width / 2 + internalLayer.width / 2}
+          position.x={-layeredBoxGeometry.dimensions.width / 2}
           position.y={internalLayer.z}
-          position.z={layeredBoxGeometry.dimensions.depth / 2 - internalLayer.depth / 2}
+          position.z={layeredBoxGeometry.dimensions.depth / 2}
         >
           <TrayInBox
             geometry={internalLayer.geometry}
