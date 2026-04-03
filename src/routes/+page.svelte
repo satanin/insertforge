@@ -157,6 +157,12 @@
     layeredBox: import('$lib/types/project').LayeredBox,
     layout: import('$lib/models/layer').LayeredBoxRenderLayout
   ): Box {
+    const exteriorWidth = layeredBox.customWidth ?? layout.width + layeredBox.wallThickness * 2;
+    const exteriorDepth = layeredBox.customDepth ?? layout.depth + layeredBox.wallThickness * 2;
+    const boxBodyHeight = layeredBox.customBoxHeight ?? layout.height + layeredBox.floorThickness;
+    const interiorWidth = Math.max(exteriorWidth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
+    const interiorDepth = Math.max(exteriorDepth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
+    const interiorHeight = Math.max(boxBodyHeight - layeredBox.floorThickness, 0.1);
     const cavityTray: CupTray = {
       id: `${layeredBox.id}-cavity`,
       type: 'cup',
@@ -166,9 +172,9 @@
         layout: {
           root: { type: 'cup', id: `${layeredBox.id}-cup` }
         },
-        trayWidth: Math.max(layout.width - layeredBox.tolerance * 2, 1),
-        trayDepth: Math.max(layout.depth - layeredBox.tolerance * 2, 1),
-        cupCavityHeight: Math.max(layout.height - layeredBox.tolerance, 0.1),
+        trayWidth: interiorWidth,
+        trayDepth: interiorDepth,
+        cupCavityHeight: interiorHeight,
         wallThickness: 0,
         floorThickness: 0,
         cornerRadius: 0
@@ -183,9 +189,9 @@
       wallThickness: layeredBox.wallThickness,
       floorThickness: layeredBox.floorThickness,
       lidParams: layeredBox.lidParams,
-      customWidth: layout.width + layeredBox.wallThickness * 2,
-      customDepth: layout.depth + layeredBox.wallThickness * 2,
-      customBoxHeight: layout.height + layeredBox.floorThickness,
+      customWidth: exteriorWidth,
+      customDepth: exteriorDepth,
+      customBoxHeight: boxBodyHeight,
       fillSolidEmpty: false
     };
   }

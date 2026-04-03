@@ -88,11 +88,14 @@ export function getLayeredBoxExteriorDimensions(
 ): { width: number; depth: number; height: number; bodyHeight: number } {
   const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
   const lidThickness = layeredBox.lidParams?.thickness ?? 2;
-  const bodyHeight = layout.height + layeredBox.floorThickness;
+  const minBodyHeight = layout.height + layeredBox.floorThickness;
+  const bodyHeight = layeredBox.customBoxHeight ?? minBodyHeight;
+  const width = layeredBox.customWidth ?? layout.width + layeredBox.wallThickness * 2;
+  const depth = layeredBox.customDepth ?? layout.depth + layeredBox.wallThickness * 2;
 
   return {
-    width: layout.width + layeredBox.wallThickness * 2,
-    depth: layout.depth + layeredBox.wallThickness * 2,
+    width,
+    depth,
     height: bodyHeight + lidThickness,
     bodyHeight
   };

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -40,6 +40,7 @@
     isCupTray,
     getGlobalSettings,
     updateGlobalSettings,
+    moveLayeredBoxToLayer,
     type Board,
     type Box,
     type Layer,
@@ -59,7 +60,8 @@
   import { countCells } from '$lib/types/cardWellLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
   import { getTrayDimensionsForTray } from '$lib/models/box';
-  import { getBoxDimensions, calculateLayerHeight } from '$lib/models/layer';
+  import { getBoxDimensions, calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
+  import { getLidHeight } from '$lib/models/box';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
 
@@ -84,6 +86,28 @@
   let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
   let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
   let selectedTray = $derived(getSelectedTray());
+
+  const layerOptions = $derived.by(() => {
+    const options = project.layers.map((layer) => ({
+      value: layer.id,
+      label: layer.name
+    }));
+    options.push({
+      value: 'new',
+      label: '+ New Layer'
+    });
+    return options;
+  });
+
+  const selectedLayeredBoxCurrentLayerId = $derived.by(() => {
+    if (!selectedLayeredBox) return '';
+    for (const layer of project.layers) {
+      if (layer.layeredBoxes?.some((b) => b.id === selectedLayeredBox.id)) {
+        return layer.id;
+      }
+    }
+    return '';
+  });
 
   function getLayeredBoxSectionTypeLabel(type: LayeredBoxSectionType): string {
     switch (type) {
@@ -118,6 +142,12 @@
     if (selectedLayeredBox) {
       updateLayeredBox(selectedLayeredBox.id, updates);
     }
+  }
+
+  function handleLayeredBoxLayerChange(layerId: string) {
+    if (!selectedLayeredBox) return;
+    if (layerId !== 'new' && layerId === selectedLayeredBoxCurrentLayerId) return;
+    moveLayeredBoxToLayer(selectedLayeredBox.id, layerId as string | 'new');
   }
 
   function handleLayeredBoxLayerRename(name: string) {
@@ -440,6 +470,24 @@
         {/if}
       {:else if selectionType === 'layeredBox'}
         {#if selectedLayeredBox}
+          {@const layeredBoxLayout = getLayeredBoxRenderLayout(selectedLayeredBox, project.cardSizes, project.counterShapes)}
+          {@const layeredBoxExterior = getLayeredBoxExteriorDimensions(selectedLayeredBox, project.cardSizes, project.counterShapes)}
+          {@const layeredBoxLidHeight = getLidHeight({
+            id: selectedLayeredBox.id,
+            name: selectedLayeredBox.name,
+            trays: [],
+            tolerance: selectedLayeredBox.tolerance,
+            wallThickness: selectedLayeredBox.wallThickness,
+            floorThickness: selectedLayeredBox.floorThickness,
+            lidParams: selectedLayeredBox.lidParams
+          })}
+          {@const minBodyWidth = layeredBoxLayout.width + selectedLayeredBox.wallThickness * 2}
+          {@const minBodyDepth = layeredBoxLayout.depth + selectedLayeredBox.wallThickness * 2}
+          {@const minBodyHeight = layeredBoxLayout.height + selectedLayeredBox.floorThickness}
+          {@const displayTotalHeight =
+            selectedLayeredBox.customBoxHeight !== undefined
+              ? selectedLayeredBox.customBoxHeight + layeredBoxLidHeight
+              : undefined}
           <div class="panelFormSection">
             <FormControl label="Layered box name" name="layeredBoxName">
               {#snippet input({ inputProps })}
@@ -448,6 +496,21 @@
                   type="text"
                   value={selectedLayeredBox.name}
                   onchange={(e) => handleLayeredBoxUpdate({ name: (e.target as HTMLInputElement).value })}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            <FormControl label="Layer" name="moveLayeredBoxToLayer">
+              {#snippet input({ inputProps })}
+                <Select
+                  {...inputProps}
+                  selected={selectedLayeredBoxCurrentLayerId ? [selectedLayeredBoxCurrentLayerId] : []}
+                  options={layerOptions}
+                  onSelectedChange={(selected) => {
+                    if (selected[0]) {
+                      handleLayeredBoxLayerChange(selected[0]);
+                    }
+                  }}
                 />
               {/snippet}
             </FormControl>
@@ -505,11 +568,89 @@
             <Spacer size="1rem" />
             <div class="layerContents">
               <div class="sectionHeader">
+                <span class="contentsLabel">Box size</span>
+                <span class="treeItemDims">{layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm</span>
+              </div>
+              <Spacer size="0.5rem" />
+              <div class="formGrid">
+                <FormControl label="Width (min: {minBodyWidth.toFixed(1)})" name="layeredBoxCustomWidth">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min={minBodyWidth}
+                      value={selectedLayeredBox.customWidth ?? ''}
+                      onchange={(e) => {
+                        const v = (e.target as HTMLInputElement).value.trim();
+                        handleLayeredBoxUpdate({ customWidth: v ? parseFloat(v) : undefined });
+                      }}
+                      placeholder="Auto"
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Depth (min: {minBodyDepth.toFixed(1)})" name="layeredBoxCustomDepth">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min={minBodyDepth}
+                      value={selectedLayeredBox.customDepth ?? ''}
+                      onchange={(e) => {
+                        const v = (e.target as HTMLInputElement).value.trim();
+                        handleLayeredBoxUpdate({ customDepth: v ? parseFloat(v) : undefined });
+                      }}
+                      placeholder="Auto"
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Total Height (min: {(minBodyHeight + layeredBoxLidHeight).toFixed(1)})" name="layeredBoxCustomHeight" class="formGrid__spanTwo">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min={minBodyHeight + layeredBoxLidHeight}
+                      value={displayTotalHeight ?? ''}
+                      onchange={(e) => {
+                        const v = (e.target as HTMLInputElement).value.trim();
+                        const boxHeight = v ? parseFloat(v) - layeredBoxLidHeight : undefined;
+                        handleLayeredBoxUpdate({ customBoxHeight: boxHeight });
+                      }}
+                      placeholder="Auto"
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+              </div>
+            </div>
+            <Spacer size="1rem" />
+            <div class="layerContents">
+              <div class="sectionHeader">
                 <span class="contentsLabel">Print options</span>
               </div>
               <Spacer size="0.5rem" />
               <InputCheckbox
-                checked={selectedLayeredBox.lidParams?.showName ?? true}
+                checked={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
+                onchange={(e) =>
+                  handleLayeredBoxUpdate({
+                    lidParams: {
+                      ...selectedLayeredBox.lidParams,
+                      honeycombEnabled: (e.target as HTMLInputElement).checked,
+                      showName: (e.target as HTMLInputElement).checked
+                        ? false
+                        : (selectedLayeredBox.lidParams?.showName ?? true)
+                    }
+                  })}
+                label="Honeycomb for lid and box bottom"
+              />
+              <Spacer size="0.5rem" />
+              <InputCheckbox
+                checked={!selectedLayeredBox.lidParams?.honeycombEnabled && (selectedLayeredBox.lidParams?.showName ?? true)}
+                disabled={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
                 onchange={(e) =>
                   handleLayeredBoxUpdate({
                     lidParams: {
@@ -519,6 +660,12 @@
                   })}
                 label="Emboss name on lid top"
               />
+              {#if selectedLayeredBox.lidParams?.honeycombEnabled}
+                <Spacer size="0.5rem" />
+                <Text size="0.875rem" color="fgMuted">
+                  Text embossing is disabled when honeycomb pattern is enabled
+                </Text>
+              {/if}
             </div>
             <Spacer size="1rem" />
             <div class="layerContents">

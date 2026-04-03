@@ -1781,6 +1781,48 @@ export function moveBoxToLayer(boxId: string, targetLayerId: string | 'new'): vo
   autosave();
 }
 
+export function moveLayeredBoxToLayer(layeredBoxId: string, targetLayerId: string | 'new'): void {
+  let sourceBox: LayeredBox | null = null;
+  let sourceLayer: Layer | null = null;
+  let sourceIndex = -1;
+
+  for (const layer of project.layers) {
+    const boxIndex = layer.layeredBoxes.findIndex((b) => b.id === layeredBoxId);
+    if (boxIndex !== -1) {
+      sourceBox = layer.layeredBoxes[boxIndex];
+      sourceLayer = layer;
+      sourceIndex = boxIndex;
+      break;
+    }
+  }
+
+  if (!sourceBox || !sourceLayer) return;
+
+  let targetLayer: Layer;
+  if (targetLayerId === 'new') {
+    const layerNumber = project.layers.length + 1;
+    targetLayer = createDefaultLayer(`Layer ${layerNumber}`);
+    project.layers.push(targetLayer);
+  } else {
+    const found = project.layers.find((l) => l.id === targetLayerId);
+    if (!found || found.id === sourceLayer.id) return;
+    targetLayer = found;
+  }
+
+  sourceLayer.layeredBoxes.splice(sourceIndex, 1);
+  targetLayer.layeredBoxes.push(sourceBox);
+
+  project.selectedLayerId = targetLayer.id;
+  project.selectedLayeredBoxId = sourceBox.id;
+  project.selectedLayeredBoxLayerId = sourceBox.layers[0]?.id ?? null;
+  project.selectedLayeredBoxSectionId = sourceBox.layers[0]?.sections[0]?.id ?? null;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedBoardId = null;
+
+  autosave();
+}
+
 // Move a loose tray into a box
 export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   let sourceTray: Tray | null = null;
