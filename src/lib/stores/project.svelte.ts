@@ -29,6 +29,7 @@ import type {
   LayeredBoxSectionType,
   LidParams,
   ManualBoxPlacement,
+  ManualBoardPlacement,
   ManualLooseTrayPlacement,
   Project,
   Tray
@@ -2109,14 +2110,16 @@ export function getManualLayout(boxId: string): ManualTrayPlacement[] | undefine
 export function saveLayerLayout(
   layerId: string,
   boxPlacements: ManualBoxPlacement[],
-  looseTrayPlacements: ManualLooseTrayPlacement[]
+  looseTrayPlacements: ManualLooseTrayPlacement[],
+  boardPlacements: ManualBoardPlacement[]
 ): void {
   const layer = project.layers.find((l) => l.id === layerId);
   if (!layer) return;
 
   layer.manualLayout = {
     boxes: boxPlacements,
-    looseTrays: looseTrayPlacements
+    looseTrays: looseTrayPlacements,
+    boards: boardPlacements
   };
 
   autosave();
@@ -2134,7 +2137,7 @@ export function clearLayerLayout(layerId: string): void {
 // Get manual layer layout
 export function getLayerLayout(
   layerId: string
-): { boxes: ManualBoxPlacement[]; looseTrays: ManualLooseTrayPlacement[] } | undefined {
+): { boxes: ManualBoxPlacement[]; looseTrays: ManualLooseTrayPlacement[]; boards?: ManualBoardPlacement[] } | undefined {
   const layer = project.layers.find((l) => l.id === layerId);
   return layer?.manualLayout;
 }

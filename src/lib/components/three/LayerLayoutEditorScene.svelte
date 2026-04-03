@@ -14,10 +14,12 @@
     updateDrag,
     endDrag,
     setSnapGuides,
+    getEffectiveBoardDimensions,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
   } from '$lib/stores/layerLayoutEditor.svelte';
   import { snapLayerItemPosition, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
+  import type { BoardPlacement } from '$lib/models/layer';
   import type { TrayPlacement } from '$lib/models/box';
   import type { CounterStack } from '$lib/models/counterTray';
   import { getProject } from '$lib/stores/project.svelte';
@@ -57,6 +59,7 @@
   interface Props {
     allBoxGeometries: BoxGeometryData[];
     allLooseTrayGeometries: LooseTrayGeometryData[];
+    layerBoardPlacements: BoardPlacement[];
     gameContainerWidth: number;
     gameContainerDepth: number;
     boxWallThickness: number;
@@ -68,6 +71,7 @@
   let {
     allBoxGeometries,
     allLooseTrayGeometries,
+    layerBoardPlacements,
     gameContainerWidth,
     gameContainerDepth,
     boxWallThickness,
@@ -79,6 +83,7 @@
   // Reactive state from layer layout editor store
   let workingBoxPlacements = $derived.by(() => layerLayoutEditorState.workingBoxPlacements);
   let workingLooseTrayPlacements = $derived.by(() => layerLayoutEditorState.workingLooseTrayPlacements);
+  let workingBoardPlacements = $derived.by(() => layerLayoutEditorState.workingBoardPlacements);
   let selectedItemId = $derived.by(() => layerLayoutEditorState.selectedItemId);
   let selectedItemType = $derived.by(() => layerLayoutEditorState.selectedItemType);
   let snapGuides = $derived.by(() => layerLayoutEditorState.activeSnapGuides);
@@ -131,6 +136,17 @@
       });
     }
 
+    for (const bp of workingBoardPlacements) {
+      const dims = getEffectiveBoardDimensions(bp);
+      items.push({
+        id: bp.boardId,
+        x: bp.x,
+        y: bp.y,
+        width: dims.width,
+        depth: dims.depth
+      });
+    }
+
     return items;
   }
 
@@ -163,11 +179,17 @@
           const dims = getEffectiveBoxDimensions(bp);
           movingItem = { id: bp.boxId, x: newX, y: newY, width: dims.width, depth: dims.depth };
         }
-      } else {
+      } else if (dragState.itemType === 'looseTray') {
         const ltp = workingLooseTrayPlacements.find((p) => p.trayId === dragState.itemId);
         if (ltp) {
           const dims = getEffectiveLooseTrayDimensions(ltp);
           movingItem = { id: ltp.trayId, x: newX, y: newY, width: dims.width, depth: dims.depth };
+        }
+      } else {
+        const bp = workingBoardPlacements.find((p) => p.boardId === dragState.itemId);
+        if (bp) {
+          const dims = getEffectiveBoardDimensions(bp);
+          movingItem = { id: bp.boardId, x: newX, y: newY, width: dims.width, depth: dims.depth };
         }
       }
 
@@ -209,7 +231,7 @@
   function handleItemPointerDown(
     e: IntersectionEvent<PointerEvent>,
     itemId: string,
-    itemType: 'box' | 'looseTray',
+    itemType: 'box' | 'looseTray' | 'board',
     itemX: number,
     itemY: number
   ) {
@@ -354,6 +376,60 @@
         position.x={trayPlacement.originalWidth / 2}
         position.y={trayPlacement.height / 2}
         position.z={-trayPlacement.originalDepth / 2}
+        geometry={edgesGeom}
+        oncreate={(ref) => {
+          ref.computeLineDistances();
+        }}
+      >
+        <T.LineDashedMaterial color="#ffffff" dashSize={3} gapSize={2} />
+      </T.LineSegments>
+    {/if}
+  </T.Group>
+{/each}
+
+<!-- Render boards at working positions -->
+{#each workingBoardPlacements as boardPlacement (boardPlacement.boardId)}
+  {@const dims = getEffectiveBoardDimensions(boardPlacement)}
+  {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
+  {@const isSelected = selectedItemId === boardPlacement.boardId && selectedItemType === 'board'}
+  {@const isHovered = hoveredItemId === boardPlacement.boardId}
+  {@const baseX = layerOffsetX + boardPlacement.x + dims.width / 2}
+  {@const baseZ = layerOffsetZ - boardPlacement.y - dims.depth / 2}
+
+  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+    <T.Mesh position.y={boardPlacement.height / 2}>
+      <T.BoxGeometry args={[boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth]} />
+      <T.MeshStandardMaterial
+        color={isSelected ? '#ffffff' : boardPlacement.color}
+        emissive={isSelected ? '#2060c0' : isHovered ? '#404040' : '#000000'}
+        emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
+        roughness={0.9}
+        metalness={0.05}
+      />
+    </T.Mesh>
+
+    <T.Mesh
+      visible={false}
+      position.y={boardPlacement.height / 2}
+      onpointerdown={(e: IntersectionEvent<PointerEvent>) =>
+        handleItemPointerDown(e, boardPlacement.boardId, 'board', boardPlacement.x, boardPlacement.y)}
+      onpointerenter={() => {
+        hoveredItemId = boardPlacement.boardId;
+      }}
+      onpointerleave={() => {
+        hoveredItemId = null;
+      }}
+    >
+      <T.BoxGeometry args={[boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth]} />
+      <T.MeshBasicMaterial transparent opacity={0} />
+    </T.Mesh>
+
+    {#if isSelected}
+      {@const edgesGeom = new THREE.EdgesGeometry(
+        new THREE.BoxGeometry(boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth)
+      )}
+      <T.LineSegments
+        position.y={boardPlacement.height / 2}
         geometry={edgesGeom}
         oncreate={(ref) => {
           ref.computeLineDistances();

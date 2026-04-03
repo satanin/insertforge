@@ -2176,7 +2176,7 @@
       counterShapes
     });
 
-    enterLayerEditMode(arrangement.boxes, arrangement.looseTrays, gameContainerWidth, gameContainerDepth);
+    enterLayerEditMode(arrangement.boxes, arrangement.looseTrays, arrangement.boards, gameContainerWidth, gameContainerDepth);
   }
 
   function handleSaveLayerLayout() {
@@ -2205,13 +2205,24 @@
         depth: isRotated ? ltp.originalWidth : ltp.originalDepth
       });
     }
+    for (const bp of layerLayoutEditorState.workingBoardPlacements) {
+      const isRotated = bp.rotation === 90 || bp.rotation === 270;
+      items.push({
+        id: bp.boardId,
+        x: bp.x,
+        y: bp.y,
+        width: isRotated ? bp.originalDepth : bp.originalWidth,
+        depth: isRotated ? bp.originalWidth : bp.originalDepth
+      });
+    }
 
     const overlaps = findLayerOverlaps(items);
 
     if (overlaps.length > 0) {
       const allPlacements = [
         ...layerLayoutEditorState.workingBoxPlacements.map((p) => ({ id: p.boxId, name: p.name })),
-        ...layerLayoutEditorState.workingLooseTrayPlacements.map((p) => ({ id: p.trayId, name: p.name }))
+        ...layerLayoutEditorState.workingLooseTrayPlacements.map((p) => ({ id: p.trayId, name: p.name })),
+        ...layerLayoutEditorState.workingBoardPlacements.map((p) => ({ id: p.boardId, name: p.name }))
       ];
       const overlapNames = overlaps.map(([id1, id2]) => {
         const item1 = allPlacements.find((p) => p.id === id1);
@@ -2229,7 +2240,7 @@
     }
 
     const placements = getManualLayerPlacements();
-    saveLayerLayout(layer.id, placements.boxes, placements.looseTrays);
+    saveLayerLayout(layer.id, placements.boxes, placements.looseTrays, placements.boards);
     exitLayerEditMode();
     regenerate(true);
   }
@@ -2412,8 +2423,10 @@
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
               canEdit={
-                ((layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1) &&
-                (selectedLayer?.boards.length ?? 0) === 0
+                (layerArrangement?.boxes.length ?? 0) +
+                  (layerArrangement?.looseTrays.length ?? 0) +
+                  (layerArrangement?.boards.length ?? 0) >
+                0
               }
             />
           </div>
@@ -2669,8 +2682,10 @@
               onResetAuto={handleResetAutoLayerLayout}
               onRotate={handleRotateLayerItem}
               canEdit={
-                ((layerArrangement?.boxes.length ?? 0) + (layerArrangement?.looseTrays.length ?? 0) > 1) &&
-                (selectedLayer?.boards.length ?? 0) === 0
+                (layerArrangement?.boxes.length ?? 0) +
+                  (layerArrangement?.looseTrays.length ?? 0) +
+                  (layerArrangement?.boards.length ?? 0) >
+                0
               }
             />
           </div>

@@ -7,6 +7,7 @@
   import {
     layerLayoutEditorState,
     getSelectedPlacement,
+    getEffectiveBoardDimensions,
     getEffectiveBoxDimensions,
     getEffectiveLooseTrayDimensions
   } from '$lib/stores/layerLayoutEditor.svelte';
@@ -31,11 +32,14 @@
     if (selectedItemType === 'box') {
       return getEffectiveBoxDimensions(selectedPlacement as Parameters<typeof getEffectiveBoxDimensions>[0]);
     }
+    if (selectedItemType === 'board') {
+      return getEffectiveBoardDimensions(selectedPlacement as Parameters<typeof getEffectiveBoardDimensions>[0]);
+    }
     return getEffectiveLooseTrayDimensions(selectedPlacement as Parameters<typeof getEffectiveLooseTrayDimensions>[0]);
   });
 
   let itemTypeLabel = $derived(
-    selectedItemType === 'box' ? 'Box' : selectedItemType === 'looseTray' ? 'Tray' : undefined
+    selectedItemType === 'box' ? 'Box' : selectedItemType === 'looseTray' ? 'Tray' : selectedItemType === 'board' ? 'Board' : undefined
   );
 </script>
 

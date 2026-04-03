@@ -194,6 +194,14 @@ export interface ManualLooseTrayPlacement {
   rotation: 0 | 90 | 180 | 270; // Rotation in degrees
 }
 
+// Manual board placement for layer layout editor
+export interface ManualBoardPlacement {
+  boardId: string;
+  x: number; // Position in layer (mm)
+  y: number;
+  rotation: 0 | 90 | 180 | 270; // Rotation in degrees
+}
+
 // Layer containing boxes and/or loose trays
 export interface Layer {
   id: string;
@@ -205,6 +213,7 @@ export interface Layer {
   manualLayout?: {
     boxes: ManualBoxPlacement[];
     looseTrays: ManualLooseTrayPlacement[];
+    boards?: ManualBoardPlacement[];
   };
 }
 

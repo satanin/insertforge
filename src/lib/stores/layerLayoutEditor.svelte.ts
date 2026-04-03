@@ -3,10 +3,10 @@
  * Manages the state for manual box and loose tray arrangement within a layer
  */
 
-import type { BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
+import type { BoardPlacement, BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
 import type { SnapGuide } from '$lib/types/editor';
 import { getEffectiveDimensions as getEffectiveDimsBase } from '$lib/types/editor';
-import type { ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
+import type { ManualBoardPlacement, ManualBoxPlacement, ManualLooseTrayPlacement } from '$lib/types/project';
 
 // Re-export SnapGuide for backwards compatibility
 export type { SnapGuide };
@@ -38,6 +38,18 @@ export interface EditorLooseTrayPlacement {
   height: number;
 }
 
+export interface EditorBoardPlacement {
+  boardId: string;
+  name: string;
+  color: string;
+  x: number;
+  y: number;
+  rotation: 0 | 90 | 180 | 270;
+  originalWidth: number;
+  originalDepth: number;
+  height: number;
+}
+
 // Computed dimensions based on rotation (uses shared implementation)
 export function getEffectiveBoxDimensions(placement: EditorBoxPlacement): {
   width: number;
@@ -53,14 +65,23 @@ export function getEffectiveLooseTrayDimensions(placement: EditorLooseTrayPlacem
   return getEffectiveDimsBase(placement);
 }
 
+export function getEffectiveBoardDimensions(placement: EditorBoardPlacement): {
+  width: number;
+  depth: number;
+} {
+  return getEffectiveDimsBase(placement);
+}
+
 // Reactive state
 let isEditMode = $state(false);
 let selectedItemId = $state<string | null>(null);
-let selectedItemType = $state<'box' | 'looseTray' | null>(null);
+let selectedItemType = $state<'box' | 'looseTray' | 'board' | null>(null);
 let workingBoxPlacements = $state<EditorBoxPlacement[]>([]);
 let workingLooseTrayPlacements = $state<EditorLooseTrayPlacement[]>([]);
+let workingBoardPlacements = $state<EditorBoardPlacement[]>([]);
 let originalBoxPlacements = $state<EditorBoxPlacement[]>([]); // For cancel/restore
 let originalLooseTrayPlacements = $state<EditorLooseTrayPlacement[]>([]); // For cancel/restore
+let originalBoardPlacements = $state<EditorBoardPlacement[]>([]); // For cancel/restore
 let gameContainerWidth = $state(256);
 let gameContainerDepth = $state(256);
 
@@ -72,7 +93,7 @@ export interface DragState {
   isDragging: boolean;
   hasMoved: boolean;
   itemId: string | null;
-  itemType: 'box' | 'looseTray' | null;
+  itemType: 'box' | 'looseTray' | 'board' | null;
   startX: number;
   startY: number;
   originalItemX: number;
@@ -106,6 +127,9 @@ export const layerLayoutEditorState = {
   get workingLooseTrayPlacements() {
     return workingLooseTrayPlacements;
   },
+  get workingBoardPlacements() {
+    return workingBoardPlacements;
+  },
   get activeSnapGuides() {
     return activeSnapGuides;
   },
@@ -129,7 +153,7 @@ export function getSelectedItemId(): string | null {
   return selectedItemId;
 }
 
-export function getSelectedItemType(): 'box' | 'looseTray' | null {
+export function getSelectedItemType(): 'box' | 'looseTray' | 'board' | null {
   return selectedItemType;
 }
 
@@ -139,6 +163,7 @@ export function getSelectedItemType(): 'box' | 'looseTray' | null {
 export function enterLayerEditMode(
   boxPlacements: BoxPlacement[],
   looseTrayPlacements: LooseTrayPlacement[],
+  boardPlacements: BoardPlacement[],
   containerWidth: number,
   containerDepth: number
 ): void {
@@ -172,10 +197,29 @@ export function enterLayerEditMode(
     };
   });
 
+  const editorBoardPlacements: EditorBoardPlacement[] = boardPlacements
+    .filter((p) => !p.board.id.startsWith('layered-box-'))
+    .map((p) => {
+      const swapped = p.rotation === 90 || p.rotation === 270;
+      return {
+        boardId: p.board.id,
+        name: p.board.name,
+        color: p.board.color,
+        x: p.x,
+        y: p.y,
+        rotation: p.rotation,
+        originalWidth: swapped ? p.dimensions.depth : p.dimensions.width,
+        originalDepth: swapped ? p.dimensions.width : p.dimensions.depth,
+        height: p.dimensions.height
+      };
+    });
+
   workingBoxPlacements = editorBoxPlacements;
   workingLooseTrayPlacements = editorLooseTrayPlacements;
+  workingBoardPlacements = editorBoardPlacements;
   originalBoxPlacements = JSON.parse(JSON.stringify(editorBoxPlacements));
   originalLooseTrayPlacements = JSON.parse(JSON.stringify(editorLooseTrayPlacements));
+  originalBoardPlacements = JSON.parse(JSON.stringify(editorBoardPlacements));
   gameContainerWidth = containerWidth;
   gameContainerDepth = containerDepth;
   isEditMode = true;
@@ -192,8 +236,10 @@ export function exitLayerEditMode(): void {
   selectedItemType = null;
   workingBoxPlacements = [];
   workingLooseTrayPlacements = [];
+  workingBoardPlacements = [];
   originalBoxPlacements = [];
   originalLooseTrayPlacements = [];
+  originalBoardPlacements = [];
   activeSnapGuides = [];
   dragState = {
     isDragging: false,
@@ -213,6 +259,7 @@ export function exitLayerEditMode(): void {
 export function cancelLayerChanges(): void {
   workingBoxPlacements = JSON.parse(JSON.stringify(originalBoxPlacements));
   workingLooseTrayPlacements = JSON.parse(JSON.stringify(originalLooseTrayPlacements));
+  workingBoardPlacements = JSON.parse(JSON.stringify(originalBoardPlacements));
   selectedItemId = null;
   selectedItemType = null;
   activeSnapGuides = [];
@@ -221,7 +268,7 @@ export function cancelLayerChanges(): void {
 /**
  * Select an item
  */
-export function selectLayerItem(itemId: string, itemType: 'box' | 'looseTray'): void {
+export function selectLayerItem(itemId: string, itemType: 'box' | 'looseTray' | 'board'): void {
   selectedItemId = itemId;
   selectedItemType = itemType;
 }
@@ -256,6 +303,14 @@ export function updateLooseTrayPosition(trayId: string, x: number, y: number): v
   }
 }
 
+export function updateBoardPosition(boardId: string, x: number, y: number): void {
+  const idx = workingBoardPlacements.findIndex((p) => p.boardId === boardId);
+  if (idx !== -1) {
+    workingBoardPlacements[idx].x = x;
+    workingBoardPlacements[idx].y = y;
+  }
+}
+
 /**
  * Rotate a box (90° clockwise)
  */
@@ -280,6 +335,15 @@ export function rotateLooseTray(trayId: string): void {
   }
 }
 
+export function rotateBoard(boardId: string): void {
+  const idx = workingBoardPlacements.findIndex((p) => p.boardId === boardId);
+  if (idx !== -1) {
+    const current = workingBoardPlacements[idx].rotation;
+    const newRotation = ((current + 90) % 360) as 0 | 90 | 180 | 270;
+    workingBoardPlacements[idx].rotation = newRotation;
+  }
+}
+
 /**
  * Rotate the currently selected item
  */
@@ -288,6 +352,8 @@ export function rotateSelectedItem(): void {
     rotateBox(selectedItemId);
   } else if (selectedItemId && selectedItemType === 'looseTray') {
     rotateLooseTray(selectedItemId);
+  } else if (selectedItemId && selectedItemType === 'board') {
+    rotateBoard(selectedItemId);
   }
 }
 
@@ -297,6 +363,7 @@ export function rotateSelectedItem(): void {
 export function getManualLayerPlacements(): {
   boxes: ManualBoxPlacement[];
   looseTrays: ManualLooseTrayPlacement[];
+  boards: ManualBoardPlacement[];
 } {
   const boxes: ManualBoxPlacement[] = workingBoxPlacements.map((p) => ({
     boxId: p.boxId,
@@ -312,7 +379,14 @@ export function getManualLayerPlacements(): {
     rotation: p.rotation
   }));
 
-  return { boxes, looseTrays };
+  const boards: ManualBoardPlacement[] = workingBoardPlacements.map((p) => ({
+    boardId: p.boardId,
+    x: p.x,
+    y: p.y,
+    rotation: p.rotation
+  }));
+
+  return { boxes, looseTrays, boards };
 }
 
 /**
@@ -332,7 +406,7 @@ export function clearSnapGuides(): void {
 /**
  * Start dragging an item
  */
-export function startDrag(itemId: string, itemType: 'box' | 'looseTray', startX: number, startY: number): void {
+export function startDrag(itemId: string, itemType: 'box' | 'looseTray' | 'board', startX: number, startY: number): void {
   let originalX = 0;
   let originalY = 0;
 
@@ -342,8 +416,14 @@ export function startDrag(itemId: string, itemType: 'box' | 'looseTray', startX:
       originalX = placement.x;
       originalY = placement.y;
     }
-  } else {
+  } else if (itemType === 'looseTray') {
     const placement = workingLooseTrayPlacements.find((p) => p.trayId === itemId);
+    if (placement) {
+      originalX = placement.x;
+      originalY = placement.y;
+    }
+  } else {
+    const placement = workingBoardPlacements.find((p) => p.boardId === itemId);
     if (placement) {
       originalX = placement.x;
       originalY = placement.y;
@@ -391,10 +471,17 @@ export function updateDrag(currentX: number, currentY: number): void {
       itemWidth = dims.width;
       itemDepth = dims.depth;
     }
-  } else {
+  } else if (dragState.itemType === 'looseTray') {
     const placement = workingLooseTrayPlacements.find((p) => p.trayId === dragState.itemId);
     if (placement) {
       const dims = getEffectiveLooseTrayDimensions(placement);
+      itemWidth = dims.width;
+      itemDepth = dims.depth;
+    }
+  } else {
+    const placement = workingBoardPlacements.find((p) => p.boardId === dragState.itemId);
+    if (placement) {
+      const dims = getEffectiveBoardDimensions(placement);
       itemWidth = dims.width;
       itemDepth = dims.depth;
     }
@@ -406,8 +493,10 @@ export function updateDrag(currentX: number, currentY: number): void {
 
   if (dragState.itemType === 'box') {
     updateBoxPosition(dragState.itemId, clampedX, clampedY);
-  } else {
+  } else if (dragState.itemType === 'looseTray') {
     updateLooseTrayPosition(dragState.itemId, clampedX, clampedY);
+  } else {
+    updateBoardPosition(dragState.itemId, clampedX, clampedY);
   }
 }
 
@@ -431,10 +520,13 @@ export function endDrag(): void {
 /**
  * Get the currently selected placement (for UI display)
  */
-export function getSelectedPlacement(): EditorBoxPlacement | EditorLooseTrayPlacement | null {
+export function getSelectedPlacement(): EditorBoxPlacement | EditorLooseTrayPlacement | EditorBoardPlacement | null {
   if (!selectedItemId || !selectedItemType) return null;
   if (selectedItemType === 'box') {
     return workingBoxPlacements.find((p) => p.boxId === selectedItemId) ?? null;
+  }
+  if (selectedItemType === 'board') {
+    return workingBoardPlacements.find((p) => p.boardId === selectedItemId) ?? null;
   }
   return workingLooseTrayPlacements.find((p) => p.trayId === selectedItemId) ?? null;
 }

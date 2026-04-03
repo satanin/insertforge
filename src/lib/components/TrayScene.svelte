@@ -1314,6 +1314,7 @@
     <LayerLayoutEditorScene
       allBoxGeometries={allBoxes}
       allLooseTrayGeometries={allLooseTrays}
+      {layerBoardPlacements}
       {gameContainerWidth}
       {gameContainerDepth}
       {boxWallThickness}

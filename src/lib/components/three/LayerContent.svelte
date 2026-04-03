@@ -371,7 +371,7 @@
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if !layeredBoxGeometry}
       <T.Mesh position.y={boardHeight / 2}>
-        <T.BoxGeometry args={[boardPlacement.dimensions.width, boardHeight, boardPlacement.dimensions.depth]} />
+        <T.BoxGeometry args={[boardPlacement.board.width, boardHeight, boardPlacement.board.depth]} />
         <T.MeshStandardMaterial
           color={boardPlacement.board.color}
           roughness={0.9}

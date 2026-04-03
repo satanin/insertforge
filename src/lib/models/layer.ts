@@ -11,6 +11,7 @@ import type {
   Layer,
   LayeredBox,
   LayeredBoxSection,
+  ManualBoardPlacement,
   ManualBoxPlacement,
   ManualLooseTrayPlacement,
   Tray
@@ -335,13 +336,38 @@ function arrangeLayerManual(
     }
   }
 
+  // Place boards from manual layout
+  if (layer.manualLayout?.boards) {
+    for (const manual of layer.manualLayout.boards) {
+      const board = layer.boards.find((b) => b.id === manual.boardId);
+      if (!board) continue;
+
+      const swapDims = manual.rotation === 90 || manual.rotation === 270;
+      const effectiveDims = swapDims
+        ? { width: board.depth, depth: board.width, height: board.height }
+        : { width: board.width, depth: board.depth, height: board.height };
+
+      boardPlacements.push({
+        board,
+        dimensions: effectiveDims,
+        x: manual.x,
+        y: manual.y,
+        rotation: manual.rotation
+      });
+    }
+  }
+
   // Add any items not in manual layout using auto-arrangement
   const manualBoxIds = new Set(layer.manualLayout?.boxes?.map((m) => m.boxId) || []);
   const manualTrayIds = new Set(layer.manualLayout?.looseTrays?.map((m) => m.trayId) || []);
+  const manualBoardIds = new Set(layer.manualLayout?.boards?.map((m) => m.boardId) || []);
 
   const unplacedBoxes = layer.boxes.filter((b) => !manualBoxIds.has(b.id));
   const unplacedTrays = layer.looseTrays.filter((t) => !manualTrayIds.has(t.id));
-  const unplacedBoards = [...layer.boards, ...layer.layeredBoxes.map((box) => createLayeredBoxBoardProxy(box, cardSizes, counterShapes))];
+  const unplacedBoards = [
+    ...layer.boards.filter((b) => !manualBoardIds.has(b.id)),
+    ...layer.layeredBoxes.map((box) => createLayeredBoxBoardProxy(box, cardSizes, counterShapes))
+  ];
 
   if (unplacedBoxes.length > 0 || unplacedTrays.length > 0 || unplacedBoards.length > 0) {
     // Find max Y of placed items
@@ -561,6 +587,7 @@ function arrangeLayerAuto(
 export function arrangementToManualPlacements(arrangement: LayerArrangement): {
   boxes: ManualBoxPlacement[];
   looseTrays: ManualLooseTrayPlacement[];
+  boards: ManualBoardPlacement[];
 } {
   const boxes: ManualBoxPlacement[] = arrangement.boxes.map((p) => ({
     boxId: p.box.id,
@@ -576,5 +603,14 @@ export function arrangementToManualPlacements(arrangement: LayerArrangement): {
     rotation: p.rotation
   }));
 
-  return { boxes, looseTrays };
+  const boards: ManualBoardPlacement[] = arrangement.boards
+    .filter((p) => !p.board.id.startsWith('layered-box-'))
+    .map((p) => ({
+      boardId: p.board.id,
+      x: p.x,
+      y: p.y,
+      rotation: p.rotation
+    }));
+
+  return { boxes, looseTrays, boards };
 }
