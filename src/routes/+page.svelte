@@ -694,11 +694,44 @@
       return selectedTray?.name ?? '';
     }
     if (viewMode === 'layer') {
+      if (selectionType === 'layer') {
+        const itemCount =
+          (selectedLayer?.boxes.length ?? 0) +
+          (selectedLayer?.looseTrays.length ?? 0) +
+          (selectedLayer?.boards.length ?? 0) +
+          (selectedLayer?.layeredBoxes.length ?? 0);
+
+        if (itemCount === 1) {
+          return (
+            selectedLayer?.boxes[0]?.name ??
+            selectedLayer?.looseTrays[0]?.name ??
+            selectedLayer?.boards[0]?.name ??
+            selectedLayer?.layeredBoxes[0]?.name ??
+            selectedLayer?.name ??
+            ''
+          );
+        }
+
+        return selectedLayer?.name ?? '';
+      }
+
+      if (selectionType === 'board') {
+        return selectedBoard?.name ?? '';
+      }
+
+      if (selectionType === 'layeredBox') {
+        return selectedLayeredBox?.name ?? '';
+      }
+
+      if (selectionType === 'layeredBoxLayer') {
+        return selectedLayeredBoxLayer?.name ?? selectedLayeredBox?.name ?? '';
+      }
+
+      if (selectionType === 'layeredBoxSection') {
+        return selectedLayeredBoxSection?.name ?? selectedLayeredBoxLayer?.name ?? selectedLayeredBox?.name ?? '';
+      }
+
       return (
-        selectedLayeredBoxSection?.name ??
-        selectedLayeredBoxLayer?.name ??
-        selectedBoard?.name ??
-        selectedLayeredBox?.name ??
         selectedLayer?.name ??
         ''
       );

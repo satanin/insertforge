@@ -187,9 +187,12 @@
     return geometry.boundingBox;
   }
 
-  // Calculate max height across all boxes for label positioning
-  let maxBoxHeight = $derived.by(() => {
-    return boxPlacements.reduce((max, bp) => Math.max(max, bp.dimensions.height), 0);
+  // Calculate max height across all visible layer items for label positioning
+  let maxItemHeight = $derived.by(() => {
+    const boxHeight = boxPlacements.reduce((max, bp) => Math.max(max, bp.dimensions.height), 0);
+    const trayHeight = looseTrayPlacements.reduce((max, tp) => Math.max(max, tp.dimensions.height), 0);
+    const boardHeight = boardPlacements.reduce((max, bp) => Math.max(max, bp.dimensions.height), 0);
+    return Math.max(boxHeight, trayHeight, boardHeight, 0);
   });
 
   // Calculate explosion offset for an item based on its position relative to container center
@@ -605,7 +608,7 @@
   {@const indicatorExplosionOffset = 100 * horizontalExplosion}
   {@const indicatorX = -gameContainerWidth / 2 - 15 - indicatorExplosionOffset}
   {@const indicatorZ = printBedSize / 2 + gameContainerDepth / 2}
-  {@const displayHeight = layerHeight || maxBoxHeight}
+  {@const displayHeight = layerHeight || maxItemHeight}
   {@const lineGeometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(indicatorX, 0, indicatorZ),
     new THREE.Vector3(indicatorX, displayHeight, indicatorZ)
