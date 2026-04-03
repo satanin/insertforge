@@ -59,6 +59,8 @@
   }
 
   interface LayeredBoxGeometryData {
+    shellGeometry: THREE.BufferGeometry;
+    lidGeometry: THREE.BufferGeometry;
     internalLayers: Array<{
       id: string;
       geometry: THREE.BufferGeometry;
@@ -73,7 +75,10 @@
     name: string;
     color: string;
     floorThickness: number;
-    dimensions: { width: number; depth: number; height: number };
+    wallThickness: number;
+    lidThickness: number;
+    interiorDimensions: { width: number; depth: number; height: number };
+    dimensions: { width: number; depth: number; height: number; bodyHeight: number };
     sections: LayeredBoxSectionGeometryData[];
   }
 
@@ -166,6 +171,19 @@
       if (looseTray?.color) return looseTray.color;
     }
     return fallbackColor;
+  }
+
+  function getLayeredBoxLayerColor(baseColor: string, index: number): string {
+    const color = new THREE.Color(baseColor);
+    const offset = Math.min(index * 0.08, 0.24);
+    color.offsetHSL(0, 0, offset);
+    return `#${color.getHexString()}`;
+  }
+
+  function getGeomBounds(geometry: THREE.BufferGeometry | null): THREE.Box3 | null {
+    if (!geometry) return null;
+    geometry.computeBoundingBox();
+    return geometry.boundingBox;
   }
 
   // Calculate max height across all boxes for label positioning
@@ -302,9 +320,7 @@
     layeredBoxGeometry
       ? selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
         ? layeredBoxGeometry.internalLayers.filter((internalLayer) => internalLayer.id === selectedLayeredBoxLayerId)
-        : selectionType === 'layeredBox' && isSelectedLayeredBox
-          ? layeredBoxGeometry.internalLayers
-          : []
+        : []
       : []}
   {@const visibleSections =
     layeredBoxGeometry
@@ -314,33 +330,120 @@
           ? layeredBoxGeometry.sections.filter((section) => section.internalLayerId === selectedLayeredBoxLayerId)
           : selectionType === 'layeredBox' && isSelectedLayeredBox
             ? layeredBoxGeometry.sections
-            : []
+          : []
       : []}
+  {@const shellBounds = layeredBoxGeometry ? getGeomBounds(layeredBoxGeometry.shellGeometry) : null}
+  {@const lidBounds = layeredBoxGeometry ? getGeomBounds(layeredBoxGeometry.lidGeometry) : null}
+  {@const shellCenterX =
+    layeredBoxGeometry && shellBounds ? -(shellBounds.max.x + shellBounds.min.x) / 2 : 0}
+  {@const shellCenterZ =
+    layeredBoxGeometry && shellBounds ? (shellBounds.max.y + shellBounds.min.y) / 2 : 0}
+  {@const shellGeomWidth = shellBounds ? shellBounds.max.x - shellBounds.min.x : 0}
+  {@const shellGeomDepth = shellBounds ? shellBounds.max.y - shellBounds.min.y : 0}
+  {@const slidesAlongX = shellGeomWidth > shellGeomDepth}
+  {@const lidGeomWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
+  {@const lidGeomDepth = lidBounds ? lidBounds.max.y - lidBounds.min.y : 0}
+  {@const lidBaseCenterX =
+    layeredBoxGeometry && lidBounds ? -(lidBounds.max.x + lidBounds.min.x) / 2 : 0}
+  {@const lidBaseCenterZ =
+    layeredBoxGeometry && lidBounds ? -(lidBounds.max.y + lidBounds.min.y) / 2 : 0}
+  {@const lidCenterX = slidesAlongX ? lidBaseCenterX : -lidBaseCenterX}
+  {@const lidCenterZ = slidesAlongX ? lidBaseCenterZ : -lidBaseCenterZ}
+  {@const lidRotZ = slidesAlongX ? 0 : Math.PI}
+  {@const interiorBaseX =
+    layeredBoxGeometry
+      ? -layeredBoxGeometry.dimensions.width / 2 + layeredBoxGeometry.wallThickness
+      : 0}
+  {@const interiorBaseZ =
+    layeredBoxGeometry
+      ? layeredBoxGeometry.dimensions.depth / 2 - layeredBoxGeometry.wallThickness
+      : 0}
+  {@const showFullLayeredBox = !layeredBoxGeometry || !isSelectedLayeredBox || selectionType === 'layeredBox'}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
-    {#if !layeredBoxGeometry || (selectionType === 'layeredBox' && isSelectedLayeredBox)}
+    {#if !layeredBoxGeometry}
       <T.Mesh position.y={boardHeight / 2}>
         <T.BoxGeometry args={[boardPlacement.dimensions.width, boardHeight, boardPlacement.dimensions.depth]} />
         <T.MeshStandardMaterial
           color={boardPlacement.board.color}
           roughness={0.9}
           metalness={0.05}
-          transparent
-          opacity={layeredBoxGeometry ? 0.2 : 0.75}
+          opacity={0.75}
         />
       </T.Mesh>
     {/if}
 
     {#if layeredBoxGeometry}
-      {#each visibleInternalLayers as internalLayer (internalLayer.id)}
+      {#if showFullLayeredBox}
+        <T.Mesh
+          geometry={layeredBoxGeometry.shellGeometry}
+          rotation.x={-Math.PI / 2}
+          position.x={shellCenterX}
+          position.y={0}
+          position.z={shellCenterZ}
+        >
+          <T.MeshStandardMaterial
+            color="#4a4a4a"
+            roughness={0.65}
+            metalness={0.08}
+            transparent={!(selectionType === 'layeredBox' && isSelectedLayeredBox)}
+            opacity={selectionType === 'layeredBox' && isSelectedLayeredBox ? 1 : 0.7}
+            side={THREE.DoubleSide}
+          />
+        </T.Mesh>
+
+        {#if showLid}
+          {@const lidGap = 20}
+          {@const lidSlideDistance = (slidesAlongX ? shellGeomWidth : shellGeomDepth) + lidGap}
+          {@const explodedLidX =
+            selectionType === 'layeredBox' && isSelectedLayeredBox
+              ? slidesAlongX
+                ? lidCenterX + lidSlideDistance
+                : lidCenterX
+              : lidCenterX}
+          {@const explodedLidY =
+            selectionType === 'layeredBox' && isSelectedLayeredBox
+              ? layeredBoxGeometry.dimensions.bodyHeight + layeredBoxGeometry.lidThickness
+              : layeredBoxGeometry.dimensions.bodyHeight}
+          {@const explodedLidZ =
+            selectionType === 'layeredBox' && isSelectedLayeredBox
+              ? slidesAlongX
+                ? lidCenterZ
+                : lidCenterZ - lidSlideDistance
+              : lidCenterZ}
+          <T.Mesh
+            geometry={layeredBoxGeometry.lidGeometry}
+            rotation.x={Math.PI / 2}
+            rotation.z={lidRotZ}
+            position.x={explodedLidX}
+            position.y={explodedLidY}
+            position.z={explodedLidZ}
+          >
+            <T.MeshStandardMaterial
+              color="#5a5a5a"
+              roughness={0.55}
+              metalness={0.08}
+              transparent={!(selectionType === 'layeredBox' && isSelectedLayeredBox)}
+              opacity={selectionType === 'layeredBox' && isSelectedLayeredBox ? 1 : 0.82}
+              side={THREE.DoubleSide}
+            />
+          </T.Mesh>
+        {/if}
+      {/if}
+
+      {#each visibleInternalLayers as internalLayer, layerIndex (internalLayer.id)}
+        {@const visibleLayerSections =
+          selectionType === 'layeredBoxLayer'
+            ? visibleSections.filter((section) => section.internalLayerId === internalLayer.id)
+            : []}
         <T.Group
-          position.x={-layeredBoxGeometry.dimensions.width / 2}
-          position.y={internalLayer.z}
-          position.z={-layeredBoxGeometry.dimensions.depth / 2}
+          position.x={selectionType === 'layeredBoxLayer' ? -internalLayer.width / 2 : interiorBaseX}
+          position.y={selectionType === 'layeredBoxLayer' ? 0 : layeredBoxGeometry.floorThickness + internalLayer.z}
+          position.z={selectionType === 'layeredBoxLayer' ? internalLayer.depth / 2 : interiorBaseZ}
         >
           <TrayInBox
             geometry={internalLayer.geometry}
-            color={internalLayer.color}
+            color={getLayeredBoxLayerColor(internalLayer.color, layerIndex)}
             counterStacks={[]}
             showCounters={false}
             trayId={internalLayer.id}
@@ -351,37 +454,44 @@
             depth={internalLayer.depth}
             height={internalLayer.height}
           />
-          {#each visibleSections.filter((section) => section.internalLayerId === internalLayer.id) as section (section.sectionId)}
-            <T.Group
-              position.x={section.x}
-              position.y={0.05}
-              position.z={section.y + section.dimensions.depth}
-            >
-              <TrayInBox
-                geometry={section.geometry}
-                color={section.color}
-                counterStacks={[]}
-                showCounters={false}
-                trayId={section.sectionId}
-                trayName={section.name}
-                trayLetter="S"
-                onClick={onTrayClick}
-                width={section.dimensions.width}
-                depth={section.dimensions.depth}
-                height={section.dimensions.height}
-                opacity={0.78}
-              />
-            </T.Group>
-          {/each}
+
+          {#if selectionType === 'layeredBoxLayer'}
+            {#each visibleLayerSections as section (section.sectionId)}
+              <T.Group position.x={section.x} position.y={0} position.z={-section.y}>
+                <TrayInBox
+                  geometry={section.geometry}
+                  color={section.color}
+                  counterStacks={[]}
+                  showCounters={false}
+                  trayId={section.sectionId}
+                  trayName={section.name}
+                  trayLetter="S"
+                  onClick={onTrayClick}
+                  width={section.dimensions.width}
+                  depth={section.dimensions.depth}
+                  height={section.dimensions.height}
+                  opacity={1}
+                />
+              </T.Group>
+            {/each}
+          {/if}
         </T.Group>
       {/each}
 
-      {#if selectionType === 'layeredBoxSection' && isSelectedLayeredBox}
+      {#if (selectionType === 'layeredBox' || selectionType === 'layeredBoxSection') && isSelectedLayeredBox}
         {#each visibleSections as section (section.sectionId)}
           <T.Group
-            position.x={-layeredBoxGeometry.dimensions.width / 2 + section.x}
-            position.y={section.z + 0.05}
-            position.z={-layeredBoxGeometry.dimensions.depth / 2 + section.y + section.dimensions.depth}
+            position.x={
+              selectionType === 'layeredBoxSection'
+                ? -section.dimensions.width / 2
+                : interiorBaseX + section.x
+            }
+            position.y={selectionType === 'layeredBoxSection' ? 0 : layeredBoxGeometry.floorThickness + section.z}
+            position.z={
+              selectionType === 'layeredBoxSection'
+                ? section.dimensions.depth / 2
+                : interiorBaseZ - section.y
+            }
           >
             <TrayInBox
               geometry={section.geometry}

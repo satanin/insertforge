@@ -81,6 +81,23 @@ export interface LayeredBoxRenderLayout {
   sections: LayeredBoxSectionRenderPlacement[];
 }
 
+export function getLayeredBoxExteriorDimensions(
+  layeredBox: LayeredBox,
+  cardSizes: CardSize[],
+  counterShapes: CounterShape[]
+): { width: number; depth: number; height: number; bodyHeight: number } {
+  const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+  const lidThickness = layeredBox.lidParams?.thickness ?? 2;
+  const bodyHeight = layout.height + layeredBox.floorThickness;
+
+  return {
+    width: layout.width + layeredBox.wallThickness * 2,
+    depth: layout.depth + layeredBox.wallThickness * 2,
+    height: bodyHeight + lidThickness,
+    bodyHeight
+  };
+}
+
 export function getLayeredBoxSectionDimensions(
   section: LayeredBoxSection,
   cardSizes: CardSize[],
@@ -168,7 +185,7 @@ function createLayeredBoxBoardProxy(
   cardSizes: CardSize[],
   counterShapes: CounterShape[]
 ): Board {
-  const dims = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+  const dims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
   return {
     id: `layered-box-${layeredBox.id}`,
     name: layeredBox.name,
@@ -198,7 +215,7 @@ export function calculateLayerHeight(
     return dims.height;
   });
   const layeredBoxHeights = layer.layeredBoxes.map((layeredBox) => {
-    const dims = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+    const dims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
     return dims.height;
   });
 

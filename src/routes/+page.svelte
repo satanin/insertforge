@@ -23,8 +23,10 @@
   import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
+  import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
   import {
     arrangeLayerContents,
+    getLayeredBoxExteriorDimensions,
     getLayeredBoxRenderLayout,
     type BoardPlacement,
     type BoxPlacement,
@@ -48,6 +50,8 @@
     getSelectedTray,
     getSelectedBox,
     getSelectedLayer,
+    getSelectedLayeredBoxLayer,
+    getSelectedLayeredBoxSection,
     getProject,
     getGlobalSettings,
     importProject,
@@ -55,6 +59,7 @@
     getTrayLetterById,
     getAllBoxes,
     getAllLooseTrays,
+    getSelectedLayeredBox,
     isCounterTray,
     isCardTray,
     isCardDividerTray,
@@ -63,7 +68,7 @@
     saveManualLayout,
     clearManualLayout
   } from '$lib/stores/project.svelte';
-  import type { Project } from '$lib/types/project';
+  import type { Box, CupTray, Project } from '$lib/types/project';
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
   import jscad from '@jscad/modeling';
@@ -117,6 +122,8 @@
   }
 
   interface LayeredBoxGeometryData {
+    shellGeometry: BufferGeometry;
+    lidGeometry: BufferGeometry;
     internalLayers: Array<{
       id: string;
       geometry: BufferGeometry;
@@ -131,7 +138,10 @@
     name: string;
     color: string;
     floorThickness: number;
-    dimensions: { width: number; depth: number; height: number };
+    wallThickness: number;
+    lidThickness: number;
+    interiorDimensions: { width: number; depth: number; height: number };
+    dimensions: { width: number; depth: number; height: number; bodyHeight: number };
     sections: LayeredBoxSectionGeometryData[];
   }
 
@@ -141,6 +151,43 @@
   const { measureArea } = jscad.measurements;
   const { mirror, translate } = jscad.transforms;
   const { cuboid, rectangle } = jscad.primitives;
+
+  function createSyntheticLayeredBoxBox(
+    layeredBox: import('$lib/types/project').LayeredBox,
+    layout: import('$lib/models/layer').LayeredBoxRenderLayout
+  ): Box {
+    const cavityTray: CupTray = {
+      id: `${layeredBox.id}-cavity`,
+      type: 'cup',
+      name: `${layeredBox.name} cavity`,
+      color: '#c9503c',
+      params: {
+        layout: {
+          root: { type: 'cup', id: `${layeredBox.id}-cup` }
+        },
+        trayWidth: Math.max(layout.width - layeredBox.tolerance * 2, 1),
+        trayDepth: Math.max(layout.depth - layeredBox.tolerance * 2, 1),
+        cupCavityHeight: Math.max(layout.height - layeredBox.tolerance, 0.1),
+        wallThickness: 0,
+        floorThickness: 0,
+        cornerRadius: 0
+      }
+    };
+
+    return {
+      id: layeredBox.id,
+      name: layeredBox.name,
+      trays: [cavityTray],
+      tolerance: layeredBox.tolerance,
+      wallThickness: layeredBox.wallThickness,
+      floorThickness: layeredBox.floorThickness,
+      lidParams: layeredBox.lidParams,
+      customWidth: layout.width + layeredBox.wallThickness * 2,
+      customDepth: layout.depth + layeredBox.wallThickness * 2,
+      customBoxHeight: layout.height + layeredBox.floorThickness,
+      fillSolidEmpty: false
+    };
+  }
 
   // Mobile detection
   $effect(() => {
@@ -183,6 +230,8 @@
     for (const layer of project.layers) {
       for (const layeredBox of layer.layeredBoxes) {
         const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+        const exterior = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
+        const syntheticBox = createSyntheticLayeredBoxBox(layeredBox, layout);
         const sections: LayeredBoxSectionGeometryData[] = [];
         const sectionGeometryMap = new Map<string, Geom3>();
 
@@ -250,7 +299,7 @@
 
             const outerBlock = cuboid({
               size: [internalLayer.width, internalLayer.depth, internalLayer.height],
-              center: [internalLayer.width / 2, -internalLayer.depth / 2, internalLayer.height / 2]
+              center: [internalLayer.width / 2, internalLayer.depth / 2, internalLayer.height / 2]
             });
 
             const cavityCuts = layerSections.map((section) => {
@@ -258,7 +307,7 @@
               const rectangularCavity = translate(
                 [
                   section.x + section.dimensions.width / 2,
-                  -(section.y + section.dimensions.depth / 2),
+                  section.y + section.dimensions.depth / 2,
                   cavityHeight / 2
                 ],
                 cuboid({
@@ -366,7 +415,7 @@
                 return [
                   rectangularCavity,
                   translate(
-                    [section.x, -(section.y + section.dimensions.depth), 0],
+                    [section.x, section.y, 0],
                     extrudeLinear({ height: cavityHeight }, union(...sideReliefs))
                   )
                 ];
@@ -389,17 +438,34 @@
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
+        const shellJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes);
+        const lidJscad = createLid(syntheticBox, cardSizes, counterShapes);
+        if (!shellJscad || !lidJscad) {
+          continue;
+        }
+        const lidThickness = layeredBox.lidParams?.thickness ?? 2;
+
         geometries.push({
+          shellGeometry: jscadToBufferGeometry(shellJscad),
+          lidGeometry: jscadToBufferGeometry(lidJscad),
           internalLayers,
           layeredBoxId: layeredBox.id,
           proxyBoardId: `layered-box-${layeredBox.id}`,
           name: layeredBox.name,
           color: '#6b7f95',
           floorThickness: layeredBox.floorThickness,
-          dimensions: {
+          wallThickness: layeredBox.wallThickness,
+          lidThickness,
+          interiorDimensions: {
             width: layout.width,
             depth: layout.depth,
             height: layout.height
+          },
+          dimensions: {
+            width: exterior.width,
+            depth: exterior.depth,
+            height: exterior.height,
+            bodyHeight: exterior.bodyHeight
           },
           sections
         });
@@ -594,6 +660,9 @@
   let selectedBox = $derived(getSelectedBox());
   let selectedBoard = $derived(getSelectedBoard());
   let selectedLayer = $derived(getSelectedLayer());
+  let selectedLayeredBox = $derived(getSelectedLayeredBox());
+  let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
+  let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
@@ -611,7 +680,14 @@
       return selectedTray?.name ?? '';
     }
     if (viewMode === 'layer') {
-      return selectedBoard?.name ?? selectedLayer?.name ?? '';
+      return (
+        selectedLayeredBoxSection?.name ??
+        selectedLayeredBoxLayer?.name ??
+        selectedBoard?.name ??
+        selectedLayeredBox?.name ??
+        selectedLayer?.name ??
+        ''
+      );
     }
     // For box views (all, exploded), show box name
     return selectedBox?.name ?? '';
@@ -721,7 +797,42 @@
         break;
       case 'layer':
         // Show layer view with boxes and loose trays arranged on game container
-        if (layerArrangement) {
+        if (
+          (selectionType === 'layeredBox' ||
+            selectionType === 'layeredBoxLayer' ||
+            selectionType === 'layeredBoxSection') &&
+          selectedLayeredBox
+        ) {
+          const layeredBoxGeometry = allLayeredBoxGeometries.find((entry) => entry.layeredBoxId === selectedLayeredBox.id);
+          if (layeredBoxGeometry) {
+            result.showLayerView = true;
+            result.layerBoxPlacements = [];
+            result.layerLooseTrayPlacements = [];
+            result.layerBoardPlacements = [
+              {
+                board: {
+                  id: layeredBoxGeometry.proxyBoardId,
+                  name: layeredBoxGeometry.name,
+                  color: layeredBoxGeometry.color,
+                  width: layeredBoxGeometry.dimensions.width,
+                  depth: layeredBoxGeometry.dimensions.depth,
+                  height: layeredBoxGeometry.dimensions.height
+                },
+                dimensions: {
+                  width: layeredBoxGeometry.dimensions.width,
+                  depth: layeredBoxGeometry.dimensions.depth,
+                  height: layeredBoxGeometry.dimensions.height
+                },
+                x: Math.max((gameContainerWidth - layeredBoxGeometry.dimensions.width) / 2, 0),
+                y: Math.max((gameContainerDepth - layeredBoxGeometry.dimensions.depth) / 2, 0),
+                rotation: 0
+              }
+            ];
+            result.allBoxes = allBoxGeometries;
+            result.allLooseTrays = allLooseTrayGeometries;
+            result.layeredBoxes = allLayeredBoxGeometries;
+          }
+        } else if (layerArrangement) {
           result.showLayerView = true;
           result.layerBoxPlacements = layerArrangement.boxes;
           result.layerLooseTrayPlacements = layerArrangement.looseTrays;

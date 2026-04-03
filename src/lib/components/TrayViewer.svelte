@@ -61,6 +61,8 @@
   }
 
   interface LayeredBoxGeometryData {
+    shellGeometry: BufferGeometry;
+    lidGeometry: BufferGeometry;
     internalLayers: Array<{
       id: string;
       geometry: BufferGeometry;
@@ -75,7 +77,10 @@
     name: string;
     color: string;
     floorThickness: number;
-    dimensions: { width: number; depth: number; height: number };
+    wallThickness: number;
+    lidThickness: number;
+    interiorDimensions: { width: number; depth: number; height: number };
+    dimensions: { width: number; depth: number; height: number; bodyHeight: number };
     sections: LayeredBoxSectionGeometryData[];
   }
 
