@@ -405,6 +405,7 @@ function createDefaultLayeredBoxLayer(name: string): LayeredBoxLayer {
   return {
     id: generateId(),
     name,
+    fillSolidEmpty: true,
     sections: []
   };
 }
@@ -417,7 +418,6 @@ function createDefaultLayeredBox(name: string): LayeredBox {
     tolerance: 0.5,
     wallThickness: 3.0,
     floorThickness: 2.0,
-    fillSolidEmpty: true,
     lidParams: { ...defaultLidParams }
   };
 }
@@ -457,6 +457,7 @@ function createDefaultProject(): Project {
         ...layeredBox,
         layers: layeredBox.layers.map((entry) => ({
           ...entry,
+          fillSolidEmpty: entry.fillSolidEmpty ?? true,
           sections: entry.sections ?? []
         }))
       })) ?? [],
@@ -938,6 +939,22 @@ export function updateLayeredBoxLayer(layeredBoxId: string, layeredBoxLayerId: s
     const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
     if (!boxLayer) continue;
     boxLayer.name = name;
+    autosave();
+    return;
+  }
+}
+
+export function updateLayeredBoxLayerOptions(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  updates: Partial<Omit<LayeredBoxLayer, 'id' | 'sections'>>
+): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const boxLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!boxLayer) continue;
+    Object.assign(boxLayer, updates);
     autosave();
     return;
   }

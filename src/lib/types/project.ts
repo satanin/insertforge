@@ -52,6 +52,7 @@ export interface Board {
 export interface LayeredBoxLayer {
   id: string;
   name: string;
+  fillSolidEmpty?: boolean;
   sections: LayeredBoxSection[];
 }
 
@@ -77,7 +78,6 @@ export interface LayeredBox {
   customWidth?: number;
   customDepth?: number;
   customBoxHeight?: number;
-  fillSolidEmpty?: boolean;
 }
 
 // Counter tray for cardboard counter tokens

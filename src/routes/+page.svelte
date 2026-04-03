@@ -126,12 +126,13 @@
     lidGeometry: BufferGeometry;
     internalLayers: Array<{
       id: string;
-      geometry: BufferGeometry;
+      geometry: BufferGeometry | null;
       width: number;
       depth: number;
       height: number;
       z: number;
       color: string;
+      fillSolidEmpty: boolean;
     }>;
     layeredBoxId: string;
     proxyBoardId: string;
@@ -296,144 +297,151 @@
             if (layerSections.length === 0) {
               return null;
             }
+            const sourceLayer = layeredBox.layers.find((entry) => entry.id === internalLayer.id);
+            const fillSolidEmpty = sourceLayer?.fillSolidEmpty ?? true;
 
-            const outerBlock = cuboid({
-              size: [internalLayer.width, internalLayer.depth, internalLayer.height],
-              center: [internalLayer.width / 2, internalLayer.depth / 2, internalLayer.height / 2]
-            });
+            let mergedGeometry: Geom3 | null = null;
 
-            const cavityCuts = layerSections.map((section) => {
-              const cavityHeight = Math.max(internalLayer.height, 0.1);
-              const rectangularCavity = translate(
-                [
-                  section.x + section.dimensions.width / 2,
-                  section.y + section.dimensions.depth / 2,
-                  cavityHeight / 2
-                ],
-                cuboid({
-                  size: [section.dimensions.width, section.dimensions.depth, cavityHeight],
-                  center: [0, 0, 0]
-                })
-              );
+            if (fillSolidEmpty) {
+              const outerBlock = cuboid({
+                size: [internalLayer.width, internalLayer.depth, internalLayer.height],
+                center: [internalLayer.width / 2, internalLayer.depth / 2, internalLayer.height / 2]
+              });
 
-              const sourceGeometry = sectionGeometryMap.get(section.section.id);
-              if (!sourceGeometry) {
-                return [rectangularCavity];
-              }
-
-              try {
-                const footprint = projectFootprint({}, sourceGeometry);
-                const footprintBounds = rectangle({
-                  size: [section.dimensions.width, section.dimensions.depth],
-                  center: [section.dimensions.width / 2, section.dimensions.depth / 2]
-                });
-                const footprintDeficit = subtract(footprintBounds, footprint);
-                const reliefDepth =
-                  section.section.type === 'counter' || section.section.type === 'playerBoard'
-                    ? Math.max(section.section.counterParams?.cutoutMax ?? 12, 4)
-                    : 16;
-                const edgeProbe = 0.5;
-
-                const sideReliefs = [
-                  section.x <= 0.01
-                    ? {
-                      probe: rectangle({
-                        size: [edgeProbe, section.dimensions.depth],
-                        center: [edgeProbe / 2, section.dimensions.depth / 2]
-                      }),
-                      band: rectangle({
-                        size: [reliefDepth, section.dimensions.depth],
-                        center: [reliefDepth / 2, section.dimensions.depth / 2]
-                      }),
-                      origin: [0, 0, 0] as [number, number, number],
-                      normal: [1, 0, 0] as [number, number, number]
-                    }
-                    : null,
-                  section.x + section.dimensions.width >= internalLayer.width - 0.01
-                    ? {
-                      probe: rectangle({
-                        size: [edgeProbe, section.dimensions.depth],
-                        center: [section.dimensions.width - edgeProbe / 2, section.dimensions.depth / 2]
-                      }),
-                      band: rectangle({
-                        size: [reliefDepth, section.dimensions.depth],
-                        center: [section.dimensions.width - reliefDepth / 2, section.dimensions.depth / 2]
-                      }),
-                      origin: [section.dimensions.width, 0, 0] as [number, number, number],
-                      normal: [1, 0, 0] as [number, number, number]
-                    }
-                    : null,
-                  section.y <= 0.01
-                    ? {
-                      probe: rectangle({
-                        size: [section.dimensions.width, edgeProbe],
-                        center: [section.dimensions.width / 2, edgeProbe / 2]
-                      }),
-                      band: rectangle({
-                        size: [section.dimensions.width, reliefDepth],
-                        center: [section.dimensions.width / 2, reliefDepth / 2]
-                      }),
-                      origin: [0, 0, 0] as [number, number, number],
-                      normal: [0, 1, 0] as [number, number, number]
-                    }
-                    : null,
-                  section.y + section.dimensions.depth >= internalLayer.depth - 0.01
-                    ? {
-                      probe: rectangle({
-                        size: [section.dimensions.width, edgeProbe],
-                        center: [section.dimensions.width / 2, section.dimensions.depth - edgeProbe / 2]
-                      }),
-                      band: rectangle({
-                        size: [section.dimensions.width, reliefDepth],
-                        center: [section.dimensions.width / 2, section.dimensions.depth - reliefDepth / 2]
-                      }),
-                      origin: [0, section.dimensions.depth, 0] as [number, number, number],
-                      normal: [0, 1, 0] as [number, number, number]
-                    }
-                    : null
-                ]
-                  .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-                  .map(({ probe, band, origin, normal }) => {
-                    const edgeTouch = intersect(footprintDeficit, probe);
-                    if (measureArea(edgeTouch) <= 0.001) {
-                      return null;
-                    }
-                    const sideDeficit = intersect(footprintDeficit, band);
-                    if (measureArea(sideDeficit) <= 0.01) {
-                      return null;
-                    }
-                    const touchMask = expand({ delta: reliefDepth, corners: 'round', segments: 16 }, edgeTouch);
-                    const touchingDeficit = intersect(sideDeficit, touchMask);
-                    return measureArea(touchingDeficit) > 0.01 ? mirror({ origin, normal }, touchingDeficit) : null;
+              const cavityCuts = layerSections.map((section) => {
+                const cavityHeight = Math.max(internalLayer.height, 0.1);
+                const rectangularCavity = translate(
+                  [
+                    section.x + section.dimensions.width / 2,
+                    section.y + section.dimensions.depth / 2,
+                    cavityHeight / 2
+                  ],
+                  cuboid({
+                    size: [section.dimensions.width, section.dimensions.depth, cavityHeight],
+                    center: [0, 0, 0]
                   })
-                  .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+                );
 
-                if (sideReliefs.length === 0) {
+                const sourceGeometry = sectionGeometryMap.get(section.section.id);
+                if (!sourceGeometry) {
                   return [rectangularCavity];
                 }
 
-                return [
-                  rectangularCavity,
-                  translate(
-                    [section.x, section.y, 0],
-                    extrudeLinear({ height: cavityHeight }, union(...sideReliefs))
-                  )
-                ];
-              } catch {
-                return [rectangularCavity];
-              }
-            }).flat();
+                try {
+                  const footprint = projectFootprint({}, sourceGeometry);
+                  const footprintBounds = rectangle({
+                    size: [section.dimensions.width, section.dimensions.depth],
+                    center: [section.dimensions.width / 2, section.dimensions.depth / 2]
+                  });
+                  const footprintDeficit = subtract(footprintBounds, footprint);
+                  const reliefDepth =
+                    section.section.type === 'counter' || section.section.type === 'playerBoard'
+                      ? Math.max(section.section.counterParams?.cutoutMax ?? 12, 4)
+                      : 16;
+                  const edgeProbe = 0.5;
 
-            const mergedGeometry = cavityCuts.length > 0 ? subtract(outerBlock, ...cavityCuts) : outerBlock;
+                  const sideReliefs = [
+                    section.x <= 0.01
+                      ? {
+                        probe: rectangle({
+                          size: [edgeProbe, section.dimensions.depth],
+                          center: [edgeProbe / 2, section.dimensions.depth / 2]
+                        }),
+                        band: rectangle({
+                          size: [reliefDepth, section.dimensions.depth],
+                          center: [reliefDepth / 2, section.dimensions.depth / 2]
+                        }),
+                        origin: [0, 0, 0] as [number, number, number],
+                        normal: [1, 0, 0] as [number, number, number]
+                      }
+                      : null,
+                    section.x + section.dimensions.width >= internalLayer.width - 0.01
+                      ? {
+                        probe: rectangle({
+                          size: [edgeProbe, section.dimensions.depth],
+                          center: [section.dimensions.width - edgeProbe / 2, section.dimensions.depth / 2]
+                        }),
+                        band: rectangle({
+                          size: [reliefDepth, section.dimensions.depth],
+                          center: [section.dimensions.width - reliefDepth / 2, section.dimensions.depth / 2]
+                        }),
+                        origin: [section.dimensions.width, 0, 0] as [number, number, number],
+                        normal: [1, 0, 0] as [number, number, number]
+                      }
+                      : null,
+                    section.y <= 0.01
+                      ? {
+                        probe: rectangle({
+                          size: [section.dimensions.width, edgeProbe],
+                          center: [section.dimensions.width / 2, edgeProbe / 2]
+                        }),
+                        band: rectangle({
+                          size: [section.dimensions.width, reliefDepth],
+                          center: [section.dimensions.width / 2, reliefDepth / 2]
+                        }),
+                        origin: [0, 0, 0] as [number, number, number],
+                        normal: [0, 1, 0] as [number, number, number]
+                      }
+                      : null,
+                    section.y + section.dimensions.depth >= internalLayer.depth - 0.01
+                      ? {
+                        probe: rectangle({
+                          size: [section.dimensions.width, edgeProbe],
+                          center: [section.dimensions.width / 2, section.dimensions.depth - edgeProbe / 2]
+                        }),
+                        band: rectangle({
+                          size: [section.dimensions.width, reliefDepth],
+                          center: [section.dimensions.width / 2, section.dimensions.depth - reliefDepth / 2]
+                        }),
+                        origin: [0, section.dimensions.depth, 0] as [number, number, number],
+                        normal: [0, 1, 0] as [number, number, number]
+                      }
+                      : null
+                  ]
+                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+                    .map(({ probe, band, origin, normal }) => {
+                      const edgeTouch = intersect(footprintDeficit, probe);
+                      if (measureArea(edgeTouch) <= 0.001) {
+                        return null;
+                      }
+                      const sideDeficit = intersect(footprintDeficit, band);
+                      if (measureArea(sideDeficit) <= 0.01) {
+                        return null;
+                      }
+                      const touchMask = expand({ delta: reliefDepth, corners: 'round', segments: 16 }, edgeTouch);
+                      const touchingDeficit = intersect(sideDeficit, touchMask);
+                      return measureArea(touchingDeficit) > 0.01 ? mirror({ origin, normal }, touchingDeficit) : null;
+                    })
+                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+                  if (sideReliefs.length === 0) {
+                    return [rectangularCavity];
+                  }
+
+                  return [
+                    rectangularCavity,
+                    translate(
+                      [section.x, section.y, 0],
+                      extrudeLinear({ height: cavityHeight }, union(...sideReliefs))
+                    )
+                  ];
+                } catch {
+                  return [rectangularCavity];
+                }
+              }).flat();
+
+              mergedGeometry = cavityCuts.length > 0 ? subtract(outerBlock, ...cavityCuts) : outerBlock;
+            }
 
             return {
               id: internalLayer.id,
-              geometry: jscadToBufferGeometry(mergedGeometry),
+              geometry: mergedGeometry ? jscadToBufferGeometry(mergedGeometry) : null,
               width: internalLayer.width,
               depth: internalLayer.depth,
               height: internalLayer.height,
               z: internalLayer.z,
-              color: '#c9503c'
+              color: '#c9503c',
+              fillSolidEmpty
             };
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);

@@ -63,12 +63,13 @@
     lidGeometry: THREE.BufferGeometry;
     internalLayers: Array<{
       id: string;
-      geometry: THREE.BufferGeometry;
+      geometry: THREE.BufferGeometry | null;
       width: number;
       depth: number;
       height: number;
       z: number;
       color: string;
+      fillSolidEmpty: boolean;
     }>;
     layeredBoxId: string;
     proxyBoardId: string;
@@ -443,19 +444,21 @@
           position.y={selectionType === 'layeredBoxLayer' ? 0 : layeredBoxGeometry.floorThickness + internalLayer.z}
           position.z={selectionType === 'layeredBoxLayer' ? internalLayer.depth / 2 : interiorBaseZ}
         >
-          <TrayInBox
-            geometry={internalLayer.geometry}
-            color={getLayeredBoxLayerColor(internalLayer.color, layerIndex)}
-            counterStacks={[]}
-            showCounters={false}
-            trayId={internalLayer.id}
-            trayName={layeredBoxGeometry.name}
-            trayLetter="L"
-            onClick={onTrayClick}
-            width={internalLayer.width}
-            depth={internalLayer.depth}
-            height={internalLayer.height}
-          />
+          {#if internalLayer.geometry}
+            <TrayInBox
+              geometry={internalLayer.geometry}
+              color={getLayeredBoxLayerColor(internalLayer.color, layerIndex)}
+              counterStacks={[]}
+              showCounters={false}
+              trayId={internalLayer.id}
+              trayName={layeredBoxGeometry.name}
+              trayLetter="L"
+              onClick={onTrayClick}
+              width={internalLayer.width}
+              depth={internalLayer.depth}
+              height={internalLayer.height}
+            />
+          {/if}
 
           {#if selectionType === 'layeredBoxLayer'}
             {#each visibleLayerSections as section (section.sectionId)}

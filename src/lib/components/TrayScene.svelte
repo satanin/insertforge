@@ -84,12 +84,13 @@
     lidGeometry: BufferGeometry;
     internalLayers: Array<{
       id: string;
-      geometry: BufferGeometry;
+      geometry: BufferGeometry | null;
       width: number;
       depth: number;
       height: number;
       z: number;
       color: string;
+      fillSolidEmpty: boolean;
     }>;
     layeredBoxId: string;
     proxyBoardId: string;

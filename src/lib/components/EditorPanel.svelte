@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer, Text } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -23,6 +23,7 @@
     updateBox,
     updateLayeredBox,
     updateLayeredBoxLayer,
+    updateLayeredBoxLayerOptions,
     updateLayeredBoxSection,
     updateTray,
     updateTrayParams,
@@ -122,6 +123,12 @@
   function handleLayeredBoxLayerRename(name: string) {
     if (selectedLayeredBox && selectedLayeredBoxLayer) {
       updateLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, name);
+    }
+  }
+
+  function handleLayeredBoxLayerUpdate(updates: Partial<Omit<LayeredBoxLayer, 'id' | 'sections'>>) {
+    if (selectedLayeredBox && selectedLayeredBoxLayer) {
+      updateLayeredBoxLayerOptions(selectedLayeredBox.id, selectedLayeredBoxLayer.id, updates);
     }
   }
 
@@ -498,6 +505,24 @@
             <Spacer size="1rem" />
             <div class="layerContents">
               <div class="sectionHeader">
+                <span class="contentsLabel">Print options</span>
+              </div>
+              <Spacer size="0.5rem" />
+              <InputCheckbox
+                checked={selectedLayeredBox.lidParams?.showName ?? true}
+                onchange={(e) =>
+                  handleLayeredBoxUpdate({
+                    lidParams: {
+                      ...selectedLayeredBox.lidParams,
+                      showName: (e.target as HTMLInputElement).checked
+                    }
+                  })}
+                label="Emboss name on lid top"
+              />
+            </div>
+            <Spacer size="1rem" />
+            <div class="layerContents">
+              <div class="sectionHeader">
                 <span class="contentsLabel">Internal layers</span>
               </div>
               <div class="contentsTree">
@@ -531,6 +556,15 @@
                 />
               {/snippet}
             </FormControl>
+            <Spacer size="1rem" />
+            <InputCheckbox
+              checked={selectedLayeredBoxLayer.fillSolidEmpty ?? true}
+              onchange={(e) =>
+                handleLayeredBoxLayerUpdate({
+                  fillSolidEmpty: (e.target as HTMLInputElement).checked
+                })}
+              label="Fill empty space solid"
+            />
             <Spacer size="1rem" />
             <div class="buttonRow">
               <button class="secondaryButton" onclick={handleAddLayeredBoxLayer}>Add internal layer</button>
