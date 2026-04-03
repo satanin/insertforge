@@ -320,7 +320,9 @@
     layeredBoxGeometry
       ? selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
         ? layeredBoxGeometry.internalLayers.filter((internalLayer) => internalLayer.id === selectedLayeredBoxLayerId)
-        : []
+        : selectionType === 'layeredBox' && isSelectedLayeredBox
+          ? layeredBoxGeometry.internalLayers
+          : []
       : []}
   {@const visibleSections =
     layeredBoxGeometry
