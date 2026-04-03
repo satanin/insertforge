@@ -197,9 +197,7 @@ export function enterLayerEditMode(
     };
   });
 
-  const editorBoardPlacements: EditorBoardPlacement[] = boardPlacements
-    .filter((p) => !p.board.id.startsWith('layered-box-'))
-    .map((p) => {
+  const editorBoardPlacements: EditorBoardPlacement[] = boardPlacements.map((p) => {
       const swapped = p.rotation === 90 || p.rotation === 270;
       return {
         boardId: p.board.id,

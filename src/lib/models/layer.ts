@@ -339,7 +339,11 @@ function arrangeLayerManual(
   // Place boards from manual layout
   if (layer.manualLayout?.boards) {
     for (const manual of layer.manualLayout.boards) {
-      const board = layer.boards.find((b) => b.id === manual.boardId);
+      const board =
+        layer.boards.find((b) => b.id === manual.boardId) ??
+        layer.layeredBoxes
+          .map((layeredBox) => createLayeredBoxBoardProxy(layeredBox, cardSizes, counterShapes))
+          .find((b) => b.id === manual.boardId);
       if (!board) continue;
 
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
@@ -366,7 +370,9 @@ function arrangeLayerManual(
   const unplacedTrays = layer.looseTrays.filter((t) => !manualTrayIds.has(t.id));
   const unplacedBoards = [
     ...layer.boards.filter((b) => !manualBoardIds.has(b.id)),
-    ...layer.layeredBoxes.map((box) => createLayeredBoxBoardProxy(box, cardSizes, counterShapes))
+    ...layer.layeredBoxes
+      .map((box) => createLayeredBoxBoardProxy(box, cardSizes, counterShapes))
+      .filter((board) => !manualBoardIds.has(board.id))
   ];
 
   if (unplacedBoxes.length > 0 || unplacedTrays.length > 0 || unplacedBoards.length > 0) {
@@ -603,9 +609,7 @@ export function arrangementToManualPlacements(arrangement: LayerArrangement): {
     rotation: p.rotation
   }));
 
-  const boards: ManualBoardPlacement[] = arrangement.boards
-    .filter((p) => !p.board.id.startsWith('layered-box-'))
-    .map((p) => ({
+  const boards: ManualBoardPlacement[] = arrangement.boards.map((p) => ({
       boardId: p.board.id,
       x: p.x,
       y: p.y,
