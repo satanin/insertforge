@@ -864,6 +864,48 @@ export function deleteBoard(boardId: string): void {
   }
 }
 
+export function moveBoardToLayer(boardId: string, targetLayerId: string | 'new'): void {
+  let sourceBoard: Board | null = null;
+  let sourceLayer: Layer | null = null;
+  let sourceIndex = -1;
+
+  for (const layer of project.layers) {
+    const boardIndex = layer.boards.findIndex((b) => b.id === boardId);
+    if (boardIndex !== -1) {
+      sourceBoard = layer.boards[boardIndex];
+      sourceLayer = layer;
+      sourceIndex = boardIndex;
+      break;
+    }
+  }
+
+  if (!sourceBoard || !sourceLayer) return;
+
+  let targetLayer: Layer;
+  if (targetLayerId === 'new') {
+    const layerNumber = project.layers.length + 1;
+    targetLayer = createDefaultLayer(`Layer ${layerNumber}`);
+    project.layers.push(targetLayer);
+  } else {
+    const found = project.layers.find((l) => l.id === targetLayerId);
+    if (!found || found.id === sourceLayer.id) return;
+    targetLayer = found;
+  }
+
+  sourceLayer.boards.splice(sourceIndex, 1);
+  targetLayer.boards.push(sourceBoard);
+
+  project.selectedLayerId = targetLayer.id;
+  project.selectedBoardId = sourceBoard.id;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+
+  autosave();
+}
+
 export function addLayeredBox(layerId?: string): LayeredBox | null {
   const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
   const layer = project.layers.find((l) => l.id === targetLayerId);

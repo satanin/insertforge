@@ -20,6 +20,7 @@
     addLayerToLayeredBox,
     deleteLayerFromLayeredBox,
     updateBoard,
+    moveBoardToLayer,
     updateBox,
     updateLayeredBox,
     updateLayeredBoxLayer,
@@ -109,6 +110,16 @@
     return '';
   });
 
+  const selectedBoardCurrentLayerId = $derived.by(() => {
+    if (!selectedBoard) return '';
+    for (const layer of project.layers) {
+      if (layer.boards?.some((b) => b.id === selectedBoard.id)) {
+        return layer.id;
+      }
+    }
+    return '';
+  });
+
   function getLayeredBoxSectionTypeLabel(type: LayeredBoxSectionType): string {
     switch (type) {
       case 'counter':
@@ -148,6 +159,12 @@
     if (!selectedLayeredBox) return;
     if (layerId !== 'new' && layerId === selectedLayeredBoxCurrentLayerId) return;
     moveLayeredBoxToLayer(selectedLayeredBox.id, layerId as string | 'new');
+  }
+
+  function handleBoardLayerChange(layerId: string) {
+    if (!selectedBoard) return;
+    if (layerId !== 'new' && layerId === selectedBoardCurrentLayerId) return;
+    moveBoardToLayer(selectedBoard.id, layerId as string | 'new');
   }
 
   function handleLayeredBoxLayerRename(name: string) {
@@ -856,6 +873,21 @@
               {/snippet}
             </FormControl>
             <Spacer size="1rem" />
+            <FormControl label="Layer" name="moveBoardToLayer">
+              {#snippet input({ inputProps })}
+                <Select
+                  {...inputProps}
+                  selected={selectedBoardCurrentLayerId ? [selectedBoardCurrentLayerId] : []}
+                  options={layerOptions}
+                  onSelectedChange={(selected) => {
+                    if (selected[0]) {
+                      handleBoardLayerChange(selected[0]);
+                    }
+                  }}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
             <div class="formGrid">
               <FormControl label="Width" name="boardWidth">
                 {#snippet input({ inputProps })}
@@ -1134,4 +1166,5 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
 </style>
