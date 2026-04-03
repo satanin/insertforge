@@ -389,8 +389,6 @@
             color="#4a4a4a"
             roughness={0.65}
             metalness={0.08}
-            transparent={!(selectionType === 'layeredBox' && isSelectedLayeredBox)}
-            opacity={selectionType === 'layeredBox' && isSelectedLayeredBox ? 1 : 0.7}
             side={THREE.DoubleSide}
           />
         </T.Mesh>
@@ -426,8 +424,6 @@
               color="#5a5a5a"
               roughness={0.55}
               metalness={0.08}
-              transparent={!(selectionType === 'layeredBox' && isSelectedLayeredBox)}
-              opacity={selectionType === 'layeredBox' && isSelectedLayeredBox ? 1 : 0.82}
               side={THREE.DoubleSide}
             />
           </T.Mesh>
