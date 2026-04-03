@@ -359,6 +359,7 @@ function arrangeLayerManual(
       boxes: unplacedBoxes,
       looseTrays: unplacedTrays,
       boards: unplacedBoards,
+      layeredBoxes: [],
       manualLayout: undefined
     };
     const autoArrangement = arrangeLayerAuto(tempLayer, layerHeight, options);

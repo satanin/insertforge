@@ -316,7 +316,12 @@
   {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2}
   {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2}
   {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
-  {@const isSelectedLayeredBox = layeredBoxGeometry && selectedLayeredBoxId === layeredBoxGeometry.layeredBoxId}
+  {@const isLayeredBoxSelection =
+    selectionType === 'layeredBox' ||
+    selectionType === 'layeredBoxLayer' ||
+    selectionType === 'layeredBoxSection'}
+  {@const isSelectedLayeredBox =
+    layeredBoxGeometry && isLayeredBoxSelection && selectedLayeredBoxId === layeredBoxGeometry.layeredBoxId}
   {@const visibleInternalLayers =
     layeredBoxGeometry
       ? selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
