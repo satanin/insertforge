@@ -755,6 +755,17 @@
                 })}
               label="Fill empty space solid"
             />
+            {#if selectedLayeredBoxLayer.fillSolidEmpty ?? true}
+              <Spacer size="0.75rem" />
+              <InputCheckbox
+                checked={selectedLayeredBoxLayer.edgeReliefEnabled ?? true}
+                onchange={(e) =>
+                  handleLayeredBoxLayerUpdate({
+                    edgeReliefEnabled: (e.target as HTMLInputElement).checked
+                  })}
+                label="Generate relief cutouts"
+              />
+            {/if}
             <Spacer size="1rem" />
             <div class="buttonRow">
               <button

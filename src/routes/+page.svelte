@@ -361,6 +361,7 @@
             }
             const sourceLayer = layeredBox.layers.find((entry) => entry.id === internalLayer.id);
             const fillSolidEmpty = sourceLayer?.fillSolidEmpty ?? true;
+            const edgeReliefEnabled = sourceLayer?.edgeReliefEnabled ?? true;
 
             let mergedGeometry: Geom3 | null = null;
 
@@ -438,7 +439,7 @@
                       )
                     );
 
-                  const sideReliefs = [
+                  const sideReliefs = edgeReliefEnabled ? [
                     {
                       axis: 'vertical' as const,
                       isOuterBoundary: section.x <= 0.01,
@@ -650,7 +651,7 @@
                       }
                       return translate([-section.x, -section.y], reliefWithinFill);
                     })
-                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null) : [];
 
                   if (sideReliefs.length === 0) {
                     return [rectangularCavity];

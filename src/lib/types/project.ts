@@ -53,6 +53,7 @@ export interface LayeredBoxLayer {
   id: string;
   name: string;
   fillSolidEmpty?: boolean;
+  edgeReliefEnabled?: boolean;
   sections: LayeredBoxSection[];
 }
 

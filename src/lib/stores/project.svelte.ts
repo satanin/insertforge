@@ -417,6 +417,7 @@ function createDefaultLayeredBoxLayer(name: string): LayeredBoxLayer {
     id: generateId(),
     name,
     fillSolidEmpty: true,
+    edgeReliefEnabled: true,
     sections: []
   };
 }
@@ -469,6 +470,7 @@ function createDefaultProject(): Project {
         layers: layeredBox.layers.map((entry) => ({
           ...entry,
           fillSolidEmpty: entry.fillSolidEmpty ?? true,
+          edgeReliefEnabled: entry.edgeReliefEnabled ?? true,
           sections: entry.sections ?? []
         }))
       })) ?? [],
