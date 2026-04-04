@@ -1350,6 +1350,7 @@
       {selectedLayeredBoxId}
       {selectedLayeredBoxLayerId}
       {selectedLayeredBoxSectionId}
+      horizontalExplosion={selectionType === 'layeredBox' ? explosionAmount / 100 : 0}
     />
   {/if}
 {/if}

@@ -2449,19 +2449,27 @@
 
         {#if viewMode === 'layer' && !generating}
           <div class="viewToolbar">
-            <LayerLayoutEditorOverlay
-              onEnterEdit={handleEnterLayerLayoutEdit}
-              onSave={handleSaveLayerLayout}
-              onCancel={handleCancelLayerLayout}
-              onResetAuto={handleResetAutoLayerLayout}
-              onRotate={handleRotateLayerItem}
-              canEdit={
-                (layerArrangement?.boxes.length ?? 0) +
-                  (layerArrangement?.looseTrays.length ?? 0) +
-                  (layerArrangement?.boards.length ?? 0) >
-                0
-              }
-            />
+            {#if selectionType === 'layeredBox'}
+              <div class="sliderContainer">
+                <span class="sliderLabel">Explode</span>
+                <InputSlider min={0} max={100} bind:value={explosionAmount} />
+              </div>
+            {:else}
+              <LayerLayoutEditorOverlay
+                onEnterEdit={handleEnterLayerLayoutEdit}
+                onSave={handleSaveLayerLayout}
+                onCancel={handleCancelLayerLayout}
+                onResetAuto={handleResetAutoLayerLayout}
+                onRotate={handleRotateLayerItem}
+                canEdit={
+                  selectionType !== 'layeredBoxLayer' &&
+                  (layerArrangement?.boxes.length ?? 0) +
+                    (layerArrangement?.looseTrays.length ?? 0) +
+                    (layerArrangement?.boards.length ?? 0) >
+                    0
+                }
+              />
+            {/if}
           </div>
         {/if}
 
@@ -2708,19 +2716,27 @@
 
         {#if viewMode === 'layer' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
-            <LayerLayoutEditorOverlay
-              onEnterEdit={handleEnterLayerLayoutEdit}
-              onSave={handleSaveLayerLayout}
-              onCancel={handleCancelLayerLayout}
-              onResetAuto={handleResetAutoLayerLayout}
-              onRotate={handleRotateLayerItem}
-              canEdit={
-                (layerArrangement?.boxes.length ?? 0) +
-                  (layerArrangement?.looseTrays.length ?? 0) +
-                  (layerArrangement?.boards.length ?? 0) >
-                0
-              }
-            />
+            {#if selectionType === 'layeredBox'}
+              <div class="sliderContainer">
+                <span class="sliderLabel">Explode</span>
+                <InputSlider min={0} max={100} bind:value={explosionAmount} />
+              </div>
+            {:else}
+              <LayerLayoutEditorOverlay
+                onEnterEdit={handleEnterLayerLayoutEdit}
+                onSave={handleSaveLayerLayout}
+                onCancel={handleCancelLayerLayout}
+                onResetAuto={handleResetAutoLayerLayout}
+                onRotate={handleRotateLayerItem}
+                canEdit={
+                  selectionType !== 'layeredBoxLayer' &&
+                  (layerArrangement?.boxes.length ?? 0) +
+                    (layerArrangement?.looseTrays.length ?? 0) +
+                    (layerArrangement?.boards.length ?? 0) >
+                    0
+                }
+              />
+            {/if}
           </div>
         {/if}
 

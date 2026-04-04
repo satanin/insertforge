@@ -443,9 +443,16 @@
           selectionType === 'layeredBoxLayer'
             ? visibleSections.filter((section) => section.internalLayerId === internalLayer.id)
             : []}
+        {@const layeredBoxExplodeX = 0}
+        {@const layeredBoxExplodeY =
+          selectionType === 'layeredBox'
+            ? horizontalExplosion * (layeredBoxGeometry.dimensions.bodyHeight + 8) + layerIndex * 12 * horizontalExplosion
+            : 0}
         <T.Group
-          position.x={selectionType === 'layeredBoxLayer' ? -internalLayer.width / 2 : interiorBaseX}
-          position.y={selectionType === 'layeredBoxLayer' ? 0 : layeredBoxGeometry.floorThickness + internalLayer.z}
+          position.x={selectionType === 'layeredBoxLayer' ? -internalLayer.width / 2 : interiorBaseX + layeredBoxExplodeX}
+          position.y={
+            selectionType === 'layeredBoxLayer' ? 0 : layeredBoxGeometry.floorThickness + internalLayer.z + layeredBoxExplodeY
+          }
           position.z={selectionType === 'layeredBoxLayer' ? internalLayer.depth / 2 : interiorBaseZ}
         >
           {#if internalLayer.geometry}
@@ -489,13 +496,20 @@
 
       {#if (selectionType === 'layeredBox' || selectionType === 'layeredBoxSection') && isSelectedLayeredBox}
         {#each visibleSections as section (section.sectionId)}
+          {@const sectionLayerIndex =
+            layeredBoxGeometry.internalLayers.findIndex((internalLayer) => internalLayer.id === section.internalLayerId)}
+          {@const sectionExplodeX = 0}
+          {@const sectionExplodeY =
+            selectionType === 'layeredBox' && sectionLayerIndex >= 0
+              ? horizontalExplosion * (layeredBoxGeometry.dimensions.bodyHeight + 8) + sectionLayerIndex * 12 * horizontalExplosion
+              : 0}
           <T.Group
             position.x={
               selectionType === 'layeredBoxSection'
                 ? -section.dimensions.width / 2
-                : interiorBaseX + section.x
+                : interiorBaseX + section.x + sectionExplodeX
             }
-            position.y={selectionType === 'layeredBoxSection' ? 0 : layeredBoxGeometry.floorThickness + section.z}
+            position.y={selectionType === 'layeredBoxSection' ? 0 : layeredBoxGeometry.floorThickness + section.z + sectionExplodeY}
             position.z={
               selectionType === 'layeredBoxSection'
                 ? section.dimensions.depth / 2
