@@ -401,30 +401,28 @@
                 <span class="navItemLabel">
                   {box.name}
                 </span>
-                {#if totalItems > 1}
-                  <span
-                    class="navItemDelete"
-                    role="none"
-                    onclick={(e) => e.stopPropagation()}
-                    onkeydown={(e) => e.stopPropagation()}
+                <span
+                  class="navItemDelete"
+                  role="none"
+                  onclick={(e) => e.stopPropagation()}
+                  onkeydown={(e) => e.stopPropagation()}
+                >
+                  <ConfirmActionButton
+                    action={() => handleDeleteBox(box.id)}
+                    actionButtonText="Delete box"
+                    positioning={{ placement: 'right' }}
+                    portal=".appContainer"
                   >
-                    <ConfirmActionButton
-                      action={() => handleDeleteBox(box.id)}
-                      actionButtonText="Delete box"
-                      positioning={{ placement: 'right' }}
-                      portal=".appContainer"
-                    >
-                      {#snippet trigger({ triggerProps })}
-                        <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
-                          <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-                        </IconButton>
-                      {/snippet}
-                      {#snippet actionMessage()}
-                        <p>Delete this box and all its trays?</p>
-                      {/snippet}
-                    </ConfirmActionButton>
-                  </span>
-                {/if}
+                    {#snippet trigger({ triggerProps })}
+                      <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete box">
+                        <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                      </IconButton>
+                    {/snippet}
+                    {#snippet actionMessage()}
+                      <p>Delete this box and all its trays?</p>
+                    {/snippet}
+                  </ConfirmActionButton>
+                </span>
               </button>
 
               <!-- Trays within Box -->
@@ -571,30 +569,28 @@
                   {layeredBox.name}
                   <span class="looseBadge">layered</span>
                 </span>
-                {#if totalItems > 1}
-                  <span
-                    class="navItemDelete"
-                    role="none"
-                    onclick={(e) => e.stopPropagation()}
-                    onkeydown={(e) => e.stopPropagation()}
+                <span
+                  class="navItemDelete"
+                  role="none"
+                  onclick={(e) => e.stopPropagation()}
+                  onkeydown={(e) => e.stopPropagation()}
+                >
+                  <ConfirmActionButton
+                    action={() => handleDeleteLayeredBox(layeredBox.id)}
+                    actionButtonText="Delete layered box"
+                    positioning={{ placement: 'right' }}
+                    portal=".appContainer"
                   >
-                    <ConfirmActionButton
-                      action={() => handleDeleteLayeredBox(layeredBox.id)}
-                      actionButtonText="Delete layered box"
-                      positioning={{ placement: 'right' }}
-                      portal=".appContainer"
-                    >
-                      {#snippet trigger({ triggerProps })}
-                        <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layered box">
-                          <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-                        </IconButton>
-                      {/snippet}
-                      {#snippet actionMessage()}
-                        <p>Delete this layered box?</p>
-                      {/snippet}
-                    </ConfirmActionButton>
-                  </span>
-                {/if}
+                    {#snippet trigger({ triggerProps })}
+                      <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete layered box">
+                        <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                      </IconButton>
+                    {/snippet}
+                    {#snippet actionMessage()}
+                      <p>Delete this layered box?</p>
+                    {/snippet}
+                  </ConfirmActionButton>
+                </span>
               </button>
 
               <div class="navTrayList">
@@ -743,30 +739,28 @@
                 {tray.name}
                 <span class="looseBadge">loose</span>
               </span>
-              {#if totalItems > 1}
-                <span
-                  class="navItemDelete"
-                  role="none"
-                  onclick={(e) => e.stopPropagation()}
-                  onkeydown={(e) => e.stopPropagation()}
+              <span
+                class="navItemDelete"
+                role="none"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+              >
+                <ConfirmActionButton
+                  action={() => handleDeleteTray(null, tray.id)}
+                  actionButtonText="Delete tray"
+                  positioning={{ placement: 'right' }}
+                  portal=".appContainer"
                 >
-                  <ConfirmActionButton
-                    action={() => handleDeleteTray(null, tray.id)}
-                    actionButtonText="Delete tray"
-                    positioning={{ placement: 'right' }}
-                    portal=".appContainer"
-                  >
-                    {#snippet trigger({ triggerProps })}
-                      <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">
-                        <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-                      </IconButton>
-                    {/snippet}
-                    {#snippet actionMessage()}
-                      <p>Delete this loose tray?</p>
-                    {/snippet}
-                  </ConfirmActionButton>
-                </span>
-              {/if}
+                  {#snippet trigger({ triggerProps })}
+                    <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete tray">
+                      <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                    </IconButton>
+                  {/snippet}
+                  {#snippet actionMessage()}
+                    <p>Delete this loose tray?</p>
+                  {/snippet}
+                </ConfirmActionButton>
+              </span>
             </button>
           {/each}
 
@@ -784,30 +778,28 @@
                 {board.name}
                 <span class="looseBadge">board</span>
               </span>
-              {#if totalItems > 1}
-                <span
-                  class="navItemDelete"
-                  role="none"
-                  onclick={(e) => e.stopPropagation()}
-                  onkeydown={(e) => e.stopPropagation()}
+              <span
+                class="navItemDelete"
+                role="none"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+              >
+                <ConfirmActionButton
+                  action={() => handleDeleteBoard(board.id)}
+                  actionButtonText="Delete board"
+                  positioning={{ placement: 'right' }}
+                  portal=".appContainer"
                 >
-                  <ConfirmActionButton
-                    action={() => handleDeleteBoard(board.id)}
-                    actionButtonText="Delete board"
-                    positioning={{ placement: 'right' }}
-                    portal=".appContainer"
-                  >
-                    {#snippet trigger({ triggerProps })}
-                      <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete board">
-                        <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
-                      </IconButton>
-                    {/snippet}
-                    {#snippet actionMessage()}
-                      <p>Delete this board?</p>
-                    {/snippet}
-                  </ConfirmActionButton>
-                </span>
-              {/if}
+                  {#snippet trigger({ triggerProps })}
+                    <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete board">
+                      <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                    </IconButton>
+                  {/snippet}
+                  {#snippet actionMessage()}
+                    <p>Delete this board?</p>
+                  {/snippet}
+                </ConfirmActionButton>
+              </span>
             </button>
           {/each}
 
