@@ -768,7 +768,10 @@
             <Spacer size="1rem" />
             <div class="buttonRow">
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('counter')}>Add counter tray</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardDraw')}>Add card draw</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardDivider')}>Add card divider</button>
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardWell')}>Add card well</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cup')}>Add cup tray</button>
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('playerBoard')}>Add player board</button>
             </div>
             <Spacer size="1rem" />
