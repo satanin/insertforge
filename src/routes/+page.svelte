@@ -241,17 +241,19 @@
         const syntheticBox = createSyntheticLayeredBoxBox(layeredBox, layout);
         const sections: LayeredBoxSectionGeometryData[] = [];
         const sectionGeometryMap = new Map<string, Geom3>();
+        const internalLayerHeightById = new Map(layout.internalLayers.map((layer) => [layer.id, layer.height]));
 
         for (const placement of layout.sections) {
           try {
             let jscadGeometry: Geom3 | null = null;
+            const sectionTargetHeight = internalLayerHeightById.get(placement.internalLayerId) ?? placement.dimensions.height;
 
             if ((placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams) {
               jscadGeometry = createCounterTray(
                 placement.section.counterParams,
                 counterShapes,
                 placement.section.name,
-                placement.dimensions.height,
+                sectionTargetHeight,
                 0,
                 false
               );
@@ -260,7 +262,7 @@
                 placement.section.cardDrawParams,
                 cardSizes,
                 placement.section.name,
-                placement.dimensions.height,
+                sectionTargetHeight,
                 0,
                 false
               );
@@ -269,7 +271,7 @@
                 placement.section.cardDividerParams,
                 cardSizes,
                 placement.section.name,
-                placement.dimensions.height,
+                sectionTargetHeight,
                 0,
                 false,
                 true
@@ -279,7 +281,7 @@
                 placement.section.cardWellParams,
                 cardSizes,
                 placement.section.name,
-                placement.dimensions.height,
+                sectionTargetHeight,
                 0,
                 false
               );
@@ -287,7 +289,7 @@
               jscadGeometry = createCupTray(
                 placement.section.cupParams,
                 placement.section.name,
-                placement.dimensions.height,
+                sectionTargetHeight,
                 0,
                 false
               );
@@ -306,10 +308,13 @@
               type: placement.section.type,
               color: placement.section.color ?? '#c9503c',
               geometry: jscadToBufferGeometry(jscadGeometry),
-              dimensions: placement.dimensions,
+              dimensions: {
+                ...placement.dimensions,
+                height: sectionTargetHeight
+              },
               counterStacks:
                 (placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams
-                  ? getCounterPositions(placement.section.counterParams, counterShapes, placement.dimensions.height, 0)
+                  ? getCounterPositions(placement.section.counterParams, counterShapes, sectionTargetHeight, 0)
                   : [],
               x: placement.x,
               y: placement.y,
