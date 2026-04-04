@@ -11,6 +11,7 @@ import {
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { DEFAULT_EMPTY_BOX_BODY_HEIGHT, DEFAULT_EMPTY_BOX_DEPTH, DEFAULT_EMPTY_BOX_WIDTH } from '$lib/models/box';
+import { arrangeLayerContents, arrangementToManualPlacements, getLayeredBoxRenderLayout } from '$lib/models/layer';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
   Board,
@@ -949,6 +950,179 @@ export function updateLayeredBox(
     autosave();
     return;
   }
+}
+
+export function expandLayeredBoxToAvailableSpace(
+  layeredBoxId: string,
+  gameContainerWidth: number,
+  gameContainerDepth: number
+): boolean {
+  for (const layer of project.layers) {
+    const layeredBoxIndex = layer.layeredBoxes?.findIndex((b) => b.id === layeredBoxId) ?? -1;
+    if (layeredBoxIndex === -1 || !layer.layeredBoxes) continue;
+    const layeredBox = layer.layeredBoxes[layeredBoxIndex];
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth,
+      gameContainerDepth,
+      cardSizes: project.cardSizes,
+      counterShapes: project.counterShapes
+    });
+    const proxyId = `layered-box-${layeredBoxId}`;
+    const targetPlacement = arrangement.boards.find((placement) => placement.board.id === proxyId);
+    if (!targetPlacement) return false;
+
+    const currentLeft = targetPlacement.x;
+    const currentTop = targetPlacement.y;
+    const currentRight = currentLeft + targetPlacement.dimensions.width;
+    const currentBottom = currentTop + targetPlacement.dimensions.depth;
+    const centerX = currentLeft + targetPlacement.dimensions.width / 2;
+    const centerY = currentTop + targetPlacement.dimensions.depth / 2;
+
+    const obstacles = [
+      ...arrangement.boxes.map((placement) => ({
+        x: placement.x,
+        y: placement.y,
+        width: placement.dimensions.width,
+        depth: placement.dimensions.depth
+      })),
+      ...arrangement.looseTrays.map((placement) => ({
+        x: placement.x,
+        y: placement.y,
+        width: placement.dimensions.width,
+        depth: placement.dimensions.depth
+      })),
+      ...arrangement.boards
+        .filter((placement) => placement.board.id !== proxyId)
+        .map((placement) => ({
+          x: placement.x,
+          y: placement.y,
+          width: placement.dimensions.width,
+          depth: placement.dimensions.depth
+        }))
+    ];
+
+    const crossesCenterY = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+      obstacle.y < centerY && obstacle.y + obstacle.depth > centerY;
+    const crossesCenterX = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+      obstacle.x < centerX && obstacle.x + obstacle.width > centerX;
+
+    const leftBoundary = obstacles
+      .filter((obstacle) => crossesCenterY(obstacle) && obstacle.x + obstacle.width <= centerX)
+      .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
+    const rightBoundary = obstacles
+      .filter((obstacle) => crossesCenterY(obstacle) && obstacle.x >= centerX)
+      .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
+    const topBoundary = obstacles
+      .filter((obstacle) => crossesCenterX(obstacle) && obstacle.y + obstacle.depth <= centerY)
+      .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
+    const bottomBoundary = obstacles
+      .filter((obstacle) => crossesCenterX(obstacle) && obstacle.y >= centerY)
+      .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
+
+    const gapWidth = Math.max(rightBoundary - leftBoundary, 1);
+    const gapDepth = Math.max(bottomBoundary - topBoundary, 1);
+    const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+    const minBodyWidth = layout.width + layeredBox.wallThickness * 2;
+    const minBodyDepth = layout.depth + layeredBox.wallThickness * 2;
+    const currentRotation = targetPlacement.rotation;
+    const isCurrentlySwapped = currentRotation === 90 || currentRotation === 270;
+    const matchingRotation = currentRotation;
+    const swappedRotation = currentRotation === 90
+      ? 0
+      : currentRotation === 270
+        ? 180
+        : currentRotation + 90;
+
+    const candidates = [
+      {
+        rotation: matchingRotation as 0 | 90 | 180 | 270,
+        localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
+        localDepth: isCurrentlySwapped ? gapWidth : gapDepth,
+        worldMinWidth: isCurrentlySwapped ? minBodyDepth : minBodyWidth,
+        worldMinDepth: isCurrentlySwapped ? minBodyWidth : minBodyDepth
+      },
+      {
+        rotation: swappedRotation as 0 | 90 | 180 | 270,
+        localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
+        localDepth: isCurrentlySwapped ? gapDepth : gapWidth,
+        worldMinWidth: isCurrentlySwapped ? minBodyWidth : minBodyDepth,
+        worldMinDepth: isCurrentlySwapped ? minBodyDepth : minBodyWidth
+      }
+    ];
+
+    const fittingCandidate =
+      candidates.find((candidate) => candidate.worldMinWidth <= gapWidth && candidate.worldMinDepth <= gapDepth) ??
+      candidates[0];
+
+    const nextCustomWidth = Math.max(fittingCandidate.localWidth, 1);
+    const nextCustomDepth = Math.max(fittingCandidate.localDepth, 1);
+
+    // Internal layered-box sections occupy the body footprint inside the outer walls.
+    // Tolerance belongs to lid fit, not to the internal tray area.
+    const targetInteriorWidth = Math.max(nextCustomWidth - layeredBox.wallThickness * 2, 1);
+    const targetInteriorDepth = Math.max(nextCustomDepth - layeredBox.wallThickness * 2, 1);
+
+    const resizedLayers = layeredBox.layers.map((internalLayer) => {
+      const cupSections = internalLayer.sections.filter(
+        (section) => section.type === 'cup' && section.cupParams
+      );
+      if (cupSections.length === 0 || cupSections.length !== internalLayer.sections.length) {
+        return internalLayer;
+      }
+
+      const totalOriginalWidth = cupSections.reduce(
+        (sum, section) => sum + (section.cupParams?.trayWidth ?? 0),
+        0
+      );
+      const totalGaps = Math.max(cupSections.length - 1, 0) * layeredBox.wallThickness;
+      const availableWidth = Math.max(targetInteriorWidth - totalGaps, cupSections.length);
+      const widthScale = totalOriginalWidth > 0 ? availableWidth / totalOriginalWidth : 1;
+
+      return {
+        ...internalLayer,
+        sections: internalLayer.sections.map((section) => {
+          if (section.type !== 'cup' || !section.cupParams) return section;
+          return {
+            ...section,
+            cupParams: {
+              ...section.cupParams,
+              trayWidth: Math.max(section.cupParams.trayWidth * widthScale, 20),
+              trayDepth: Math.max(targetInteriorDepth, 20)
+            }
+          };
+        })
+      };
+    });
+
+    layer.layeredBoxes[layeredBoxIndex] = {
+      ...layeredBox,
+      customWidth: nextCustomWidth,
+      customDepth: nextCustomDepth,
+      layers: resizedLayers
+    };
+
+    const manualPlacements = arrangementToManualPlacements(arrangement);
+    layer.manualLayout = {
+      boxes: manualPlacements.boxes,
+      looseTrays: manualPlacements.looseTrays,
+      boards: manualPlacements.boards.map((placement) =>
+        placement.boardId === proxyId
+          ? {
+            ...placement,
+            x: leftBoundary,
+            y: topBoundary,
+            rotation: fittingCandidate.rotation
+          }
+          : placement
+      )
+    };
+
+    autosave();
+    return true;
+  }
+
+  return false;
 }
 
 export function deleteLayeredBox(layeredBoxId: string): void {

@@ -45,6 +45,7 @@
     getGlobalSettings,
     updateGlobalSettings,
     moveLayeredBoxToLayer,
+    expandLayeredBoxToAvailableSpace,
     type Board,
     type Box,
     type Layer,
@@ -185,6 +186,12 @@
   function handleLayeredBoxLayerUpdate(updates: Partial<Omit<LayeredBoxLayer, 'id' | 'sections'>>) {
     if (selectedLayeredBox && selectedLayeredBoxLayer) {
       updateLayeredBoxLayerOptions(selectedLayeredBox.id, selectedLayeredBoxLayer.id, updates);
+    }
+  }
+
+  function handleExpandLayeredBoxToAvailableSpace() {
+    if (selectedLayeredBox) {
+      expandLayeredBoxToAvailableSpace(selectedLayeredBox.id, gameContainerWidth, gameContainerDepth);
     }
   }
 
@@ -608,6 +615,12 @@
               <div class="sectionHeader">
                 <span class="contentsLabel">Box size</span>
                 <span class="treeItemDims">{layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm</span>
+              </div>
+              <Spacer size="0.5rem" />
+              <div class="buttonRow">
+                <button class="secondaryButton" onclick={handleExpandLayeredBoxToAvailableSpace}>
+                  Adapt to gap
+                </button>
               </div>
               <Spacer size="0.5rem" />
               <div class="formGrid">
