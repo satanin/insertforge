@@ -149,9 +149,67 @@
   const { intersect, subtract, union } = jscad.booleans;
   const { expand } = jscad.expansions;
   const { extrudeLinear, project: projectFootprint } = jscad.extrusions;
-  const { measureArea } = jscad.measurements;
+  const { measureArea, measureBoundingBox } = jscad.measurements;
   const { mirror, translate } = jscad.transforms;
   const { cuboid, rectangle } = jscad.primitives;
+
+  function createLayeredBoxSectionJscadGeometry(
+    placement: import('$lib/models/layer').LayeredBoxSectionRenderPlacement,
+    cardSizes: import('$lib/types/project').CardSize[],
+    counterShapes: import('$lib/types/project').CounterShape[],
+    targetHeight: number
+  ): Geom3 | null {
+    if ((placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams) {
+      return createCounterTray(
+        placement.section.counterParams,
+        counterShapes,
+        placement.section.name,
+        targetHeight,
+        0,
+        false
+      );
+    }
+
+    if (placement.section.type === 'cardDraw' && placement.section.cardDrawParams) {
+      return createCardDrawTray(
+        placement.section.cardDrawParams,
+        cardSizes,
+        placement.section.name,
+        targetHeight,
+        0,
+        false
+      );
+    }
+
+    if (placement.section.type === 'cardDivider' && placement.section.cardDividerParams) {
+      return createCardDividerTray(
+        placement.section.cardDividerParams,
+        cardSizes,
+        placement.section.name,
+        targetHeight,
+        0,
+        false,
+        true
+      );
+    }
+
+    if (placement.section.type === 'cardWell' && placement.section.cardWellParams) {
+      return createCardWellTray(
+        placement.section.cardWellParams,
+        cardSizes,
+        placement.section.name,
+        targetHeight,
+        0,
+        false
+      );
+    }
+
+    if (placement.section.type === 'cup' && placement.section.cupParams) {
+      return createCupTray(placement.section.cupParams, placement.section.name, targetHeight, 0, false);
+    }
+
+    return null;
+  }
 
   function createSyntheticLayeredBoxBox(
     layeredBox: import('$lib/types/project').LayeredBox,
@@ -241,65 +299,31 @@
         const syntheticBox = createSyntheticLayeredBoxBox(layeredBox, layout);
         const sections: LayeredBoxSectionGeometryData[] = [];
         const sectionGeometryMap = new Map<string, Geom3>();
+        const sectionReliefGeometryMap = new Map<string, Geom3>();
         const internalLayerHeightById = new Map(layout.internalLayers.map((layer) => [layer.id, layer.height]));
 
         for (const placement of layout.sections) {
           try {
-            let jscadGeometry: Geom3 | null = null;
             const sectionTargetHeight = internalLayerHeightById.get(placement.internalLayerId) ?? placement.dimensions.height;
-
-            if ((placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams) {
-              jscadGeometry = createCounterTray(
-                placement.section.counterParams,
-                counterShapes,
-                placement.section.name,
-                sectionTargetHeight,
-                0,
-                false
-              );
-            } else if (placement.section.type === 'cardDraw' && placement.section.cardDrawParams) {
-              jscadGeometry = createCardDrawTray(
-                placement.section.cardDrawParams,
-                cardSizes,
-                placement.section.name,
-                sectionTargetHeight,
-                0,
-                false
-              );
-            } else if (placement.section.type === 'cardDivider' && placement.section.cardDividerParams) {
-              jscadGeometry = createCardDividerTray(
-                placement.section.cardDividerParams,
-                cardSizes,
-                placement.section.name,
-                sectionTargetHeight,
-                0,
-                false,
-                true
-              );
-            } else if (placement.section.type === 'cardWell' && placement.section.cardWellParams) {
-              jscadGeometry = createCardWellTray(
-                placement.section.cardWellParams,
-                cardSizes,
-                placement.section.name,
-                sectionTargetHeight,
-                0,
-                false
-              );
-            } else if (placement.section.type === 'cup' && placement.section.cupParams) {
-              jscadGeometry = createCupTray(
-                placement.section.cupParams,
-                placement.section.name,
-                sectionTargetHeight,
-                0,
-                false
-              );
-            }
+            const jscadGeometry = createLayeredBoxSectionJscadGeometry(
+              placement,
+              cardSizes,
+              counterShapes,
+              sectionTargetHeight
+            );
+            const reliefGeometry =
+              sectionTargetHeight !== placement.dimensions.height
+                ? createLayeredBoxSectionJscadGeometry(placement, cardSizes, counterShapes, placement.dimensions.height)
+                : jscadGeometry;
 
             if (!jscadGeometry) {
               continue;
             }
 
             sectionGeometryMap.set(placement.section.id, jscadGeometry);
+            if (reliefGeometry) {
+              sectionReliefGeometryMap.set(placement.section.id, reliefGeometry);
+            }
 
             sections.push({
               sectionId: placement.section.id,
@@ -341,6 +365,7 @@
             let mergedGeometry: Geom3 | null = null;
 
             if (fillSolidEmpty) {
+              const cavityOverlap = 0.05;
               const outerBlock = cuboid({
                 size: [internalLayer.width, internalLayer.depth, internalLayer.height],
                 center: [internalLayer.width / 2, internalLayer.depth / 2, internalLayer.height / 2]
@@ -355,12 +380,16 @@
                     cavityHeight / 2
                   ],
                   cuboid({
-                    size: [section.dimensions.width, section.dimensions.depth, cavityHeight],
+                    size: [
+                      section.dimensions.width + cavityOverlap * 2,
+                      section.dimensions.depth + cavityOverlap * 2,
+                      cavityHeight
+                    ],
                     center: [0, 0, 0]
                   })
                 );
 
-                const sourceGeometry = sectionGeometryMap.get(section.section.id);
+                const sourceGeometry = sectionReliefGeometryMap.get(section.section.id) ?? sectionGeometryMap.get(section.section.id);
                 if (!sourceGeometry) {
                   return [rectangularCavity];
                 }
@@ -377,67 +406,199 @@
                       ? Math.max(section.section.counterParams?.cutoutMax ?? 12, 4)
                       : 16;
                   const edgeProbe = 0.5;
+                  const adjacentBandThickness = 1;
+                  const minAdjacentFillLength = 4;
+                  const outerReliefClearance = 0.2;
+                  const layerBounds2D = rectangle({
+                    size: [internalLayer.width, internalLayer.depth],
+                    center: [internalLayer.width / 2, internalLayer.depth / 2]
+                  });
+                  const innerLayerBounds2D =
+                    internalLayer.width > outerReliefClearance * 2 && internalLayer.depth > outerReliefClearance * 2
+                      ? rectangle({
+                        size: [
+                          internalLayer.width - outerReliefClearance * 2,
+                          internalLayer.depth - outerReliefClearance * 2
+                        ],
+                        center: [internalLayer.width / 2, internalLayer.depth / 2]
+                      })
+                      : layerBounds2D;
+                  const otherSectionRects = layerSections
+                    .filter((other) => other.section.id !== section.section.id)
+                    .map((other) =>
+                      translate(
+                        [other.x + other.dimensions.width / 2, other.y + other.dimensions.depth / 2],
+                        rectangle({
+                          size: [
+                            other.dimensions.width + cavityOverlap * 2,
+                            other.dimensions.depth + cavityOverlap * 2
+                          ],
+                          center: [0, 0]
+                        })
+                      )
+                    );
 
                   const sideReliefs = [
-                    section.x <= 0.01
-                      ? {
-                        probe: rectangle({
-                          size: [edgeProbe, section.dimensions.depth],
-                          center: [edgeProbe / 2, section.dimensions.depth / 2]
-                        }),
-                        band: rectangle({
+                    {
+                      axis: 'vertical' as const,
+                      isOuterBoundary: section.x <= 0.01,
+                      probe: rectangle({
+                        size: [edgeProbe, section.dimensions.depth],
+                        center: [edgeProbe / 2, section.dimensions.depth / 2]
+                      }),
+                      adjacentBand: translate(
+                        [section.x - adjacentBandThickness / 2, section.y + section.dimensions.depth / 2],
+                        rectangle({
+                          size: [adjacentBandThickness, section.dimensions.depth],
+                          center: [0, 0]
+                        })
+                      ),
+                      mirroredBandGlobal: translate(
+                        [section.x - reliefDepth / 2, section.y + section.dimensions.depth / 2],
+                        rectangle({
                           size: [reliefDepth, section.dimensions.depth],
-                          center: [reliefDepth / 2, section.dimensions.depth / 2]
-                        }),
-                        origin: [0, 0, 0] as [number, number, number],
-                        normal: [1, 0, 0] as [number, number, number]
-                      }
-                      : null,
-                    section.x + section.dimensions.width >= internalLayer.width - 0.01
-                      ? {
-                        probe: rectangle({
-                          size: [edgeProbe, section.dimensions.depth],
-                          center: [section.dimensions.width - edgeProbe / 2, section.dimensions.depth / 2]
-                        }),
-                        band: rectangle({
+                          center: [0, 0]
+                        })
+                      ),
+                      outerBoundaryProbeGlobal: rectangle({
+                        size: [edgeProbe, internalLayer.depth],
+                        center: [edgeProbe / 2, internalLayer.depth / 2]
+                      }),
+                      band: rectangle({
+                        size: [reliefDepth, section.dimensions.depth],
+                        center: [reliefDepth / 2, section.dimensions.depth / 2]
+                      }),
+                      origin: [0, 0, 0] as [number, number, number],
+                      normal: [1, 0, 0] as [number, number, number]
+                    },
+                    {
+                      axis: 'vertical' as const,
+                      isOuterBoundary: section.x + section.dimensions.width >= internalLayer.width - 0.01,
+                      probe: rectangle({
+                        size: [edgeProbe, section.dimensions.depth],
+                        center: [section.dimensions.width - edgeProbe / 2, section.dimensions.depth / 2]
+                      }),
+                      adjacentBand: translate(
+                        [section.x + section.dimensions.width + adjacentBandThickness / 2, section.y + section.dimensions.depth / 2],
+                        rectangle({
+                          size: [adjacentBandThickness, section.dimensions.depth],
+                          center: [0, 0]
+                        })
+                      ),
+                      mirroredBandGlobal: translate(
+                        [section.x + section.dimensions.width + reliefDepth / 2, section.y + section.dimensions.depth / 2],
+                        rectangle({
                           size: [reliefDepth, section.dimensions.depth],
-                          center: [section.dimensions.width - reliefDepth / 2, section.dimensions.depth / 2]
-                        }),
-                        origin: [section.dimensions.width, 0, 0] as [number, number, number],
-                        normal: [1, 0, 0] as [number, number, number]
-                      }
-                      : null,
-                    section.y <= 0.01
-                      ? {
-                        probe: rectangle({
-                          size: [section.dimensions.width, edgeProbe],
-                          center: [section.dimensions.width / 2, edgeProbe / 2]
-                        }),
-                        band: rectangle({
+                          center: [0, 0]
+                        })
+                      ),
+                      outerBoundaryProbeGlobal: rectangle({
+                        size: [edgeProbe, internalLayer.depth],
+                        center: [internalLayer.width - edgeProbe / 2, internalLayer.depth / 2]
+                      }),
+                      band: rectangle({
+                        size: [reliefDepth, section.dimensions.depth],
+                        center: [section.dimensions.width - reliefDepth / 2, section.dimensions.depth / 2]
+                      }),
+                      origin: [section.dimensions.width, 0, 0] as [number, number, number],
+                      normal: [1, 0, 0] as [number, number, number]
+                    },
+                    {
+                      axis: 'horizontal' as const,
+                      isOuterBoundary: section.y <= 0.01,
+                      probe: rectangle({
+                        size: [section.dimensions.width, edgeProbe],
+                        center: [section.dimensions.width / 2, edgeProbe / 2]
+                      }),
+                      adjacentBand: translate(
+                        [section.x + section.dimensions.width / 2, section.y - adjacentBandThickness / 2],
+                        rectangle({
+                          size: [section.dimensions.width, adjacentBandThickness],
+                          center: [0, 0]
+                        })
+                      ),
+                      mirroredBandGlobal: translate(
+                        [section.x + section.dimensions.width / 2, section.y - reliefDepth / 2],
+                        rectangle({
                           size: [section.dimensions.width, reliefDepth],
-                          center: [section.dimensions.width / 2, reliefDepth / 2]
-                        }),
-                        origin: [0, 0, 0] as [number, number, number],
-                        normal: [0, 1, 0] as [number, number, number]
-                      }
-                      : null,
-                    section.y + section.dimensions.depth >= internalLayer.depth - 0.01
-                      ? {
-                        probe: rectangle({
-                          size: [section.dimensions.width, edgeProbe],
-                          center: [section.dimensions.width / 2, section.dimensions.depth - edgeProbe / 2]
-                        }),
-                        band: rectangle({
+                          center: [0, 0]
+                        })
+                      ),
+                      outerBoundaryProbeGlobal: rectangle({
+                        size: [internalLayer.width, edgeProbe],
+                        center: [internalLayer.width / 2, edgeProbe / 2]
+                      }),
+                      band: rectangle({
+                        size: [section.dimensions.width, reliefDepth],
+                        center: [section.dimensions.width / 2, reliefDepth / 2]
+                      }),
+                      origin: [0, 0, 0] as [number, number, number],
+                      normal: [0, 1, 0] as [number, number, number]
+                    },
+                    {
+                      axis: 'horizontal' as const,
+                      isOuterBoundary: section.y + section.dimensions.depth >= internalLayer.depth - 0.01,
+                      probe: rectangle({
+                        size: [section.dimensions.width, edgeProbe],
+                        center: [section.dimensions.width / 2, section.dimensions.depth - edgeProbe / 2]
+                      }),
+                      adjacentBand: translate(
+                        [section.x + section.dimensions.width / 2, section.y + section.dimensions.depth + adjacentBandThickness / 2],
+                        rectangle({
+                          size: [section.dimensions.width, adjacentBandThickness],
+                          center: [0, 0]
+                        })
+                      ),
+                      mirroredBandGlobal: translate(
+                        [section.x + section.dimensions.width / 2, section.y + section.dimensions.depth + reliefDepth / 2],
+                        rectangle({
                           size: [section.dimensions.width, reliefDepth],
-                          center: [section.dimensions.width / 2, section.dimensions.depth - reliefDepth / 2]
-                        }),
-                        origin: [0, section.dimensions.depth, 0] as [number, number, number],
-                        normal: [0, 1, 0] as [number, number, number]
-                      }
-                      : null
+                          center: [0, 0]
+                        })
+                      ),
+                      outerBoundaryProbeGlobal: rectangle({
+                        size: [internalLayer.width, edgeProbe],
+                        center: [internalLayer.width / 2, internalLayer.depth - edgeProbe / 2]
+                      }),
+                      band: rectangle({
+                        size: [section.dimensions.width, reliefDepth],
+                        center: [section.dimensions.width / 2, section.dimensions.depth - reliefDepth / 2]
+                      }),
+                      origin: [0, section.dimensions.depth, 0] as [number, number, number],
+                      normal: [0, 1, 0] as [number, number, number]
+                    }
                   ]
-                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-                    .map(({ probe, band, origin, normal }) => {
+                    .map(({ axis, isOuterBoundary, probe, adjacentBand, mirroredBandGlobal, outerBoundaryProbeGlobal, band, origin, normal }) => {
+                      if (isOuterBoundary) {
+                        return null;
+                      }
+                      let availableAdjacentFill = intersect(adjacentBand, layerBounds2D);
+                      if (measureArea(availableAdjacentFill) <= 0.001) {
+                        return null;
+                      }
+                      if (otherSectionRects.length > 0) {
+                        availableAdjacentFill = subtract(availableAdjacentFill, ...otherSectionRects);
+                        if (measureArea(availableAdjacentFill) <= 0.001) {
+                          return null;
+                        }
+                      }
+                      if (measureArea(availableAdjacentFill) < adjacentBandThickness * minAdjacentFillLength) {
+                        return null;
+                      }
+                      let availableMirroredFill = intersect(mirroredBandGlobal, layerBounds2D);
+                      if (measureArea(availableMirroredFill) <= 0.001) {
+                        return null;
+                      }
+                      if (otherSectionRects.length > 0) {
+                        availableMirroredFill = subtract(availableMirroredFill, ...otherSectionRects);
+                        if (measureArea(availableMirroredFill) <= 0.001) {
+                          return null;
+                        }
+                      }
+                      const mirroredFillTouchesOuterBoundary = intersect(availableMirroredFill, outerBoundaryProbeGlobal);
+                      if (measureArea(mirroredFillTouchesOuterBoundary) > 0.001) {
+                        return null;
+                      }
                       const edgeTouch = intersect(footprintDeficit, probe);
                       if (measureArea(edgeTouch) <= 0.001) {
                         return null;
@@ -446,9 +607,48 @@
                       if (measureArea(sideDeficit) <= 0.01) {
                         return null;
                       }
-                      const touchMask = expand({ delta: reliefDepth, corners: 'round', segments: 16 }, edgeTouch);
-                      const touchingDeficit = intersect(sideDeficit, touchMask);
-                      return measureArea(touchingDeficit) > 0.01 ? mirror({ origin, normal }, touchingDeficit) : null;
+                      const [[minX, minY], [maxX, maxY]] = measureBoundingBox(edgeTouch);
+                      const spanPadding = 0.5;
+                      const directionalTouchMask =
+                        axis === 'vertical'
+                          ? rectangle({
+                            size: [
+                              reliefDepth,
+                              Math.max(maxY - minY + spanPadding * 2, edgeProbe)
+                            ],
+                            center: [
+                              origin[0] === 0 ? reliefDepth / 2 : section.dimensions.width - reliefDepth / 2,
+                              (minY + maxY) / 2
+                            ]
+                          })
+                          : rectangle({
+                            size: [
+                              Math.max(maxX - minX + spanPadding * 2, edgeProbe),
+                              reliefDepth
+                            ],
+                            center: [
+                              (minX + maxX) / 2,
+                              origin[1] === 0 ? reliefDepth / 2 : section.dimensions.depth - reliefDepth / 2
+                            ]
+                          });
+                      const touchingDeficit = intersect(sideDeficit, directionalTouchMask);
+                      const effectiveDeficit = measureArea(touchingDeficit) > 0.01 ? touchingDeficit : sideDeficit;
+                      const expandedDeficit = expand(
+                        { delta: cavityOverlap, corners: 'round', segments: 16 },
+                        effectiveDeficit
+                      );
+                      const mirroredRelief = mirror({ origin, normal }, expandedDeficit);
+                      const mirroredBand = mirror({ origin, normal }, band);
+                      const clippedMirroredRelief = intersect(mirroredRelief, mirroredBand);
+                      const clippedReliefGlobal = translate(
+                        [section.x, section.y],
+                        clippedMirroredRelief
+                      );
+                      const reliefWithinFill = intersect(clippedReliefGlobal, availableMirroredFill, innerLayerBounds2D);
+                      if (measureArea(reliefWithinFill) <= 0.01) {
+                        return null;
+                      }
+                      return translate([-section.x, -section.y], reliefWithinFill);
                     })
                     .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
