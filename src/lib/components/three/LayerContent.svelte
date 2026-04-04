@@ -316,8 +316,17 @@
 {#each boardPlacements as boardPlacement (boardPlacement.board.id)}
   {@const boardHeight = boardPlacement.dimensions.height}
   {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
-  {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2}
-  {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2}
+  {@const itemCenterX = boardPlacement.x + boardPlacement.dimensions.width / 2}
+  {@const itemCenterZ = boardPlacement.y + boardPlacement.dimensions.depth / 2}
+  {@const explosion = calculateExplosionOffset(
+    itemCenterX,
+    itemCenterZ,
+    gameContainerWidth,
+    gameContainerDepth,
+    horizontalExplosion
+  )}
+  {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2 + explosion.offsetX}
+  {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2 - explosion.offsetZ}
   {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
   {@const isLayeredBoxSelection =
     selectionType === 'layeredBox' ||
