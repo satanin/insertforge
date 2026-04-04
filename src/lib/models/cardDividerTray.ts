@@ -12,6 +12,7 @@ const { extrudeLinear } = jscad.extrusions;
 // Import types from project
 import type { CardSize } from '$lib/types/project';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+import { getSafeEmbossDepth } from './emboss';
 
 // Re-export for backwards compatibility
 export type CustomCardSize = CardSize;
@@ -316,9 +317,12 @@ function createStackLabelGeometry(
   const trimmedLabel = label.trim();
   if (trimmedLabel.length === 0) return null;
 
-  const textDepth = 0.6; // mm, emboss depth
+  const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(wallThickness);
   const strokeWidth = 1.0; // mm, slightly thinner for smaller labels
   const baseTextHeight = 5; // mm, base font size before scaling
+
+  // Skip labels entirely if the wall is too thin to leave printable material behind the cut.
+  if (!embossEnabled) return null;
 
   // Generate text segments
   const textSegments = vectorText({ height: baseTextHeight, align: 'center' }, trimmedLabel.toUpperCase());
@@ -616,7 +620,8 @@ export function createCardDividerTray(
 
   // Emboss tray name on bottom
   if (showEmboss && _trayName && _trayName.trim().length > 0) {
-    const textDepth = 0.6;
+    const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(floorThickness);
+    if (!embossEnabled) return tray;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
     const margin = wallThickness * 2;

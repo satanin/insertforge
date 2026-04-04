@@ -3,6 +3,7 @@ import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from 
 import type { CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+import { getSafeEmbossDepth } from './emboss';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
@@ -540,7 +541,8 @@ export function createCardWellTray(
 
   // Emboss tray name on bottom
   if (showEmboss && trayName && trayName.trim().length > 0) {
-    const textDepth = 0.6;
+    const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(floorThickness);
+    if (!embossEnabled) return result;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
     const margin = wallThickness * 2;

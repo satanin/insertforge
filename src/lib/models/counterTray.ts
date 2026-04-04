@@ -1,4 +1,5 @@
 import type { CounterBaseShape, CounterShape } from '$lib/types/project';
+import { getSafeEmbossDepth } from './emboss';
 import jscad from '@jscad/modeling';
 
 const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
@@ -1570,7 +1571,8 @@ export function createCounterTray(
 
   // Emboss tray name on bottom (Z=0 face)
   if (showEmboss && trayName && trayName.trim().length > 0) {
-    const textDepth = 0.6;
+    const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(floorThickness);
+    if (!embossEnabled) return result;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
     const margin = wallThickness * 2;

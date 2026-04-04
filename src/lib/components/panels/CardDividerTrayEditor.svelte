@@ -269,6 +269,11 @@
       checked={tray.showStackLabels ?? true}
       onchange={(e) => onUpdateTray?.({ showStackLabels: e.currentTarget.checked })}
     />
+    {#if (tray.showStackLabels ?? true) && tray.params.wallThickness < 2}
+      <p class="settingHint">
+        Thin walls reduce stack label emboss depth automatically to avoid cutting through the wall.
+      </p>
+    {/if}
   </section>
 </div>
 
@@ -305,6 +310,13 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
+  }
+
+  .settingHint {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    line-height: 1.4;
   }
 
   .stackList {

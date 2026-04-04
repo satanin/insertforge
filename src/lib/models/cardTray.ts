@@ -12,6 +12,7 @@ const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
 import type { CardSize } from '$lib/types/project';
+import { getSafeEmbossDepth } from './emboss';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
 
 // Re-export for backwards compatibility
@@ -368,7 +369,8 @@ export function createCardDrawTray(
 
   // === EMBOSS TRAY NAME ON BOTTOM ===
   if (showEmboss && _trayName && _trayName.trim().length > 0) {
-    const textDepth = 0.6;
+    const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(floorThickness);
+    if (!embossEnabled) return tray;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
     const margin = wallThickness * 2;
