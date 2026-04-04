@@ -10,7 +10,7 @@ import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
 import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
 
-const { cylinder } = jscad.primitives;
+const { cylinder, cuboid } = jscad.primitives;
 const { subtract } = jscad.booleans;
 const { translate } = jscad.transforms;
 const { hull } = jscad.hulls;
@@ -34,6 +34,10 @@ export interface BoxMinimumDimensions {
   minDepth: number; // Minimum exterior Y
   minHeight: number; // Minimum exterior Z
 }
+
+export const DEFAULT_EMPTY_BOX_WIDTH = 50;
+export const DEFAULT_EMPTY_BOX_DEPTH = 30;
+export const DEFAULT_EMPTY_BOX_BODY_HEIGHT = 20;
 
 export interface ValidationResult {
   valid: boolean;
@@ -690,22 +694,29 @@ const POKE_HOLE_DIAMETER = 15;
 
 // Create box geometry with rounded corners
 export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
-  if (box.trays.length === 0) return null;
-
-  const placements = arrangeTrays(box.trays, {
-    customBoxWidth: box.customWidth,
-    wallThickness: box.wallThickness,
-    tolerance: box.tolerance,
-    cardSizes,
-    counterShapes,
-    manualLayout: box.manualLayout
-  });
-  const interior = getBoxInteriorDimensions(placements, box.tolerance);
-
-  // Box exterior dimensions
-  const exteriorWidth = interior.width + box.wallThickness * 2;
-  const exteriorDepth = interior.depth + box.wallThickness * 2;
-  const exteriorHeight = interior.height + box.floorThickness;
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const placements =
+    box.trays.length === 0
+      ? []
+      : arrangeTrays(box.trays, {
+          customBoxWidth: box.customWidth,
+          wallThickness: box.wallThickness,
+          tolerance: box.tolerance,
+          cardSizes,
+          counterShapes,
+          manualLayout: box.manualLayout
+        });
+  const exteriorWidth = box.customWidth ?? minimums.minWidth;
+  const exteriorDepth = box.customDepth ?? minimums.minDepth;
+  const exteriorHeight = box.customBoxHeight ?? minimums.minHeight;
+  const interior =
+    box.trays.length === 0
+      ? {
+          width: exteriorWidth - box.wallThickness * 2,
+          depth: exteriorDepth - box.wallThickness * 2,
+          height: exteriorHeight - box.floorThickness
+        }
+      : getBoxInteriorDimensions(placements, box.tolerance);
 
   const cornerRadius = getCornerRadius(box.wallThickness);
   const innerCornerRadius = Math.max(cornerRadius - box.wallThickness, 1);
@@ -771,7 +782,11 @@ export function calculateMinimumBoxDimensions(
   counterShapes: CounterShape[] = []
 ): BoxMinimumDimensions {
   if (box.trays.length === 0) {
-    return { minWidth: 0, minDepth: 0, minHeight: 0 };
+    return {
+      minWidth: DEFAULT_EMPTY_BOX_WIDTH,
+      minDepth: DEFAULT_EMPTY_BOX_DEPTH,
+      minHeight: DEFAULT_EMPTY_BOX_BODY_HEIGHT
+    };
   }
 
   const placements = arrangeTrays(box.trays, {
@@ -909,10 +924,6 @@ export function getBoxExteriorDimensions(
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = []
 ): TrayDimensions {
-  if (box.trays.length === 0) {
-    return { width: 0, depth: 0, height: 0 };
-  }
-
   const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
   const lidHeight = getLidHeight(box);
 

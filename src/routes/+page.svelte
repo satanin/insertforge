@@ -1002,8 +1002,9 @@
 
     let generationTray = selectedTray;
     let generationBox = selectedBox;
+    const selectedEmptyBox = !!selectedBox && selectedBox.trays.length === 0;
 
-    if (!generationTray) {
+    if (!generationTray && !selectedEmptyBox) {
       for (const layer of project.layers) {
         if (layer.looseTrays.length > 0) {
           generationTray = layer.looseTrays[0];
@@ -1021,7 +1022,7 @@
       }
     }
 
-    if (!generationTray) {
+    if (!generationTray && !selectedEmptyBox) {
       selectedTrayGeometry = null;
       selectedTrayCounters = [];
       allTrayGeometries = [];
@@ -1036,11 +1037,11 @@
     }
 
     // Check if this is a loose tray (not in a box)
-    const trayLocation = findTrayLocation(project, generationTray.id);
-    const isLoose = trayLocation && trayLocation.boxId === null;
+    const trayLocation = generationTray ? findTrayLocation(project, generationTray.id) : null;
+    const isLoose = !!(trayLocation && trayLocation.boxId === null);
 
     // For boxed trays, we need a box
-    if (!isLoose && !generationBox) {
+    if (!isLoose && !generationBox && !selectedEmptyBox) {
       error = 'No box selected';
       return;
     }
@@ -1054,7 +1055,7 @@
     // If cache valid and not forced, try to use cached geometry
     if (cacheValid && !force) {
       // Handle loose trays
-      if (selectedTray && isLoose && allLooseTrayGeometries.length > 0) {
+      if (selectedTray && generationTray && isLoose && allLooseTrayGeometries.length > 0) {
         const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === generationTray.id);
         if (cachedLooseTray) {
           selectedTrayGeometry = cachedLooseTray.geometry;
@@ -1090,7 +1091,19 @@
       }
 
       // Handle boxed trays
-      if (selectedTray && !isLoose && allBoxGeometries.length > 0 && generationBox) {
+      if (selectedEmptyBox && allBoxGeometries.length > 0 && selectedBox) {
+        const cachedBox = allBoxGeometries.find((b) => b.boxId === selectedBox.id);
+        if (cachedBox) {
+          selectedTrayGeometry = null;
+          selectedTrayCounters = [];
+          allTrayGeometries = [];
+          boxGeometry = cachedBox.boxGeometry;
+          lidGeometry = cachedBox.lidGeometry;
+          return;
+        }
+      }
+
+      if (selectedTray && generationTray && !isLoose && allBoxGeometries.length > 0 && generationBox) {
         // Find the selected box in the all-boxes cache
         const cachedBox = allBoxGeometries.find((b) => b.boxId === generationBox.id);
         if (cachedBox) {
@@ -1142,7 +1155,7 @@
 
     console.debug('[Geometry Worker] Calling worker:', {
       force,
-      trayId: generationTray.id,
+      trayId: generationTray?.id ?? '(none)',
       boxId: generationBox?.id ?? '(loose)',
       cacheValid,
       hashMatch: lastGeneratedHash === hashAtGenerationStart
@@ -1163,7 +1176,7 @@
     try {
       // Use web worker for geometry generation (handles both boxed and loose trays)
       // Pass empty string for boxId if it's a loose tray - worker handles this case
-      const result = await geometryWorker.generate(project, generationBox?.id ?? '', generationTray.id, (progress) => {
+      const result = await geometryWorker.generate(project, generationBox?.id ?? '', generationTray?.id ?? '', (progress) => {
         generationProgress = progress;
       });
 

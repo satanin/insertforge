@@ -106,22 +106,6 @@ export function createBoxWithLidGrooves(
   counterShapes: CounterShape[] = [],
   targetExteriorHeight?: number
 ): Geom3 | null {
-  if (box.trays.length === 0) return null;
-
-  const placements = arrangeTrays(box.trays, {
-    customBoxWidth: box.customWidth,
-    wallThickness: box.wallThickness,
-    tolerance: box.tolerance,
-    cardSizes,
-    counterShapes,
-    manualLayout: box.manualLayout
-  });
-  const interior = getBoxInteriorDimensions(placements, box.tolerance);
-
-  if (interior.width <= 0 || interior.depth <= 0 || interior.height <= 0) {
-    throw new Error(`Box "${box.name}": Invalid dimensions. Add counter stacks to trays.`);
-  }
-
   const wall = box.wallThickness;
   const floor = box.floorThickness;
   const tolerance = box.tolerance;
@@ -144,6 +128,29 @@ export function createBoxWithLidGrooves(
     targetExteriorHeight !== undefined && targetExteriorHeight > 0
       ? Math.max(targetExteriorHeight - lidThickness, naturalHeight)
       : naturalHeight;
+  const placements =
+    box.trays.length === 0
+      ? []
+      : arrangeTrays(box.trays, {
+          customBoxWidth: box.customWidth,
+          wallThickness: box.wallThickness,
+          tolerance: box.tolerance,
+          cardSizes,
+          counterShapes,
+          manualLayout: box.manualLayout
+        });
+  const interior =
+    box.trays.length === 0
+      ? {
+          width: extWidth - wall * 2,
+          depth: extDepth - wall * 2,
+          height: extHeight - floor
+        }
+      : getBoxInteriorDimensions(placements, box.tolerance);
+
+  if (interior.width <= 0 || interior.depth <= 0 || interior.height <= 0) {
+    throw new Error(`Box "${box.name}": Invalid dimensions.`);
+  }
 
   // Calculate gaps for fill logic
   const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)
@@ -486,10 +493,27 @@ export function createBoxWithLidGrooves(
     recess = subtract(outerRecess, innerWallKeep);
   }
 
+  const emptyBoxInteriorCavity =
+    box.trays.length === 0
+      ? cuboid({
+          size: [actualInteriorWidth, actualInteriorDepth, actualInteriorHeight + 1],
+          center: [
+            wall + actualInteriorWidth / 2,
+            wall + actualInteriorDepth / 2,
+            floor + (actualInteriorHeight + 1) / 2
+          ]
+        })
+      : null;
+
   // When fillSolid is true, don't subtract fillCells - leave them as solid material
-  let result = fillSolid
-    ? subtract(outerBox, ...trayCavities, recess)
-    : subtract(outerBox, ...trayCavities, ...fillCells, recess);
+  let result =
+    box.trays.length === 0 && emptyBoxInteriorCavity
+      ? fillSolid
+        ? subtract(outerBox, recess)
+        : subtract(outerBox, emptyBoxInteriorCavity, recess)
+      : fillSolid
+        ? subtract(outerBox, ...trayCavities, recess)
+        : subtract(outerBox, ...trayCavities, ...fillCells, recess);
 
   // Add gap fills (solid pieces for custom box dimensions)
   if (gapFills.length > 0) {
@@ -972,22 +996,6 @@ export function createBoxWithLidGrooves(
  *       (open here)
  */
 export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
-  if (box.trays.length === 0) return null;
-
-  const placements = arrangeTrays(box.trays, {
-    customBoxWidth: box.customWidth,
-    wallThickness: box.wallThickness,
-    tolerance: box.tolerance,
-    cardSizes,
-    counterShapes,
-    manualLayout: box.manualLayout
-  });
-  const interior = getBoxInteriorDimensions(placements, box.tolerance);
-
-  if (interior.width <= 0 || interior.depth <= 0) {
-    throw new Error(`Lid for "${box.name}": Invalid dimensions.`);
-  }
-
   const wall = box.wallThickness;
   const clearance = 0.3;
   const innerWallThickness = wall / 2;
@@ -1010,6 +1018,12 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
   // Lid exterior matches box exterior (uses custom dimensions if set)
   const extWidth = box.customWidth ?? minimums.minWidth;
   const extDepth = box.customDepth ?? minimums.minDepth;
+  const actualInteriorWidth = extWidth - wall * 2;
+  const actualInteriorDepth = extDepth - wall * 2;
+
+  if (actualInteriorWidth <= 0 || actualInteriorDepth <= 0) {
+    throw new Error(`Lid for "${box.name}": Invalid dimensions.`);
+  }
 
   // Total lid height = 2× wall thickness
   const lidHeight = wall * 2;
@@ -1025,8 +1039,6 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
   // 2. Subtract cavity from TOP (matches box's inner wall size + clearance)
   // This leaves the flat plate at bottom and short walls around the edges
   // Use actual box interior (custom exterior minus walls), not just tray area
-  const actualInteriorWidth = extWidth - wall * 2;
-  const actualInteriorDepth = extDepth - wall * 2;
   const cavityWidth = actualInteriorWidth + innerWallThickness * 2 + clearance * 2;
   const cavityDepth = actualInteriorDepth + innerWallThickness * 2 + clearance * 2;
 

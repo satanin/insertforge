@@ -164,7 +164,7 @@
 
   function handleAddBox(layerId: string, trayType: TrayType) {
     addBox(layerId, trayType);
-    onSelectionChange('tray');
+    onSelectionChange(trayType === 'empty' ? 'box' : 'tray');
     onExpandPanel();
   }
 
@@ -820,6 +820,18 @@
               </button>
             {/snippet}
             {#snippet content({ contentProps })}
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddBox(layer.id, 'empty');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleTrayTypeHover('empty', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Empty box</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Empty container with default editable dimensions</Text>
+              </button>
               <button
                 class="trayTypeOption"
                 onclick={() => {

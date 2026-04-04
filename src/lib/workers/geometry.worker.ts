@@ -183,6 +183,13 @@ interface GeometryData {
   normals: Float32Array;
 }
 
+function createEmptyGeometryData(): GeometryData {
+  return {
+    positions: new Float32Array(0),
+    normals: new Float32Array(0)
+  };
+}
+
 interface TrayGeometryResult {
   trayId: string;
   name: string;
@@ -536,9 +543,10 @@ function handleGenerate(msg: GenerateMessage): void {
 
   try {
     const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
-    const tray = findTrayById(project.layers, selectedTrayId);
+    const tray = selectedTrayId ? findTrayById(project.layers, selectedTrayId) : undefined;
+    const isEmptySelectedBox = !!box && box.trays.length === 0 && !tray;
 
-    if (!tray) {
+    if (!tray && !isEmptySelectedBox) {
       self.postMessage({
         type: 'generate-result',
         id,
@@ -570,8 +578,8 @@ function handleGenerate(msg: GenerateMessage): void {
     }
 
     // If tray is in a box, generate box-related geometry
-    let selectedTrayGeometry: GeometryData;
-    let selectedTrayCounters: CounterStack[];
+    let selectedTrayGeometry: GeometryData = createEmptyGeometryData();
+    let selectedTrayCounters: CounterStack[] = [];
     let allTrayGeometries: TrayGeometryResult[] = [];
     let boxGeometry: GeometryData | null = null;
     let lidGeometry: GeometryData | null = null;
@@ -596,28 +604,30 @@ function handleGenerate(msg: GenerateMessage): void {
       const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedLayerHeight);
 
       // Generate all trays with their placements for selected box
-      const placements = arrangeTrays(box.trays, {
-        customBoxWidth: box.customWidth,
-        wallThickness: box.wallThickness,
-        tolerance: box.tolerance,
-        cardSizes,
-        counterShapes,
-        manualLayout: box.manualLayout
-      });
+      const placements =
+        box.trays.length === 0
+          ? []
+          : arrangeTrays(box.trays, {
+              customBoxWidth: box.customWidth,
+              wallThickness: box.wallThickness,
+              tolerance: box.tolerance,
+              cardSizes,
+              counterShapes,
+              manualLayout: box.manualLayout
+            });
 
       const spacerInfo = calculateTraySpacers(box, cardSizes, counterShapes);
       // Use the layer-adjusted tray height instead of natural height
       const naturalMaxHeight = Math.max(...placements.map((p) => p.dimensions.height));
       const maxHeight = selectedLayerHeight > 0 ? requiredTrayHeight : naturalMaxHeight;
 
-      // Find spacer for selected tray
-      const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
-      const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
-
-      // Generate selected tray
-      cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
-      selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-      selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+      if (tray) {
+        const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
+        const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
+        cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+        selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
+        selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+      }
 
       // Generate all trays for selected box
       cachedAllTrays = [];
@@ -662,6 +672,10 @@ function handleGenerate(msg: GenerateMessage): void {
     } else {
       // Loose tray - no box context
       // Find the layer containing this loose tray and get the unified layer height
+      if (!tray) {
+        throw new Error('No tray selected');
+      }
+
       const looseTrayLayer = findLayerForLooseTray(tray.id);
       const looseTrayLayerHeight = looseTrayLayer ? (layerHeights.get(looseTrayLayer.id) ?? 0) : 0;
 

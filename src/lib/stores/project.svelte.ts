@@ -10,6 +10,7 @@ import {
 } from '$lib/models/counterTray';
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
+import { DEFAULT_EMPTY_BOX_BODY_HEIGHT, DEFAULT_EMPTY_BOX_DEPTH, DEFAULT_EMPTY_BOX_WIDTH } from '$lib/models/box';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
   Board,
@@ -379,7 +380,10 @@ function createDefaultBox(name: string): Box {
     wallThickness: 3.0,
     floorThickness: 2.0,
     fillSolidEmpty: true,
-    lidParams: { ...defaultLidParams }
+    lidParams: { ...defaultLidParams },
+    customWidth: DEFAULT_EMPTY_BOX_WIDTH,
+    customDepth: DEFAULT_EMPTY_BOX_DEPTH,
+    customBoxHeight: DEFAULT_EMPTY_BOX_BODY_HEIGHT
   };
 }
 
@@ -1127,30 +1131,36 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
 
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
-  const color = getNextTrayColor(project.layers);
-
-  let tray: Tray;
-  if (trayType === 'cardDraw' || trayType === 'card') {
-    tray = createDefaultCardDrawTray('Card Draw 1', color, project.cardSizes);
-  } else if (trayType === 'cardDivider') {
-    tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
-  } else if (trayType === 'cup') {
-    tray = createDefaultCupTray('Cup Tray 1', color);
-  } else if (trayType === 'cardWell') {
-    tray = createDefaultCardWellTray('Card Well 1', color, project.cardSizes);
-  } else {
-    tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
-    // Inherit global params (including customShapes) from existing counter trays
-    const globalParams = getGlobalParamsFromExisting();
-    tray.params = { ...tray.params, ...globalParams };
-  }
-
-  box.trays.push(tray);
   layer.boxes.push(box);
   project.selectedLayerId = layer.id;
   project.selectedBoxId = box.id;
-  project.selectedTrayId = tray.id;
+  project.selectedTrayId = null;
   project.selectedBoardId = null;
+
+  if (trayType !== 'empty') {
+    const color = getNextTrayColor(project.layers);
+    let tray: Tray;
+    if (trayType === 'cardDraw' || trayType === 'card') {
+      tray = createDefaultCardDrawTray('Card Draw 1', color, project.cardSizes);
+    } else if (trayType === 'cardDivider') {
+      tray = createDefaultCardDividerTray('Card Divider 1', color, project.cardSizes);
+    } else if (trayType === 'cup') {
+      tray = createDefaultCupTray('Cup Tray 1', color);
+    } else if (trayType === 'cardWell') {
+      tray = createDefaultCardWellTray('Card Well 1', color, project.cardSizes);
+    } else {
+      tray = createDefaultCounterTray('Tray 1', color, project.counterShapes);
+      const globalParams = getGlobalParamsFromExisting();
+      tray.params = { ...tray.params, ...globalParams };
+    }
+
+    box.customWidth = undefined;
+    box.customDepth = undefined;
+    box.customBoxHeight = undefined;
+    box.trays.push(tray);
+    project.selectedTrayId = tray.id;
+  }
+
   autosave();
   return box;
 }
@@ -1237,7 +1247,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card';
+export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card' | 'empty';
 
 // Loose tray operations
 export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
