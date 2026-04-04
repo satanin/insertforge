@@ -28,9 +28,9 @@
   <!-- Header -->
   <div class="appHeader">
     <div style="display: flex; align-items: center; gap: 0.25rem;">
-      <Link href={resolve('/')} color="fg">Counter Slayer</Link>
-      by
-      <Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer" color="fg">Dave Snider</Link>
+      <Link href={resolve('/')} color="fg">InsertForge</Link>
+      <span>based on</span>
+      <Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer" color="fg">Counter Slayer by Dave Snider</Link>
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
       <div class="headerLinks">

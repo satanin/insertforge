@@ -111,7 +111,7 @@
     sectionId: string;
     internalLayerId: string;
     name: string;
-    type: 'counter' | 'cardWell' | 'playerBoard';
+    type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard';
     color: string;
     geometry: BufferGeometry;
     dimensions: { width: number; depth: number; height: number };
@@ -255,10 +255,37 @@
                 0,
                 false
               );
+            } else if (placement.section.type === 'cardDraw' && placement.section.cardDrawParams) {
+              jscadGeometry = createCardDrawTray(
+                placement.section.cardDrawParams,
+                cardSizes,
+                placement.section.name,
+                placement.dimensions.height,
+                0,
+                false
+              );
+            } else if (placement.section.type === 'cardDivider' && placement.section.cardDividerParams) {
+              jscadGeometry = createCardDividerTray(
+                placement.section.cardDividerParams,
+                cardSizes,
+                placement.section.name,
+                placement.dimensions.height,
+                0,
+                false,
+                true
+              );
             } else if (placement.section.type === 'cardWell' && placement.section.cardWellParams) {
               jscadGeometry = createCardWellTray(
                 placement.section.cardWellParams,
                 cardSizes,
+                placement.section.name,
+                placement.dimensions.height,
+                0,
+                false
+              );
+            } else if (placement.section.type === 'cup' && placement.section.cupParams) {
+              jscadGeometry = createCupTray(
+                placement.section.cupParams,
                 placement.section.name,
                 placement.dimensions.height,
                 0,
@@ -2357,7 +2384,7 @@
 </script>
 
 <svelte:head>
-  <title>Counter Slayer - design inserts for your board games</title>
+  <title>InsertForge - design inserts for your board games</title>
   <meta
     name="description"
     content="Design and 3D print custom inserts for board game boxes to organize your components. Create trays for cards, tokens, and miniatures with adjustable layouts."

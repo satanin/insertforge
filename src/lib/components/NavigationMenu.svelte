@@ -180,18 +180,30 @@
     onExpandPanel();
   }
 
-  function handleAddLayeredBoxSection(layeredBox: LayeredBox, layer: LayeredBoxLayer, type: 'counter' | 'cardWell' | 'playerBoard') {
+  function handleAddLayeredBoxSection(
+    layeredBox: LayeredBox,
+    layer: LayeredBoxLayer,
+    type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard'
+  ) {
     addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
     onSelectionChange('layeredBoxSection');
     onExpandPanel();
   }
 
-  function getLayeredBoxSectionTypeLabel(type: 'counter' | 'cardWell' | 'playerBoard'): string {
+  function getLayeredBoxSectionTypeLabel(
+    type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard'
+  ): string {
     switch (type) {
       case 'counter':
         return 'counter';
+      case 'cardDraw':
+        return 'card draw';
+      case 'cardDivider':
+        return 'card divider';
       case 'cardWell':
         return 'cardWell';
+      case 'cup':
+        return 'cup';
       case 'playerBoard':
         return 'player board';
     }
@@ -691,12 +703,42 @@
                       <button
                         class="trayTypeOption"
                         onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'cardDraw');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Card draw</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for a single sloped card stack</Text>
+                      </button>
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'cardDivider');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Card divider</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for divided standing card stacks</Text>
+                      </button>
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
                           handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'cardWell');
                           contentProps.close();
                         }}
                       >
                         <Text weight={500}>Card well</Text>
                         <Text size="0.75rem" color="var(--fgMuted)">Section for flat stacks of cards</Text>
+                      </button>
+                      <button
+                        class="trayTypeOption"
+                        onclick={() => {
+                          handleAddLayeredBoxSection(layeredBox, layeredBoxLayer, 'cup');
+                          contentProps.close();
+                        }}
+                      >
+                        <Text weight={500}>Cup tray</Text>
+                        <Text size="0.75rem" color="var(--fgMuted)">Section for loose components in cups</Text>
                       </button>
                       <button
                         class="trayTypeOption"

@@ -390,7 +390,10 @@ function createDefaultBox(name: string): Box {
 function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: string): LayeredBoxSection {
   const color = getNextTrayColor(project.layers);
   const counterTray = createDefaultCounterTray(name, color, project.counterShapes);
+  const cardDrawTray = createDefaultCardDrawTray(name, color, project.cardSizes);
+  const cardDividerTray = createDefaultCardDividerTray(name, color, project.cardSizes);
   const cardWellTray = createDefaultCardWellTray(name, color, project.cardSizes);
+  const cupTray = createDefaultCupTray(name, color);
   return {
     id: generateId(),
     type,
@@ -402,7 +405,10 @@ function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: strin
         : type === 'playerBoard'
           ? createDefaultPlayerBoardParams(project.counterShapes)
           : undefined,
-    cardWellParams: type === 'cardWell' ? cardWellTray.params : undefined
+    cardDrawParams: type === 'cardDraw' ? cardDrawTray.params : undefined,
+    cardDividerParams: type === 'cardDivider' ? cardDividerTray.params : undefined,
+    cardWellParams: type === 'cardWell' ? cardWellTray.params : undefined,
+    cupParams: type === 'cup' ? cupTray.params : undefined
   };
 }
 
@@ -1022,8 +1028,14 @@ export function addSectionToLayeredBoxLayer(
     const sectionName =
       type === 'counter'
         ? `Counter Tray ${sectionCountOfType}`
+        : type === 'cardDraw'
+          ? `Card Draw ${sectionCountOfType}`
+          : type === 'cardDivider'
+            ? `Card Divider ${sectionCountOfType}`
         : type === 'cardWell'
           ? `Card Well ${sectionCountOfType}`
+          : type === 'cup'
+            ? `Cup Tray ${sectionCountOfType}`
           : `Player Board ${sectionCountOfType}`;
     const section = createDefaultLayeredBoxSection(type, sectionName);
     boxLayer.sections.push(section);

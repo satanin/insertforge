@@ -4,7 +4,10 @@
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
   import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
+  import CardDrawTrayEditor from './panels/CardDrawTrayEditor.svelte';
+  import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
+  import CupTrayEditor from './panels/CupTrayEditor.svelte';
   import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
@@ -124,8 +127,14 @@
     switch (type) {
       case 'counter':
         return 'Counter tray';
+      case 'cardDraw':
+        return 'Card draw';
+      case 'cardDivider':
+        return 'Card divider';
       case 'cardWell':
         return 'Card well';
+      case 'cup':
+        return 'Cup tray';
       case 'playerBoard':
         return 'Player board';
     }
@@ -209,6 +218,18 @@
 
   function handleLayeredBoxSectionCardWellParamsChange(newParams: CardWellTrayParams) {
     handleLayeredBoxSectionUpdate({ cardWellParams: newParams });
+  }
+
+  function handleLayeredBoxSectionCardDrawParamsChange(newParams: CardDrawTrayParams) {
+    handleLayeredBoxSectionUpdate({ cardDrawParams: newParams });
+  }
+
+  function handleLayeredBoxSectionCardDividerParamsChange(newParams: CardDividerTrayParams) {
+    handleLayeredBoxSectionUpdate({ cardDividerParams: newParams });
+  }
+
+  function handleLayeredBoxSectionCupParamsChange(newParams: CupTrayParams) {
+    handleLayeredBoxSectionUpdate({ cupParams: newParams });
   }
 
   function handleDeleteSelectedLayeredBoxSection() {
@@ -689,6 +710,11 @@
               <div class="sectionHeader">
                 <span class="contentsLabel">Internal layers</span>
               </div>
+              <Spacer size="0.5rem" />
+              <div class="buttonRow">
+                <button class="secondaryButton" onclick={handleAddLayeredBoxLayer}>Add internal layer</button>
+              </div>
+              <Spacer size="0.5rem" />
               <div class="contentsTree">
                 {#each selectedLayeredBox.layers as boxLayer (boxLayer.id)}
                   <div class="treeItem treeItem--box">
@@ -731,7 +757,6 @@
             />
             <Spacer size="1rem" />
             <div class="buttonRow">
-              <button class="secondaryButton" onclick={handleAddLayeredBoxLayer}>Add internal layer</button>
               <button
                 class="secondaryButton"
                 onclick={handleDeleteSelectedLayeredBoxLayer}
@@ -812,6 +837,36 @@
                 displayDimensions={getTrayDimensions(selectedLayeredBoxSection.counterParams, project.counterShapes)}
                 allowedShapeCategory={selectedLayeredBoxSection.type === 'playerBoard' ? 'playerBoard' : 'counter'}
               />
+            {:else if selectedLayeredBoxSection.type === 'cardDraw' && selectedLayeredBoxSection.cardDrawParams}
+              {@const virtualCardDrawTray = {
+                id: selectedLayeredBoxSection.id,
+                type: 'cardDraw',
+                name: selectedLayeredBoxSection.name,
+                color: selectedLayeredBoxSection.color ?? '#c9503c',
+                rotationOverride: 'auto',
+                params: selectedLayeredBoxSection.cardDrawParams
+              } as const}
+              <CardDrawTrayEditor
+                tray={virtualCardDrawTray}
+                onUpdateParams={handleLayeredBoxSectionCardDrawParamsChange}
+              />
+            {:else if selectedLayeredBoxSection.type === 'cardDivider' && selectedLayeredBoxSection.cardDividerParams}
+              {@const virtualCardDividerTray = {
+                id: selectedLayeredBoxSection.id,
+                type: 'cardDivider',
+                name: selectedLayeredBoxSection.name,
+                color: selectedLayeredBoxSection.color ?? '#c9503c',
+                rotationOverride: 'auto',
+                params: selectedLayeredBoxSection.cardDividerParams,
+                showEmboss: true,
+                showStackLabels: true
+              } as const}
+              <CardDividerTrayEditor
+                tray={virtualCardDividerTray}
+                trayLetter="S"
+                onUpdateParams={handleLayeredBoxSectionCardDividerParamsChange}
+                onUpdateTray={(updates) => handleLayeredBoxSectionUpdate(updates)}
+              />
             {:else if selectedLayeredBoxSection.type === 'cardWell' && selectedLayeredBoxSection.cardWellParams}
               {@const virtualCardWellTray = {
                 id: selectedLayeredBoxSection.id,
@@ -825,6 +880,19 @@
                 tray={virtualCardWellTray}
                 trayLetter="S"
                 onUpdateParams={handleLayeredBoxSectionCardWellParamsChange}
+              />
+            {:else if selectedLayeredBoxSection.type === 'cup' && selectedLayeredBoxSection.cupParams}
+              {@const virtualCupTray = {
+                id: selectedLayeredBoxSection.id,
+                type: 'cup',
+                name: selectedLayeredBoxSection.name,
+                color: selectedLayeredBoxSection.color ?? '#c9503c',
+                rotationOverride: 'auto',
+                params: selectedLayeredBoxSection.cupParams
+              } as const}
+              <CupTrayEditor
+                tray={virtualCupTray}
+                onUpdateParams={handleLayeredBoxSectionCupParamsChange}
               />
             {:else}
               <Text size="0.875rem" color="fgMuted">
@@ -840,7 +908,10 @@
             <Spacer size="1rem" />
             <div class="buttonRow">
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('counter')}>Add counter tray</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardDraw')}>Add card draw</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardDivider')}>Add card divider</button>
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cardWell')}>Add card well</button>
+              <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('cup')}>Add cup tray</button>
               <button class="secondaryButton" onclick={() => handleAddLayeredBoxSection('playerBoard')}>Add player board</button>
             </div>
             <Spacer size="1rem" />

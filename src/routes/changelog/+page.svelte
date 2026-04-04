@@ -26,8 +26,8 @@
 </script>
 
 <svelte:head>
-  <title>Counter Slayer changelog</title>
-  <meta name="description" content="Monthly updates and new features for Counter Slayer." />
+  <title>InsertForge changelog</title>
+  <meta name="description" content="Monthly updates and new features for InsertForge." />
 </svelte:head>
 
 <div class="changelogPage">
@@ -36,7 +36,7 @@
       <Title as="h1" size="md">Product updates</Title>
       <Spacer size="0.5rem" />
       <Text color="var(--fgMuted)">
-        Notable updates and improvements to Counter Slayer. A complete <Link
+        Notable updates and improvements to InsertForge. A complete <Link
           href="https://github.com/Siege-Perilous/counterslayer/pulls?q=is%3Apr+is%3Amerged"
           target="_blank"
           rel="noopener noreferrer"

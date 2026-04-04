@@ -711,6 +711,7 @@
 
   <section class="section">
     <h3 class="sectionTitle">Card Sizes (Sleeved)</h3>
+    <p class="sectionHint">Default thickness is for regular sleeves, change it to 0.75~0.8 for premium sleeves.</p>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
       {#each cardSizes as cardSize, index (cardSize.id)}
@@ -853,6 +854,13 @@
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    color: var(--fgMuted);
+  }
+
+  .sectionHint {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
     color: var(--fgMuted);
   }
 

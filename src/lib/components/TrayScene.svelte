@@ -69,7 +69,7 @@
     sectionId: string;
     internalLayerId: string;
     name: string;
-    type: 'counter' | 'cardWell' | 'playerBoard';
+    type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard';
     color: string;
     geometry: BufferGeometry;
     dimensions: { width: number; depth: number; height: number };

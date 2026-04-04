@@ -56,7 +56,7 @@ export interface LayeredBoxLayer {
   sections: LayeredBoxSection[];
 }
 
-export type LayeredBoxSectionType = 'counter' | 'cardWell' | 'playerBoard';
+export type LayeredBoxSectionType = 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard';
 
 export interface LayeredBoxSection {
   id: string;
@@ -64,7 +64,10 @@ export interface LayeredBoxSection {
   name: string;
   color?: string;
   counterParams?: CounterTrayParams;
+  cardDrawParams?: CardDrawTrayParams;
+  cardDividerParams?: CardDividerTrayParams;
   cardWellParams?: CardWellTrayParams;
+  cupParams?: CupTrayParams;
 }
 
 export interface LayeredBox {

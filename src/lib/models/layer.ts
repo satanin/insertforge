@@ -17,8 +17,7 @@ import type {
   Tray
 } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
-import { getBoxExteriorDimensions, getCounterTrayDimensions, getTrayDimensionsForTray } from './box';
-import { getCardWellTrayDimensions } from './cardWellTray';
+import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {
   width: number;
@@ -108,11 +107,73 @@ export function getLayeredBoxSectionDimensions(
   counterShapes: CounterShape[]
 ): { width: number; depth: number; height: number } {
   if ((section.type === 'counter' || section.type === 'playerBoard') && section.counterParams) {
-    return getCounterTrayDimensions(section.counterParams, counterShapes);
+    return getTrayDimensionsForTray(
+      {
+        id: section.id,
+        type: 'counter',
+        name: section.name,
+        color: section.color ?? '#c9503c',
+        params: section.counterParams
+      },
+      cardSizes,
+      counterShapes
+    );
+  }
+
+  if (section.type === 'cardDraw' && section.cardDrawParams) {
+    return getTrayDimensionsForTray(
+      {
+        id: section.id,
+        type: 'cardDraw',
+        name: section.name,
+        color: section.color ?? '#c9503c',
+        params: section.cardDrawParams
+      },
+      cardSizes,
+      counterShapes
+    );
+  }
+
+  if (section.type === 'cardDivider' && section.cardDividerParams) {
+    return getTrayDimensionsForTray(
+      {
+        id: section.id,
+        type: 'cardDivider',
+        name: section.name,
+        color: section.color ?? '#c9503c',
+        params: section.cardDividerParams
+      },
+      cardSizes,
+      counterShapes
+    );
   }
 
   if (section.type === 'cardWell' && section.cardWellParams) {
-    return getCardWellTrayDimensions(section.cardWellParams, cardSizes);
+    return getTrayDimensionsForTray(
+      {
+        id: section.id,
+        type: 'cardWell',
+        name: section.name,
+        color: section.color ?? '#c9503c',
+        params: section.cardWellParams
+      },
+      cardSizes,
+      counterShapes
+    );
+  }
+
+  if (section.type === 'cup' && section.cupParams) {
+    return getTrayDimensionsForTray(
+      {
+        id: section.id,
+        type: 'cup',
+        name: section.name,
+        color: section.color ?? '#c9503c',
+        params: section.cupParams
+      },
+      cardSizes,
+      counterShapes
+    );
   }
 
   return { width: 40, depth: 40, height: 10 };
