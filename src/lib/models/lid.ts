@@ -133,6 +133,7 @@ export function createBoxWithLidGrooves(
       ? []
       : arrangeTrays(box.trays, {
           customBoxWidth: box.customWidth,
+          customBoxDepth: box.customDepth,
           wallThickness: box.wallThickness,
           tolerance: box.tolerance,
           cardSizes,

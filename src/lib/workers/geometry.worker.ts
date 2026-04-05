@@ -609,6 +609,7 @@ function handleGenerate(msg: GenerateMessage): void {
           ? []
           : arrangeTrays(box.trays, {
               customBoxWidth: box.customWidth,
+              customBoxDepth: box.customDepth,
               wallThickness: box.wallThickness,
               tolerance: box.tolerance,
               cardSizes,
@@ -767,6 +768,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Use the global cardSizes and counterShapes
       const boxPlacements = arrangeTrays(projectBox.trays, {
         customBoxWidth: projectBox.customWidth,
+        customBoxDepth: projectBox.customDepth,
         wallThickness: projectBox.wallThickness,
         tolerance: projectBox.tolerance,
         cardSizes,

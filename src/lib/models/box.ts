@@ -700,6 +700,7 @@ export function createBox(box: Box, cardSizes: CardSize[] = [], counterShapes: C
       ? []
       : arrangeTrays(box.trays, {
           customBoxWidth: box.customWidth,
+          customBoxDepth: box.customDepth,
           wallThickness: box.wallThickness,
           tolerance: box.tolerance,
           cardSizes,
@@ -791,6 +792,7 @@ export function calculateMinimumBoxDimensions(
 
   const placements = arrangeTrays(box.trays, {
     customBoxWidth: box.customWidth,
+    customBoxDepth: box.customDepth,
     wallThickness: box.wallThickness,
     tolerance: box.tolerance,
     cardSizes,
@@ -884,6 +886,7 @@ export function calculateTraySpacers(
 
   const placements = arrangeTrays(box.trays, {
     customBoxWidth: box.customWidth,
+    customBoxDepth: box.customDepth,
     wallThickness: box.wallThickness,
     tolerance: box.tolerance,
     cardSizes,

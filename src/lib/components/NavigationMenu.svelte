@@ -79,6 +79,10 @@
   let previewStyles = $state('');
 
   function handleTrayTypeHover(trayType: TrayType, element: HTMLElement) {
+    if (trayType === 'empty') {
+      handleTrayTypeLeave();
+      return;
+    }
     hoverAnchorElement = element;
     if (hoverTimeout) clearTimeout(hoverTimeout);
     hoverTimeout = setTimeout(() => {

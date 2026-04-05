@@ -1703,6 +1703,7 @@
         const box = allBoxes[boxIdx];
         const placements = arrangeTrays(box.trays, {
           customBoxWidth: box.customWidth,
+          customBoxDepth: box.customDepth,
           wallThickness: box.wallThickness,
           tolerance: box.tolerance,
           cardSizes,
@@ -2217,6 +2218,7 @@
           floorThickness: box.floorThickness,
           lidParams: box.lidParams,
           customWidth: box.customWidth,
+          customDepth: box.customDepth,
           customBoxHeight: box.customBoxHeight,
           fillSolidEmpty: box.fillSolidEmpty,
           trays: box.trays.map((t) => ({
@@ -2355,6 +2357,7 @@
     // Get current placements (either from manual layout or auto)
     const placements = arrangeTrays(box.trays, {
       customBoxWidth: box.customWidth,
+      customBoxDepth: box.customDepth,
       wallThickness: box.wallThickness,
       tolerance: box.tolerance,
       cardSizes,
@@ -2870,7 +2873,13 @@
     <!-- Mobile Editor Pane (bottom) -->
     <Pane defaultSize={0} minSize={0} maxSize={60} bind:this={mobileEditorPane}>
       <div class="mobilePanelContent">
-        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+        <EditorPanel
+          {selectionType}
+          {isLayoutEditMode}
+          {gameContainerWidth}
+          {gameContainerDepth}
+          onForceRegenerate={() => regenerate(true)}
+        />
       </div>
     </Pane>
   </PaneGroup>
@@ -3168,7 +3177,13 @@
         onCollapse={() => (isEditorCollapsed = true)}
         onExpand={() => (isEditorCollapsed = false)}
       >
-        <EditorPanel {selectionType} {isLayoutEditMode} {gameContainerWidth} {gameContainerDepth} />
+        <EditorPanel
+          {selectionType}
+          {isLayoutEditMode}
+          {gameContainerWidth}
+          {gameContainerDepth}
+          onForceRegenerate={() => regenerate(true)}
+        />
       </Pane>
     {/if}
   </PaneGroup>

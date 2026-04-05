@@ -10,7 +10,14 @@ import {
 } from '$lib/models/counterTray';
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
-import { DEFAULT_EMPTY_BOX_BODY_HEIGHT, DEFAULT_EMPTY_BOX_DEPTH, DEFAULT_EMPTY_BOX_WIDTH } from '$lib/models/box';
+import {
+  DEFAULT_EMPTY_BOX_BODY_HEIGHT,
+  DEFAULT_EMPTY_BOX_DEPTH,
+  DEFAULT_EMPTY_BOX_WIDTH,
+  arrangeTrays,
+  calculateMinimumBoxDimensions,
+  getBoxInteriorDimensions
+} from '$lib/models/box';
 import { arrangeLayerContents, arrangementToManualPlacements, getLayeredBoxRenderLayout } from '$lib/models/layer';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
@@ -1016,16 +1023,16 @@ export function expandLayeredBoxToAvailableSpace(
         obstacle.x < bestRect.right && obstacle.x + obstacle.width > bestRect.left;
 
       const nextLeft = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= currentLeft)
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= bestRect.left)
         .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
       const nextRight = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= currentRight)
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= bestRect.right)
         .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
       const nextTop = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= currentTop)
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= bestRect.top)
         .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
       const nextBottom = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= currentBottom)
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= bestRect.bottom)
         .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
 
       const unchanged =
@@ -1358,11 +1365,6 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
 
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
-  layer.boxes.push(box);
-  project.selectedLayerId = layer.id;
-  project.selectedBoxId = box.id;
-  project.selectedTrayId = null;
-  project.selectedBoardId = null;
 
   if (trayType !== 'empty') {
     const color = getNextTrayColor(project.layers);
@@ -1384,9 +1386,14 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
     box.customWidth = undefined;
     box.customDepth = undefined;
     box.customBoxHeight = undefined;
-    box.trays.push(tray);
-    project.selectedTrayId = tray.id;
+    box.trays = [tray];
   }
+
+  layer.boxes.push(box);
+  project.selectedLayerId = layer.id;
+  project.selectedBoxId = box.id;
+  project.selectedTrayId = box.trays[0]?.id ?? null;
+  project.selectedBoardId = null;
 
   autosave();
   return box;
@@ -1428,6 +1435,234 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
       return;
     }
   }
+}
+
+export function expandBoxToAvailableSpace(
+  boxId: string,
+  gameContainerWidth: number,
+  gameContainerDepth: number
+): boolean {
+  for (const layer of project.layers) {
+    const boxIndex = layer.boxes.findIndex((b) => b.id === boxId);
+    if (boxIndex === -1) continue;
+    const box = layer.boxes[boxIndex];
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth,
+      gameContainerDepth,
+      cardSizes: project.cardSizes,
+      counterShapes: project.counterShapes
+    });
+    const targetPlacement = arrangement.boxes.find((placement) => placement.box.id === boxId);
+    if (!targetPlacement) return false;
+
+    const currentLeft = targetPlacement.x;
+    const currentTop = targetPlacement.y;
+    const currentRight = currentLeft + targetPlacement.dimensions.width;
+    const currentBottom = currentTop + targetPlacement.dimensions.depth;
+
+    const obstacles = [
+      ...arrangement.boxes
+        .filter((placement) => placement.box.id !== boxId)
+        .map((placement) => ({
+          x: placement.x,
+          y: placement.y,
+          width: placement.dimensions.width,
+          depth: placement.dimensions.depth
+        })),
+      ...arrangement.looseTrays.map((placement) => ({
+        x: placement.x,
+        y: placement.y,
+        width: placement.dimensions.width,
+        depth: placement.dimensions.depth
+      })),
+      ...arrangement.boards.map((placement) => ({
+        x: placement.x,
+        y: placement.y,
+        width: placement.dimensions.width,
+        depth: placement.dimensions.depth
+      }))
+    ];
+
+    let bestRect = {
+      left: currentLeft,
+      right: currentRight,
+      top: currentTop,
+      bottom: currentBottom
+    };
+
+    for (let i = 0; i < 4; i += 1) {
+      const overlapsVerticalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+        obstacle.y < bestRect.bottom && obstacle.y + obstacle.depth > bestRect.top;
+      const overlapsHorizontalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+        obstacle.x < bestRect.right && obstacle.x + obstacle.width > bestRect.left;
+
+      const nextLeft = obstacles
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= bestRect.left)
+        .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
+      const nextRight = obstacles
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= bestRect.right)
+        .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
+      const nextTop = obstacles
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= bestRect.top)
+        .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
+      const nextBottom = obstacles
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= bestRect.bottom)
+        .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
+
+      const unchanged =
+        nextLeft === bestRect.left &&
+        nextRight === bestRect.right &&
+        nextTop === bestRect.top &&
+        nextBottom === bestRect.bottom;
+
+      bestRect = {
+        left: nextLeft,
+        right: nextRight,
+        top: nextTop,
+        bottom: nextBottom
+      };
+
+      if (unchanged) break;
+    }
+
+    const isEmpty = box.trays.length === 0;
+    const isCupOnly = !isEmpty && box.trays.every((tray) => isCupTray(tray));
+    const canShrinkContent = isEmpty || isCupOnly;
+
+    const currentTrayPlacements =
+      box.trays.length > 0
+        ? arrangeTrays(box.trays, {
+            customBoxWidth: box.customWidth,
+            wallThickness: box.wallThickness,
+            tolerance: box.tolerance,
+            cardSizes: project.cardSizes,
+            counterShapes: project.counterShapes,
+            manualLayout: box.manualLayout
+          })
+        : [];
+    const currentInterior = getBoxInteriorDimensions(currentTrayPlacements, box.tolerance);
+
+    const cupOnlyMinimums = isCupOnly
+      ? (() => {
+          const minCupWidth = Math.min(...box.trays.map((tray) => (isCupTray(tray) ? tray.params.trayWidth : Infinity)));
+          const minCupDepth = Math.min(...box.trays.map((tray) => (isCupTray(tray) ? tray.params.trayDepth : Infinity)));
+          const contentWidth = Math.max(currentInterior.width - box.tolerance * 2, 1);
+          const contentDepth = Math.max(currentInterior.depth - box.tolerance * 2, 1);
+          const minWidthScale = Number.isFinite(minCupWidth) && minCupWidth > 0 ? 20 / minCupWidth : 1;
+          const minDepthScale = Number.isFinite(minCupDepth) && minCupDepth > 0 ? 20 / minCupDepth : 1;
+          return {
+            minWidth: contentWidth * minWidthScale + box.wallThickness * 2 + box.tolerance * 2,
+            minDepth: contentDepth * minDepthScale + box.wallThickness * 2 + box.tolerance * 2
+          };
+        })()
+      : null;
+
+    const effectiveLeftBoundary = canShrinkContent ? bestRect.left : Math.min(bestRect.left, currentLeft);
+    const effectiveRightBoundary = canShrinkContent ? bestRect.right : Math.max(bestRect.right, currentRight);
+    const effectiveTopBoundary = canShrinkContent ? bestRect.top : Math.min(bestRect.top, currentTop);
+    const effectiveBottomBoundary = canShrinkContent ? bestRect.bottom : Math.max(bestRect.bottom, currentBottom);
+
+    const gapWidth = Math.max(effectiveRightBoundary - effectiveLeftBoundary, 1);
+    const gapDepth = Math.max(effectiveBottomBoundary - effectiveTopBoundary, 1);
+
+    const minimums = calculateMinimumBoxDimensions(box, project.cardSizes, project.counterShapes);
+    const currentRotation = targetPlacement.rotation;
+    const isCurrentlySwapped = currentRotation === 90 || currentRotation === 270;
+    const matchingRotation = currentRotation;
+    const swappedRotation = currentRotation === 90
+      ? 0
+      : currentRotation === 270
+        ? 180
+        : currentRotation + 90;
+
+    const candidates = [
+      {
+        rotation: matchingRotation as 0 | 90 | 180 | 270,
+        localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
+        localDepth: isCurrentlySwapped ? gapWidth : gapDepth,
+        worldMinWidth: isCurrentlySwapped
+          ? (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
+          : (cupOnlyMinimums?.minWidth ?? minimums.minWidth),
+        worldMinDepth: isCurrentlySwapped
+          ? (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
+          : (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
+      },
+      {
+        rotation: swappedRotation as 0 | 90 | 180 | 270,
+        localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
+        localDepth: isCurrentlySwapped ? gapDepth : gapWidth,
+        worldMinWidth: isCurrentlySwapped
+          ? (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
+          : (cupOnlyMinimums?.minDepth ?? minimums.minDepth),
+        worldMinDepth: isCurrentlySwapped
+          ? (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
+          : (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
+      }
+    ];
+
+    const fittingCandidate =
+      candidates.find((candidate) => candidate.worldMinWidth <= gapWidth && candidate.worldMinDepth <= gapDepth) ??
+      candidates[0];
+
+    const nextCustomWidth = Math.max(
+      fittingCandidate.localWidth,
+      cupOnlyMinimums?.minWidth ?? minimums.minWidth
+    );
+    const nextCustomDepth = Math.max(
+      fittingCandidate.localDepth,
+      cupOnlyMinimums?.minDepth ?? minimums.minDepth
+    );
+
+    const targetInteriorWidth = Math.max(nextCustomWidth - box.wallThickness * 2 - box.tolerance * 2, 1);
+    const targetInteriorDepth = Math.max(nextCustomDepth - box.wallThickness * 2 - box.tolerance * 2, 1);
+    const currentContentWidth = Math.max(currentInterior.width - box.tolerance * 2, 1);
+    const currentContentDepth = Math.max(currentInterior.depth - box.tolerance * 2, 1);
+    const widthScale = isCupOnly ? targetInteriorWidth / currentContentWidth : 1;
+    const depthScale = isCupOnly ? targetInteriorDepth / currentContentDepth : 1;
+
+    const resizedTrays = isCupOnly
+      ? box.trays.map((tray) => {
+          if (!isCupTray(tray)) return tray;
+          return {
+            ...tray,
+            params: {
+              ...tray.params,
+              trayWidth: Math.max(tray.params.trayWidth * widthScale, 20),
+              trayDepth: Math.max(tray.params.trayDepth * depthScale, 20)
+            }
+          };
+        })
+      : box.trays;
+
+    layer.boxes[boxIndex] = {
+      ...box,
+      trays: resizedTrays,
+      customWidth: nextCustomWidth,
+      customDepth: nextCustomDepth
+    };
+
+    const manualPlacements = arrangementToManualPlacements(arrangement);
+    layer.manualLayout = {
+      boxes: manualPlacements.boxes.map((placement) =>
+        placement.boxId === boxId
+          ? {
+              ...placement,
+              x: effectiveLeftBoundary,
+              y: effectiveTopBoundary,
+              rotation: fittingCandidate.rotation
+            }
+          : placement
+      ),
+      looseTrays: manualPlacements.looseTrays,
+      boards: manualPlacements.boards
+    };
+
+    autosave();
+    return true;
+  }
+
+  return false;
 }
 
 // Global params that should be shared across counter trays
