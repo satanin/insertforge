@@ -337,7 +337,9 @@
     layeredBoxGeometry && isLayeredBoxSelection && selectedLayeredBoxId === layeredBoxGeometry.layeredBoxId}
   {@const visibleInternalLayers =
     layeredBoxGeometry
-      ? selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
+      ? !isLayeredBoxSelection
+        ? layeredBoxGeometry.internalLayers
+        : selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
         ? layeredBoxGeometry.internalLayers.filter((internalLayer) => internalLayer.id === selectedLayeredBoxLayerId)
         : selectionType === 'layeredBox' && isSelectedLayeredBox
           ? layeredBoxGeometry.internalLayers
@@ -345,7 +347,9 @@
       : []}
   {@const visibleSections =
     layeredBoxGeometry
-      ? selectionType === 'layeredBoxSection' && isSelectedLayeredBox
+      ? !isLayeredBoxSelection
+        ? layeredBoxGeometry.sections
+        : selectionType === 'layeredBoxSection' && isSelectedLayeredBox
         ? layeredBoxGeometry.sections.filter((section) => section.sectionId === selectedLayeredBoxSectionId)
         : selectionType === 'layeredBoxLayer' && isSelectedLayeredBox
           ? layeredBoxGeometry.sections.filter((section) => section.internalLayerId === selectedLayeredBoxLayerId)
@@ -460,7 +464,7 @@
 
       {#each visibleInternalLayers as internalLayer, layerIndex (internalLayer.id)}
         {@const visibleLayerSections =
-          selectionType === 'layeredBoxLayer'
+          selectionType === 'layeredBoxLayer' || !isLayeredBoxSelection
             ? visibleSections.filter((section) => section.internalLayerId === internalLayer.id)
             : []}
         {@const layeredBoxExplodeX = 0}
@@ -491,7 +495,7 @@
             />
           {/if}
 
-          {#if selectionType === 'layeredBoxLayer'}
+          {#if selectionType === 'layeredBoxLayer' || !isLayeredBoxSelection}
             {#each visibleLayerSections as section (section.sectionId)}
               <T.Group position.x={section.x} position.y={0} position.z={-section.y}>
                 <TrayInBox
