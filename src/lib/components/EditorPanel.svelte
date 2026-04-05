@@ -529,6 +529,14 @@
           {@const minBodyWidth = layeredBoxLayout.width + selectedLayeredBox.wallThickness * 2}
           {@const minBodyDepth = layeredBoxLayout.depth + selectedLayeredBox.wallThickness * 2}
           {@const minBodyHeight = layeredBoxLayout.height + selectedLayeredBox.floorThickness}
+          {@const layeredBoxIsEmpty = selectedLayeredBox.layers.every((entry) => entry.sections.length === 0)}
+          {@const layeredBoxIsCupOnly =
+            !layeredBoxIsEmpty &&
+            selectedLayeredBox.layers.every(
+              (entry) =>
+                entry.sections.length > 0 &&
+                entry.sections.every((section) => section.type === 'cup')
+            )}
           {@const displayTotalHeight =
             selectedLayeredBox.customBoxHeight !== undefined
               ? selectedLayeredBox.customBoxHeight + layeredBoxLidHeight
@@ -621,6 +629,13 @@
                 <button class="secondaryButton" onclick={handleExpandLayeredBoxToAvailableSpace}>
                   Adapt to gap
                 </button>
+              </div>
+              <div class="helperText">
+                {#if layeredBoxIsEmpty || layeredBoxIsCupOnly}
+                  Adapts the box to the free gap and may also resize internal cup trays.
+                {:else}
+                  Adapts the box to the free gap without shrinking fixed-size internal trays.
+                {/if}
               </div>
               <Spacer size="0.5rem" />
               <div class="formGrid">

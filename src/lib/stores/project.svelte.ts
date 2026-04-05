@@ -1002,26 +1002,65 @@ export function expandLayeredBoxToAvailableSpace(
         }))
     ];
 
-    const crossesCenterY = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-      obstacle.y < centerY && obstacle.y + obstacle.depth > centerY;
-    const crossesCenterX = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-      obstacle.x < centerX && obstacle.x + obstacle.width > centerX;
+    let bestRect = {
+      left: currentLeft,
+      right: currentRight,
+      top: currentTop,
+      bottom: currentBottom
+    };
 
-    const leftBoundary = obstacles
-      .filter((obstacle) => crossesCenterY(obstacle) && obstacle.x + obstacle.width <= centerX)
-      .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
-    const rightBoundary = obstacles
-      .filter((obstacle) => crossesCenterY(obstacle) && obstacle.x >= centerX)
-      .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
-    const topBoundary = obstacles
-      .filter((obstacle) => crossesCenterX(obstacle) && obstacle.y + obstacle.depth <= centerY)
-      .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
-    const bottomBoundary = obstacles
-      .filter((obstacle) => crossesCenterX(obstacle) && obstacle.y >= centerY)
-      .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
+    for (let i = 0; i < 4; i += 1) {
+      const overlapsVerticalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+        obstacle.y < bestRect.bottom && obstacle.y + obstacle.depth > bestRect.top;
+      const overlapsHorizontalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
+        obstacle.x < bestRect.right && obstacle.x + obstacle.width > bestRect.left;
 
-    const gapWidth = Math.max(rightBoundary - leftBoundary, 1);
-    const gapDepth = Math.max(bottomBoundary - topBoundary, 1);
+      const nextLeft = obstacles
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= currentLeft)
+        .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
+      const nextRight = obstacles
+        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= currentRight)
+        .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
+      const nextTop = obstacles
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= currentTop)
+        .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
+      const nextBottom = obstacles
+        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= currentBottom)
+        .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
+
+      const unchanged =
+        nextLeft === bestRect.left &&
+        nextRight === bestRect.right &&
+        nextTop === bestRect.top &&
+        nextBottom === bestRect.bottom;
+
+      bestRect = {
+        left: nextLeft,
+        right: nextRight,
+        top: nextTop,
+        bottom: nextBottom
+      };
+
+      if (unchanged) break;
+    }
+
+    const isEmpty = layeredBox.layers.every((internalLayer) => internalLayer.sections.length === 0);
+    const isCupOnly =
+      !isEmpty &&
+      layeredBox.layers.every(
+        (internalLayer) =>
+          internalLayer.sections.length > 0 &&
+          internalLayer.sections.every((section) => section.type === 'cup' && section.cupParams)
+      );
+    const canShrinkContent = isEmpty || isCupOnly;
+
+    const effectiveLeftBoundary = canShrinkContent ? bestRect.left : Math.min(bestRect.left, currentLeft);
+    const effectiveRightBoundary = canShrinkContent ? bestRect.right : Math.max(bestRect.right, currentRight);
+    const effectiveTopBoundary = canShrinkContent ? bestRect.top : Math.min(bestRect.top, currentTop);
+    const effectiveBottomBoundary = canShrinkContent ? bestRect.bottom : Math.max(bestRect.bottom, currentBottom);
+
+    const gapWidth = Math.max(effectiveRightBoundary - effectiveLeftBoundary, 1);
+    const gapDepth = Math.max(effectiveBottomBoundary - effectiveTopBoundary, 1);
     const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
     const minBodyWidth = layout.width + layeredBox.wallThickness * 2;
     const minBodyDepth = layout.depth + layeredBox.wallThickness * 2;
@@ -1110,8 +1149,8 @@ export function expandLayeredBoxToAvailableSpace(
         placement.boardId === proxyId
           ? {
             ...placement,
-            x: leftBoundary,
-            y: topBoundary,
+            x: effectiveLeftBoundary,
+            y: effectiveTopBoundary,
             rotation: fittingCandidate.rotation
           }
           : placement
