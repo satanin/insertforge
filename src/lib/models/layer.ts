@@ -87,16 +87,20 @@ export function getLayeredBoxExteriorDimensions(
   counterShapes: CounterShape[]
 ): { width: number; depth: number; height: number; bodyHeight: number } {
   const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
-  const lidThickness = layeredBox.lidParams?.thickness ?? 2;
-  const minBodyHeight = layout.height + layeredBox.floorThickness;
+  const lidHeight = layeredBox.wallThickness * 2;
+  const minBodyHeight = layout.height + layeredBox.floorThickness + layeredBox.tolerance;
   const bodyHeight = layeredBox.customBoxHeight ?? minBodyHeight;
-  const width = layeredBox.customWidth ?? layout.width + layeredBox.wallThickness * 2;
-  const depth = layeredBox.customDepth ?? layout.depth + layeredBox.wallThickness * 2;
+  const width =
+    layeredBox.customWidth ??
+    layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+  const depth =
+    layeredBox.customDepth ??
+    layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
 
   return {
     width,
     depth,
-    height: bodyHeight + lidThickness,
+    height: bodyHeight + lidHeight,
     bodyHeight
   };
 }

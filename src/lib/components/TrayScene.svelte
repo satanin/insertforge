@@ -96,6 +96,7 @@
     proxyBoardId: string;
     name: string;
     color: string;
+    tolerance: number;
     floorThickness: number;
     wallThickness: number;
     lidThickness: number;

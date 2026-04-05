@@ -75,6 +75,7 @@
     proxyBoardId: string;
     name: string;
     color: string;
+    tolerance: number;
     floorThickness: number;
     wallThickness: number;
     lidThickness: number;
@@ -372,11 +373,15 @@
   {@const lidRotZ = slidesAlongX ? 0 : Math.PI}
   {@const interiorBaseX =
     layeredBoxGeometry
-      ? -layeredBoxGeometry.dimensions.width / 2 + layeredBoxGeometry.wallThickness
+      ? -layeredBoxGeometry.dimensions.width / 2 +
+        layeredBoxGeometry.wallThickness +
+        layeredBoxGeometry.tolerance
       : 0}
   {@const interiorBaseZ =
     layeredBoxGeometry
-      ? layeredBoxGeometry.dimensions.depth / 2 - layeredBoxGeometry.wallThickness
+      ? layeredBoxGeometry.dimensions.depth / 2 -
+        layeredBoxGeometry.wallThickness -
+        layeredBoxGeometry.tolerance
       : 0}
   {@const showFullLayeredBox = !layeredBoxGeometry || !isSelectedLayeredBox || selectionType === 'layeredBox'}
 
@@ -403,10 +408,13 @@
           position.z={shellCenterZ}
         >
           <T.MeshStandardMaterial
-            color="#4a4a4a"
-            roughness={0.65}
-            metalness={0.08}
+            color="#333333"
+            roughness={0.6}
+            metalness={0.1}
             side={THREE.DoubleSide}
+            polygonOffset
+            polygonOffsetFactor={1}
+            polygonOffsetUnits={1}
           />
         </T.Mesh>
 
@@ -421,8 +429,8 @@
               : lidCenterX}
           {@const explodedLidY =
             selectionType === 'layeredBox' && isSelectedLayeredBox
-              ? layeredBoxGeometry.dimensions.bodyHeight + layeredBoxGeometry.lidThickness
-              : layeredBoxGeometry.dimensions.bodyHeight}
+              ? layeredBoxGeometry.dimensions.height + layeredBoxGeometry.lidThickness
+              : layeredBoxGeometry.dimensions.height}
           {@const explodedLidZ =
             selectionType === 'layeredBox' && isSelectedLayeredBox
               ? slidesAlongX
@@ -438,10 +446,13 @@
             position.z={explodedLidZ}
           >
             <T.MeshStandardMaterial
-              color="#5a5a5a"
-              roughness={0.55}
-              metalness={0.08}
+              color="#444444"
+              roughness={0.5}
+              metalness={0.1}
               side={THREE.DoubleSide}
+              polygonOffset
+              polygonOffsetFactor={1}
+              polygonOffsetUnits={1}
             />
           </T.Mesh>
         {/if}

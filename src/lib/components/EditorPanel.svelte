@@ -543,9 +543,12 @@
             floorThickness: selectedLayeredBox.floorThickness,
             lidParams: selectedLayeredBox.lidParams
           })}
-          {@const minBodyWidth = layeredBoxLayout.width + selectedLayeredBox.wallThickness * 2}
-          {@const minBodyDepth = layeredBoxLayout.depth + selectedLayeredBox.wallThickness * 2}
-          {@const minBodyHeight = layeredBoxLayout.height + selectedLayeredBox.floorThickness}
+          {@const minBodyWidth =
+            layeredBoxLayout.width + selectedLayeredBox.wallThickness * 2 + selectedLayeredBox.tolerance * 2}
+          {@const minBodyDepth =
+            layeredBoxLayout.depth + selectedLayeredBox.wallThickness * 2 + selectedLayeredBox.tolerance * 2}
+          {@const minBodyHeight =
+            layeredBoxLayout.height + selectedLayeredBox.floorThickness + selectedLayeredBox.tolerance}
           {@const layeredBoxIsEmpty = selectedLayeredBox.layers.every((entry) => entry.sections.length === 0)}
           {@const layeredBoxIsCupOnly =
             !layeredBoxIsEmpty &&
