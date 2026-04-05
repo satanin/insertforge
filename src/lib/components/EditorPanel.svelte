@@ -46,6 +46,7 @@
     updateGlobalSettings,
     moveLayeredBoxToLayer,
     expandLayeredBoxToAvailableSpace,
+    expandBoxToAvailableSpace,
     type Board,
     type Box,
     type Layer,
@@ -75,9 +76,16 @@
     isLayoutEditMode?: boolean;
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    onForceRegenerate?: () => void;
   }
 
-  let { selectionType, isLayoutEditMode = false, gameContainerWidth = 256, gameContainerDepth = 256 }: Props = $props();
+  let {
+    selectionType,
+    isLayoutEditMode = false,
+    gameContainerWidth = 256,
+    gameContainerDepth = 256,
+    onForceRegenerate
+  }: Props = $props();
 
   // Layout editor dimensions
   let interiorWidth = $derived(layoutEditorState.boundsWidth);
@@ -192,6 +200,14 @@
   function handleExpandLayeredBoxToAvailableSpace() {
     if (selectedLayeredBox) {
       expandLayeredBoxToAvailableSpace(selectedLayeredBox.id, gameContainerWidth, gameContainerDepth);
+    }
+  }
+
+  function handleExpandBoxToAvailableSpace() {
+    if (selectedBox) {
+      if (expandBoxToAvailableSpace(selectedBox.id, gameContainerWidth, gameContainerDepth)) {
+        onForceRegenerate?.();
+      }
     }
   }
 
@@ -506,6 +522,7 @@
             onAddBox={() => {}}
             onDeleteBox={() => {}}
             onUpdateBox={handleBoxUpdate}
+            onAdaptToGap={handleExpandBoxToAvailableSpace}
             hideList={true}
           />
         {:else}

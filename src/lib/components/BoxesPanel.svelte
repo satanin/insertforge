@@ -2,6 +2,7 @@
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '$lib/types/project';
+  import { isCupTray } from '$lib/types/project';
   import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
   import { calculateLayerHeight } from '$lib/models/layer';
@@ -13,10 +14,11 @@
     onAddBox: () => void;
     onDeleteBox: (boxId: string) => void;
     onUpdateBox: (updates: Partial<Omit<Box, 'id' | 'trays'>>) => void;
+    onAdaptToGap?: () => void;
     hideList?: boolean;
   }
 
-  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, hideList = false }: Props = $props();
+  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, onAdaptToGap, hideList = false }: Props = $props();
 
   // Get all boxes from all layers
   const allBoxes = $derived(getAllBoxes());
@@ -106,6 +108,21 @@
         }
       : null
   );
+
+  const isEmptyBox = $derived((selectedBox?.trays.length ?? 0) === 0);
+  const isCupOnlyBox = $derived(
+    !!selectedBox && selectedBox.trays.length > 0 && selectedBox.trays.every((tray) => isCupTray(tray))
+  );
+  const canShrinkBoxContent = $derived(isEmptyBox || isCupOnlyBox);
+  const adaptToGapHelpText = $derived.by(() => {
+    if (isEmptyBox) {
+      return 'Adapts the empty box to the available gap by growing or shrinking.';
+    }
+    if (isCupOnlyBox) {
+      return 'Adapts the box to the available gap by growing or shrinking, and resizes internal cup trays to match.';
+    }
+    return 'Adapts the box to the available gap by expanding only. Fixed-size tray contents will not be shrunk.';
+  });
 </script>
 
 <div class="boxesPanel">
@@ -246,6 +263,15 @@
             </span>
           {/if}
         </div>
+        <Spacer size="0.5rem" />
+        <div class="buttonRow">
+          <button class="secondaryButton" onclick={() => onAdaptToGap?.()}>
+            Adapt to gap
+          </button>
+        </div>
+        <Text color="var(--fgMuted)" size="0.875rem">
+          {adaptToGapHelpText}
+        </Text>
         <Spacer size="0.5rem" />
 
         <div class="formGrid">
@@ -471,6 +497,25 @@
     font-size: 0.75rem;
     color: var(--fgMuted);
     margin: 0;
+  }
+
+  .buttonRow {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .secondaryButton {
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    background: var(--contrastLow);
+    color: var(--fgPrimary);
+    cursor: pointer;
+    padding: 0.4rem 0.75rem;
+    font: inherit;
+  }
+
+  .secondaryButton:hover {
+    background: var(--contrastMedium);
   }
 
   .emptyState {
