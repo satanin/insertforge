@@ -52,6 +52,14 @@
   import { countCells } from '$lib/types/cardWellLayout';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
+  type LayeredBoxInitialSectionType =
+    | 'empty'
+    | 'counter'
+    | 'cardDraw'
+    | 'cardDivider'
+    | 'cardWell'
+    | 'cup'
+    | 'playerBoard';
 
   interface Props {
     selectionType: SelectionType;
@@ -181,6 +189,20 @@
   function handleAddLayeredBox(layerId: string) {
     addLayeredBox(layerId);
     onSelectionChange('layeredBox');
+    onExpandPanel();
+  }
+
+  function handleLayeredBoxInitialTypeHover(trayType: LayeredBoxInitialSectionType, element: HTMLElement) {
+    if (trayType === 'empty' || trayType === 'playerBoard') {
+      handleTrayTypeLeave();
+      return;
+    }
+    handleTrayTypeHover(trayType, element);
+  }
+
+  function handleAddLayeredBoxWithType(layerId: string, type: LayeredBoxInitialSectionType) {
+    addLayeredBox(layerId, type === 'empty' ? undefined : type);
+    onSelectionChange(type === 'empty' ? 'layeredBox' : 'layeredBoxSection');
     onExpandPanel();
   }
 
@@ -938,10 +960,100 @@
             <span class="addLabel">Add board</span>
           </button>
 
-          <button class="navItem navItem--add navItem--box" onclick={() => handleAddLayeredBox(layer.id)}>
-            <span class="addIcon">+</span>
-            <span class="addLabel">Add layered box</span>
-          </button>
+          <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">
+            {#snippet trigger()}
+              <button class="navItem navItem--add navItem--box">
+                <span class="addIcon">+</span>
+                <span class="addLabel">Add layered box</span>
+              </button>
+            {/snippet}
+            {#snippet content({ contentProps })}
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'empty');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('empty', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Empty layered box</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Empty box with one internal layer ready to edit</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'counter');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('counter', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Counters</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a counter tray</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'cardDraw');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('cardDraw', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Card draw</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a card draw tray</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'cardDivider');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('cardDivider', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Card divider</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a card divider tray</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'cardWell');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('cardWell', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Card well</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a card well tray</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'cup');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('cup', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Cup tray</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a cup tray</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLayeredBoxWithType(layer.id, 'playerBoard');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleLayeredBoxInitialTypeHover('playerBoard', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Player board</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Create the first internal layer with a player board tray</Text>
+              </button>
+            {/snippet}
+          </Popover>
 
           <!-- Add Loose Tray Button with Popover -->
           <Popover positioning={{ placement: 'right-start' }} portal=".appContainer" contentClass="trayTypePopover">

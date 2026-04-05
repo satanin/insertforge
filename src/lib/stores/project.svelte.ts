@@ -927,7 +927,10 @@ export function moveBoardToLayer(boardId: string, targetLayerId: string | 'new')
   autosave();
 }
 
-export function addLayeredBox(layerId?: string): LayeredBox | null {
+export function addLayeredBox(
+  layerId?: string,
+  initialSectionType?: LayeredBoxSectionType
+): LayeredBox | null {
   const targetLayerId = layerId ?? project.selectedLayerId ?? project.layers[0]?.id;
   const layer = project.layers.find((l) => l.id === targetLayerId);
   if (!layer) return null;
@@ -942,6 +945,27 @@ export function addLayeredBox(layerId?: string): LayeredBox | null {
   project.selectedLayeredBoxId = layeredBox.id;
   project.selectedLayeredBoxLayerId = layeredBox.layers[0]?.id ?? null;
   project.selectedLayeredBoxSectionId = layeredBox.layers[0]?.sections[0]?.id ?? null;
+
+  if (initialSectionType && layeredBox.layers[0]) {
+    const sectionCountOfType =
+      layeredBox.layers[0].sections.filter((section) => section.type === initialSectionType).length + 1;
+    const sectionName =
+      initialSectionType === 'counter'
+        ? `Counter Tray ${sectionCountOfType}`
+        : initialSectionType === 'cardDraw'
+          ? `Card Draw ${sectionCountOfType}`
+          : initialSectionType === 'cardDivider'
+            ? `Card Divider ${sectionCountOfType}`
+            : initialSectionType === 'cardWell'
+              ? `Card Well ${sectionCountOfType}`
+              : initialSectionType === 'cup'
+                ? `Cup Tray ${sectionCountOfType}`
+                : `Player Board ${sectionCountOfType}`;
+    const section = createDefaultLayeredBoxSection(initialSectionType, sectionName);
+    layeredBox.layers[0].sections.push(section);
+    project.selectedLayeredBoxSectionId = section.id;
+  }
+
   autosave();
   return layeredBox;
 }
