@@ -375,6 +375,8 @@
   {@const lidCenterX = slidesAlongX ? lidBaseCenterX : -lidBaseCenterX}
   {@const lidCenterZ = slidesAlongX ? lidBaseCenterZ : -lidBaseCenterZ}
   {@const lidRotZ = slidesAlongX ? 0 : Math.PI}
+  {@const lidSlidePhase = selectionType === 'layeredBox' ? Math.min(horizontalExplosion * 2, 1) : 0}
+  {@const layerLiftPhase = selectionType === 'layeredBox' ? Math.max((horizontalExplosion - 0.5) * 2, 0) : 0}
   {@const interiorBaseX =
     layeredBoxGeometry
       ? -layeredBoxGeometry.dimensions.width / 2 +
@@ -428,18 +430,16 @@
           {@const explodedLidX =
             selectionType === 'layeredBox' && isSelectedLayeredBox
               ? slidesAlongX
-                ? lidCenterX + lidSlideDistance
+                ? lidCenterX + lidSlideDistance * lidSlidePhase
                 : lidCenterX
               : lidCenterX}
           {@const explodedLidY =
-            selectionType === 'layeredBox' && isSelectedLayeredBox
-              ? layeredBoxGeometry.dimensions.height + layeredBoxGeometry.lidThickness
-              : layeredBoxGeometry.dimensions.height}
+            layeredBoxGeometry.dimensions.height}
           {@const explodedLidZ =
             selectionType === 'layeredBox' && isSelectedLayeredBox
               ? slidesAlongX
                 ? lidCenterZ
-                : lidCenterZ - lidSlideDistance
+                : lidCenterZ - lidSlideDistance * lidSlidePhase
               : lidCenterZ}
           <T.Mesh
             geometry={layeredBoxGeometry.lidGeometry}
@@ -470,7 +470,7 @@
         {@const layeredBoxExplodeX = 0}
         {@const layeredBoxExplodeY =
           selectionType === 'layeredBox'
-            ? horizontalExplosion * (layeredBoxGeometry.dimensions.bodyHeight + 8) + layerIndex * 12 * horizontalExplosion
+            ? layerLiftPhase * (layeredBoxGeometry.dimensions.bodyHeight + 8) + layerIndex * 12 * layerLiftPhase
             : 0}
         <T.Group
           position.x={selectionType === 'layeredBoxLayer' ? -internalLayer.width / 2 : interiorBaseX + layeredBoxExplodeX}
@@ -525,7 +525,7 @@
           {@const sectionExplodeX = 0}
           {@const sectionExplodeY =
             selectionType === 'layeredBox' && sectionLayerIndex >= 0
-              ? horizontalExplosion * (layeredBoxGeometry.dimensions.bodyHeight + 8) + sectionLayerIndex * 12 * horizontalExplosion
+              ? layerLiftPhase * (layeredBoxGeometry.dimensions.bodyHeight + 8) + sectionLayerIndex * 12 * layerLiftPhase
               : 0}
           <T.Group
             position.x={

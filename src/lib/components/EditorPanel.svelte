@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -405,9 +405,9 @@
     <!-- Content -->
     <div class="panelContent">
       {#if isLayoutEditMode}
-        <div class="layoutEditMessage">
-          <p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>
-          <div class="dimensionsInfo">
+          <div class="layoutEditMessage">
+            <p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>
+          <div class="layoutDimensionsInfo">
             <div class="dimensionRow">
               <span class="dimensionLabel">Game container</span>
               <span class="dimensionValue">{gameContainerWidth} × {gameContainerDepth}mm</span>
@@ -557,12 +557,18 @@
                 entry.sections.length > 0 &&
                 entry.sections.every((section) => section.type === 'cup')
             )}
+          {@const layeredBoxAdaptToGapHelpText =
+            layeredBoxIsEmpty
+              ? 'Adapts the empty box to the available gap by growing or shrinking.'
+              : layeredBoxIsCupOnly
+                ? 'Adapts the box to the available gap by growing or shrinking, and resizes internal cup trays to match.'
+                : 'Adapts the box to the available gap by expanding only. Fixed-size tray contents will not be shrunk.'}
           {@const displayTotalHeight =
             selectedLayeredBox.customBoxHeight !== undefined
               ? selectedLayeredBox.customBoxHeight + layeredBoxLidHeight
               : undefined}
           <div class="panelFormSection">
-            <FormControl label="Layered box name" name="layeredBoxName">
+            <FormControl label="Name" name="layeredBoxName">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
@@ -621,7 +627,7 @@
                 {/snippet}
                 {#snippet end()}mm{/snippet}
               </FormControl>
-              <FormControl label="Floor" name="layeredBoxFloorThickness">
+              <FormControl label="Floor" name="layeredBoxFloorThickness" class="formGrid__spanTwo">
                 {#snippet input({ inputProps })}
                   <Input
                     {...inputProps}
@@ -638,11 +644,12 @@
                 {#snippet end()}mm{/snippet}
               </FormControl>
             </div>
-            <Spacer size="1rem" />
-            <div class="layerContents">
+            <Hr />
+
+            <div class="panelFormSection">
               <div class="sectionHeader">
-                <span class="contentsLabel">Box size</span>
-                <span class="treeItemDims">{layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm</span>
+                <h4 class="sectionTitle">Box Size</h4>
+                <span class="dimensionsInfo">{layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm</span>
               </div>
               <Spacer size="0.5rem" />
               <div class="buttonRow">
@@ -650,13 +657,9 @@
                   Adapt to gap
                 </button>
               </div>
-              <div class="helperText">
-                {#if layeredBoxIsEmpty || layeredBoxIsCupOnly}
-                  Adapts the box to the free gap and may also resize internal cup trays.
-                {:else}
-                  Adapts the box to the free gap without shrinking fixed-size internal trays.
-                {/if}
-              </div>
+              <Text color="var(--fgMuted)" size="0.875rem">
+                {layeredBoxAdaptToGapHelpText}
+              </Text>
               <Spacer size="0.5rem" />
               <div class="formGrid">
                 <FormControl label="Width (min: {minBodyWidth.toFixed(1)})" name="layeredBoxCustomWidth">
@@ -693,7 +696,11 @@
                   {/snippet}
                   {#snippet end()}mm{/snippet}
                 </FormControl>
-                <FormControl label="Total Height (min: {(minBodyHeight + layeredBoxLidHeight).toFixed(1)})" name="layeredBoxCustomHeight" class="formGrid__spanTwo">
+                <FormControl
+                  label="Total Height (min: {(minBodyHeight + layeredBoxLidHeight).toFixed(1)})"
+                  name="layeredBoxCustomHeight"
+                  class="formGrid__spanTwo"
+                >
                   {#snippet input({ inputProps })}
                     <Input
                       {...inputProps}
@@ -713,10 +720,12 @@
                 </FormControl>
               </div>
             </div>
-            <Spacer size="1rem" />
-            <div class="layerContents">
+
+            <Hr />
+
+            <div class="panelFormSection">
               <div class="sectionHeader">
-                <span class="contentsLabel">Print options</span>
+                <h4 class="sectionTitle">Print Options</h4>
               </div>
               <Spacer size="0.5rem" />
               <InputCheckbox
@@ -734,18 +743,20 @@
                 label="Honeycomb for lid and box bottom"
               />
               <Spacer size="0.5rem" />
-              <InputCheckbox
-                checked={!selectedLayeredBox.lidParams?.honeycombEnabled && (selectedLayeredBox.lidParams?.showName ?? true)}
-                disabled={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
-                onchange={(e) =>
-                  handleLayeredBoxUpdate({
-                    lidParams: {
-                      ...selectedLayeredBox.lidParams,
-                      showName: (e.target as HTMLInputElement).checked
-                    }
-                  })}
-                label="Emboss name on lid top"
-              />
+              <span class={selectedLayeredBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+                <InputCheckbox
+                  checked={!selectedLayeredBox.lidParams?.honeycombEnabled && (selectedLayeredBox.lidParams?.showName ?? true)}
+                  disabled={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
+                  onchange={(e) =>
+                    handleLayeredBoxUpdate({
+                      lidParams: {
+                        ...selectedLayeredBox.lidParams,
+                        showName: (e.target as HTMLInputElement).checked
+                      }
+                    })}
+                  label="Emboss name on lid top"
+                />
+              </span>
               {#if selectedLayeredBox.lidParams?.honeycombEnabled}
                 <Spacer size="0.5rem" />
                 <Text size="0.875rem" color="fgMuted">
@@ -753,10 +764,12 @@
                 </Text>
               {/if}
             </div>
-            <Spacer size="1rem" />
-            <div class="layerContents">
+
+            <Hr />
+
+            <div class="panelFormSection">
               <div class="sectionHeader">
-                <span class="contentsLabel">Internal layers</span>
+                <h4 class="sectionTitle">Internal Layers</h4>
               </div>
               <Spacer size="0.5rem" />
               <div class="buttonRow">
@@ -771,10 +784,6 @@
                 {/each}
               </div>
             </div>
-            <Spacer size="1rem" />
-            <Text size="0.875rem" color="fgMuted">
-              Phase 1 only includes the layered box structure. Internal layer contents and geometry come next.
-            </Text>
           </div>
         {:else}
           <div class="emptyState">
@@ -1162,7 +1171,7 @@
     color: var(--fgMuted);
   }
 
-  .dimensionsInfo {
+  .layoutDimensionsInfo {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1211,10 +1220,46 @@
     padding: 0 0.75rem;
   }
 
+  .formGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  :global(.formGrid__spanTwo) {
+    grid-column: span 2;
+  }
+
   .layerContents {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .sectionTitle {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--fgMuted);
+  }
+
+  .sectionHeader .sectionTitle {
+    margin-bottom: 0;
+  }
+
+  .dimensionsInfo {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    margin: 0;
   }
 
   .contentsLabel {
@@ -1281,23 +1326,32 @@
 
   .buttonRow {
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .secondaryButton {
     border: var(--borderThin);
-    background: var(--contrastLowest);
-    color: var(--fg);
     border-radius: var(--radius-2);
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
+    background: var(--contrastLow);
+    color: #000;
     cursor: pointer;
+    padding: 0.4rem 0.75rem;
+    font: inherit;
+  }
+
+  .secondaryButton:hover {
+    background: var(--contrastMedium);
+  }
+
+  .disabledOption {
+    text-decoration: line-through;
+    opacity: 0.6;
   }
 
   .secondaryButton:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    border-radius: var(--radius-2);
   }
 
 </style>

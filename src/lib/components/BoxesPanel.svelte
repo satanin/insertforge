@@ -508,7 +508,7 @@
     border: var(--borderThin);
     border-radius: var(--radius-2);
     background: var(--contrastLow);
-    color: var(--fgPrimary);
+    color: #000;
     cursor: pointer;
     padding: 0.4rem 0.75rem;
     font: inherit;
