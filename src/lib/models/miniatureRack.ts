@@ -179,27 +179,8 @@ export function createMiniatureRack(
     );
   }
 
-  let cursorX = normalized.sideWallThickness;
-  for (let index = 0; index < normalized.slots.length - 1; index += 1) {
-    const slot = normalized.slots[index];
-    cursorX +=
-      slot.slotSpacingLeft +
-      normalized.railWallThickness * 2 +
-      slot.baseWidth +
-      slot.slotSpacingRight;
-    parts.push(
-      translate(
-        [cursorX + normalized.wallThickness / 2, reinforcementDepth / 2, dimensions.height / 2],
-        cuboid({
-          size: [normalized.wallThickness, reinforcementDepth, dimensions.height]
-        })
-      )
-    );
-    cursorX += normalized.wallThickness;
-  }
-
   // Vertical guide rails for each slot.
-  cursorX = normalized.sideWallThickness;
+  let cursorX = normalized.sideWallThickness;
   for (const slot of normalized.slots) {
     const railWallThickness = normalized.railWallThickness;
     const slotOuterStartX = cursorX + slot.slotSpacingLeft;
