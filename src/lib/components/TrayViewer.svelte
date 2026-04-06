@@ -63,6 +63,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: BufferGeometry;
     lidGeometry: BufferGeometry;
+    assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
       geometry: BufferGeometry | null;

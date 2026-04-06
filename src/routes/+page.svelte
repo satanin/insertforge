@@ -124,6 +124,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: BufferGeometry;
     lidGeometry: BufferGeometry;
+    assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
       geometry: BufferGeometry | null;
@@ -412,6 +413,7 @@
         const exterior = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
         const syntheticBox = createSyntheticLayeredBoxBox(layeredBox, layout, cardSizes, counterShapes);
         const sections: LayeredBoxSectionGeometryData[] = [];
+        const assemblyTrayGeometries: TrayGeometryData[] = [];
         const sectionGeometryMap = new Map<string, Geom3>();
         const sectionReliefGeometryMap = new Map<string, Geom3>();
         const internalLayerHeightById = new Map(layout.internalLayers.map((layer) => [layer.id, layer.height]));
@@ -463,6 +465,37 @@
               layeredBoxId: layeredBox.id,
               sectionId: placement.section.id,
               error
+            });
+          }
+        }
+
+        const bottomInternalLayer = [...layout.internalLayers].sort((a, b) => a.z - b.z)[0];
+        if (bottomInternalLayer) {
+          const bottomLayerSections = layout.sections.filter((section) => section.internalLayerId === bottomInternalLayer.id);
+          for (const placement of bottomLayerSections) {
+            const tray = createTrayFromLayeredBoxSection(placement.section);
+            const sectionGeometry = sections.find((section) => section.sectionId === placement.section.id);
+            if (!tray || !sectionGeometry) continue;
+
+            const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+            const rotated =
+              Math.abs(trayDims.width - placement.dimensions.width) > 0.01 ||
+              Math.abs(trayDims.depth - placement.dimensions.depth) > 0.01;
+
+            assemblyTrayGeometries.push({
+              trayId: placement.section.id,
+              name: placement.section.name,
+              color: placement.section.color ?? '#c9503c',
+              geometry: sectionGeometry.geometry,
+              placement: {
+                tray,
+                x: placement.x,
+                y: placement.y,
+                rotated,
+                dimensions: placement.dimensions
+              },
+              counterStacks: sectionGeometry.counterStacks,
+              trayLetter: 'S'
             });
           }
         }
@@ -809,6 +842,7 @@
         geometries.push({
           shellGeometry: jscadToBufferGeometry(shellJscad),
           lidGeometry: jscadToBufferGeometry(lidJscad),
+          assemblyTrayGeometries,
           internalLayers,
           layeredBoxId: layeredBox.id,
           proxyBoardId: `layered-box-${layeredBox.id}`,

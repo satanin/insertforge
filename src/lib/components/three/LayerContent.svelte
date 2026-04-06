@@ -61,6 +61,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: THREE.BufferGeometry;
     lidGeometry: THREE.BufferGeometry;
+    assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
       geometry: THREE.BufferGeometry | null;
@@ -335,6 +336,7 @@
     selectionType === 'layeredBoxSection'}
   {@const isSelectedLayeredBox =
     layeredBoxGeometry && isLayeredBoxSelection && selectedLayeredBoxId === layeredBoxGeometry.layeredBoxId}
+  {@const useBoxAssemblyLayeredBox = layeredBoxGeometry && !isLayeredBoxSelection}
   {@const visibleInternalLayers =
     layeredBoxGeometry
       ? !isLayeredBoxSelection
@@ -405,6 +407,29 @@
     {/if}
 
     {#if layeredBoxGeometry}
+      {#if useBoxAssemblyLayeredBox}
+        <BoxAssembly
+          boxGeometry={layeredBoxGeometry.shellGeometry}
+          lidGeometry={layeredBoxGeometry.lidGeometry}
+          trayGeometries={layeredBoxGeometry.assemblyTrayGeometries}
+          boxDimensions={{
+            width: layeredBoxGeometry.dimensions.width,
+            depth: layeredBoxGeometry.dimensions.depth,
+            height: layeredBoxGeometry.dimensions.height
+          }}
+          boxId={layeredBoxGeometry.layeredBoxId}
+          boxName={layeredBoxGeometry.name}
+          wallThickness={layeredBoxGeometry.wallThickness}
+          tolerance={layeredBoxGeometry.tolerance}
+          floorThickness={layeredBoxGeometry.floorThickness}
+          {showCounters}
+          {showLid}
+          {onTrayClick}
+          {onTrayDoubleClick}
+          onBoxClick={onBoxDoubleClick}
+          allowInnerTrayClicks={false}
+        />
+      {:else}
       {#if showFullLayeredBox}
         <T.Mesh
           geometry={layeredBoxGeometry.shellGeometry}
@@ -555,6 +580,7 @@
             />
           </T.Group>
         {/each}
+      {/if}
       {/if}
     {/if}
   </T.Group>
