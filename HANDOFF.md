@@ -107,6 +107,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - `Edit layout` recuperado en layers normales
 - soporte de `Board` en `Edit layout`
 - soporte de `Layered Box` en `Edit layout` de layer normal
+- render de `Layered Box` en `Edit layout` alineado con la vista normal para distinguir multiples cajas
 - posicion y rotacion de `Board` guardadas correctamente
 
 ### Emboss
@@ -116,6 +117,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Commits recientes relevantes
 
+- `65de715` Match layered box rendering to box assembly
 - `9a87bdf` Align box and layered box panels and explode
 - `c5cc405` Align layered box creation with box menu
 - `ea42979` Render layered box contents in layer view
@@ -158,8 +160,6 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
-- optimizar render de `Layered Box` cuando esta seleccionada para no generar de mas
 - revisar si `Layered Box` debe dejar de usar proxies en `Edit layout`
 - seguir puliendo consistencia visual y de UX entre `Box` y `Layered Box`
 - trabajar el `README` publico con creditos y cambios introducidos en el fork
-

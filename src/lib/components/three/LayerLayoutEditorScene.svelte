@@ -56,9 +56,51 @@
     trayLetter: string;
   }
 
+  interface LayeredBoxSectionGeometryData {
+    sectionId: string;
+    internalLayerId: string;
+    name: string;
+    type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard';
+    color: string;
+    geometry: THREE.BufferGeometry;
+    dimensions: { width: number; depth: number; height: number };
+    counterStacks: CounterStack[];
+    x: number;
+    y: number;
+    z: number;
+  }
+
+  interface LayeredBoxGeometryData {
+    shellGeometry: THREE.BufferGeometry;
+    lidGeometry: THREE.BufferGeometry;
+    assemblyTrayGeometries: TrayGeometryData[];
+    internalLayers: Array<{
+      id: string;
+      geometry: THREE.BufferGeometry | null;
+      width: number;
+      depth: number;
+      height: number;
+      z: number;
+      color: string;
+      fillSolidEmpty: boolean;
+    }>;
+    layeredBoxId: string;
+    proxyBoardId: string;
+    name: string;
+    color: string;
+    tolerance: number;
+    floorThickness: number;
+    wallThickness: number;
+    lidThickness: number;
+    interiorDimensions: { width: number; depth: number; height: number };
+    dimensions: { width: number; depth: number; height: number; bodyHeight: number };
+    sections: LayeredBoxSectionGeometryData[];
+  }
+
   interface Props {
     allBoxGeometries: BoxGeometryData[];
     allLooseTrayGeometries: LooseTrayGeometryData[];
+    layeredBoxes: LayeredBoxGeometryData[];
     layerBoardPlacements: BoardPlacement[];
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -71,6 +113,7 @@
   let {
     allBoxGeometries,
     allLooseTrayGeometries,
+    layeredBoxes,
     layerBoardPlacements,
     gameContainerWidth,
     gameContainerDepth,
@@ -393,20 +436,42 @@
   {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boardPlacement.boardId && selectedItemType === 'board'}
   {@const isHovered = hoveredItemId === boardPlacement.boardId}
+  {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.boardId)}
   {@const baseX = layerOffsetX + boardPlacement.x + dims.width / 2}
   {@const baseZ = layerOffsetZ - boardPlacement.y - dims.depth / 2}
 
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
-    <T.Mesh position.y={boardPlacement.height / 2}>
-      <T.BoxGeometry args={[boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth]} />
-      <T.MeshStandardMaterial
-        color={isSelected ? '#ffffff' : boardPlacement.color}
-        emissive={isSelected ? '#2060c0' : isHovered ? '#404040' : '#000000'}
-        emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
-        roughness={0.9}
-        metalness={0.05}
+    {#if layeredBoxGeometry}
+      <BoxAssembly
+        boxGeometry={layeredBoxGeometry.shellGeometry}
+        lidGeometry={layeredBoxGeometry.lidGeometry}
+        trayGeometries={layeredBoxGeometry.assemblyTrayGeometries}
+        boxDimensions={{
+          width: layeredBoxGeometry.dimensions.width,
+          depth: layeredBoxGeometry.dimensions.depth,
+          height: layeredBoxGeometry.dimensions.height
+        }}
+        boxId={layeredBoxGeometry.layeredBoxId}
+        boxName={layeredBoxGeometry.name}
+        wallThickness={layeredBoxGeometry.wallThickness}
+        tolerance={layeredBoxGeometry.tolerance}
+        floorThickness={layeredBoxGeometry.floorThickness}
+        showCounters={false}
+        showLid={true}
+        allowInnerTrayClicks={false}
       />
-    </T.Mesh>
+    {:else}
+      <T.Mesh position.y={boardPlacement.height / 2}>
+        <T.BoxGeometry args={[boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth]} />
+        <T.MeshStandardMaterial
+          color={isSelected ? '#ffffff' : boardPlacement.color}
+          emissive={isSelected ? '#2060c0' : isHovered ? '#404040' : '#000000'}
+          emissiveIntensity={isSelected ? 0.3 : isHovered ? 0.15 : 0}
+          roughness={0.9}
+          metalness={0.05}
+        />
+      </T.Mesh>
+    {/if}
 
     <T.Mesh
       visible={false}
