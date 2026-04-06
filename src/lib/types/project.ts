@@ -3,6 +3,7 @@ import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
+import type { MiniatureRackParams } from '$lib/models/miniatureRack';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
@@ -115,11 +116,16 @@ export interface CardWellTray extends BaseTray {
   params: CardWellTrayParams;
 }
 
+export interface MiniatureRackTray extends BaseTray {
+  type: 'miniatureRack';
+  params: MiniatureRackParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | MiniatureRackTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -140,6 +146,10 @@ export function isCupTray(tray: Tray): tray is CupTray {
 
 export function isCardWellTray(tray: Tray): tray is CardWellTray {
   return tray.type === 'cardWell';
+}
+
+export function isMiniatureRackTray(tray: Tray): tray is MiniatureRackTray {
+  return tray.type === 'miniatureRack';
 }
 
 // Legacy alias - also matches old 'card' type for migration

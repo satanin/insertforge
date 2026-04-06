@@ -10,7 +10,8 @@
     Icon,
     ColorPicker,
     ColorPickerSwatch,
-    Popover
+    Popover,
+    Text
   } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box, Tray } from '$lib/types/project';
@@ -20,17 +21,20 @@
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    isMiniatureRackTray,
     type CounterTray,
     type CardDrawTray,
     type CardDividerTray,
     type CardWellTray,
-    type CupTray
+    type CupTray,
+    type MiniatureRackTray
   } from '$lib/types/project';
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
   import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
+  import type { MiniatureRackParams } from '$lib/models/miniatureRack';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
   import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
@@ -50,6 +54,7 @@
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
+  import MiniatureRackTrayEditor from './panels/MiniatureRackTrayEditor.svelte';
 
   interface Props {
     selectedBox: Box | null;
@@ -63,6 +68,7 @@
     onUpdateCardDividerParams?: (params: CardDividerTrayParams) => void;
     onUpdateCardWellParams?: (params: CardWellTrayParams) => void;
     onUpdateCupParams?: (params: CupTrayParams) => void;
+    onUpdateMiniatureRackParams?: (params: MiniatureRackParams) => void;
     hideList?: boolean;
   }
 
@@ -78,6 +84,7 @@
     onUpdateCardDividerParams,
     onUpdateCardWellParams,
     onUpdateCupParams,
+    onUpdateMiniatureRackParams,
     hideList = false
   }: Props = $props();
 
@@ -92,15 +99,18 @@
   let moveDestinations = $derived.by(() => {
     const project = getProject();
     const options: { value: string; label: string; group?: string }[] = [];
+    const boxMovesAllowed = !selectedTray || !isMiniatureRackTray(selectedTray);
 
     for (const layer of project.layers) {
       // Add boxes in this layer
-      for (const box of layer.boxes) {
-        options.push({
-          value: `box:${box.id}`,
-          label: box.name,
-          group: layer.name
-        });
+      if (boxMovesAllowed) {
+        for (const box of layer.boxes) {
+          options.push({
+            value: `box:${box.id}`,
+            label: box.name,
+            group: layer.name
+          });
+        }
       }
       // Add loose tray option for this layer
       options.push({
@@ -217,6 +227,16 @@
         isCupTray: true
       };
     }
+    if (isMiniatureRackTray(tray)) {
+      return {
+        stacks: tray.params.slots.length,
+        counters: tray.params.slots.length,
+        isCardTray: false,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false
+      };
+    }
     if (isCardWellTray(tray)) {
       const cellTotal = countCells(tray.params.layout);
       const totalCards = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
@@ -307,6 +327,8 @@
                   ? stats.counters + ' cards in ' + stats.stacks + ' cells'
                   : stats.isCupTray
                     ? stats.stacks + ' cups'
+                    : isMiniatureRackTray(tray)
+                      ? stats.stacks + ' slots'
                     : stats.counters + ' counters in ' + stats.stacks + ' stacks'}"
           >
             <span style="overflow: hidden; text-overflow: ellipsis;">{tray.name}</span>
@@ -320,6 +342,8 @@
                       ? stats.counters + ' cards/' + stats.stacks + 'c'
                       : stats.isCupTray
                         ? stats.stacks + ' cups'
+                        : isMiniatureRackTray(tray)
+                          ? stats.stacks + ' slots'
                         : stats.counters + 'c in ' + stats.stacks + 's'}
               </span>
               <IconButton
@@ -373,6 +397,12 @@
             />
           {/snippet}
         </FormControl>
+        {#if isMiniatureRackTray(selectedTray)}
+          <Spacer size="0.5rem" />
+          <Text size="0.875rem" color="fgMuted">
+            Miniature racks are loose-only for now and cannot be moved into boxes.
+          </Text>
+        {/if}
 
         <Spacer size="1rem" />
 
@@ -403,12 +433,13 @@
 
         <Spacer size="1rem" />
 
-        <!-- Emboss Name -->
-        <InputCheckbox
-          label="Emboss name on tray bottom"
-          checked={selectedTray.showEmboss ?? true}
-          onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-        />
+        {#if !isMiniatureRackTray(selectedTray)}
+          <InputCheckbox
+            label="Emboss name on tray bottom"
+            checked={selectedTray.showEmboss ?? true}
+            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+          />
+        {/if}
       </div>
 
       <Hr />
@@ -449,6 +480,13 @@
         <CupTrayEditor
           tray={selectedTray as CupTray}
           onUpdateParams={onUpdateCupParams}
+          actualHeight={maxTrayHeight}
+          displayDimensions={selectedTrayDimensions}
+        />
+      {:else if isMiniatureRackTray(selectedTray) && onUpdateMiniatureRackParams}
+        <MiniatureRackTrayEditor
+          tray={selectedTray as MiniatureRackTray}
+          onUpdateParams={onUpdateMiniatureRackParams}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

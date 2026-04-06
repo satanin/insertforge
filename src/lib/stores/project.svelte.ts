@@ -11,6 +11,16 @@ import {
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
 import {
+  createDefaultMiniatureRackSlot,
+  DEFAULT_MINIATURE_RACK_BASE_DEPTH,
+  DEFAULT_MINIATURE_RACK_HEIGHT,
+  DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
+  DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
+  DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
+  DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
+  type MiniatureRackParams
+} from '$lib/models/miniatureRack';
+import {
   DEFAULT_EMPTY_BOX_BODY_HEIGHT,
   DEFAULT_EMPTY_BOX_DEPTH,
   DEFAULT_EMPTY_BOX_WIDTH,
@@ -37,6 +47,7 @@ import type {
   LayeredBoxSection,
   LayeredBoxSectionType,
   LidParams,
+  MiniatureRackTray,
   ManualBoxPlacement,
   ManualBoardPlacement,
   ManualLooseTrayPlacement,
@@ -51,6 +62,7 @@ import {
   isCardWellTray,
   isCounterTray,
   isCupTray,
+  isMiniatureRackTray,
   isLooseTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
@@ -63,6 +75,7 @@ export {
   isCardWellTray,
   isCounterTray,
   isCupTray,
+  isMiniatureRackTray,
   isLooseTray
 };
 export type {
@@ -371,6 +384,27 @@ function createDefaultCardWellTray(name: string, color: string, cardSizes?: Card
     name,
     color,
     rotationOverride: 'auto',
+    params
+  };
+}
+
+function createDefaultMiniatureRack(name: string, color: string): MiniatureRackTray {
+  const params: MiniatureRackParams = {
+    rackHeight: DEFAULT_MINIATURE_RACK_HEIGHT,
+    rackBaseDepth: DEFAULT_MINIATURE_RACK_BASE_DEPTH,
+    wallThickness: DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
+    sideWallThickness: DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
+    railWallThickness: DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
+    railLipInset: DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
+    slots: [createDefaultMiniatureRackSlot(1)]
+  };
+  return {
+    id: generateId(),
+    type: 'miniatureRack',
+    name,
+    color,
+    rotationOverride: 'auto',
+    showEmboss: false,
     params
   };
 }
@@ -1476,7 +1510,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
 
-  if (trayType !== 'empty') {
+  if (trayType !== 'empty' && trayType !== 'miniatureRack') {
     const color = getNextTrayColor(project.layers);
     let tray: Tray;
     if (trayType === 'cardDraw' || trayType === 'card') {
@@ -1795,7 +1829,15 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 }
 
 // Tray type for addTray function
-export type TrayType = 'counter' | 'cardDraw' | 'cardDivider' | 'cup' | 'cardWell' | 'card' | 'empty';
+export type TrayType =
+  | 'miniatureRack'
+  | 'counter'
+  | 'cardDraw'
+  | 'cardDivider'
+  | 'cup'
+  | 'cardWell'
+  | 'card'
+  | 'empty';
 
 // Loose tray operations
 export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): Tray | null {
@@ -1808,7 +1850,9 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   const color = getNextTrayColor(project.layers);
 
   let tray: Tray;
-  if (trayType === 'cardDraw' || trayType === 'card') {
+  if (trayType === 'miniatureRack') {
+    tray = createDefaultMiniatureRack(`Miniature Rack ${trayNumber}`, color);
+  } else if (trayType === 'cardDraw' || trayType === 'card') {
     tray = createDefaultCardDrawTray(`Loose Card ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'cardDivider') {
     tray = createDefaultCardDividerTray(`Loose Divider ${trayNumber}`, color, project.cardSizes);
@@ -1867,6 +1911,9 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
       const color = getNextTrayColor(project.layers);
 
       let tray: Tray;
+      if (trayType === 'miniatureRack') {
+        return null;
+      }
       if (trayType === 'cardDraw' || trayType === 'card') {
         tray = createDefaultCardDrawTray(`Card Draw ${trayNumber}`, color, project.cardSizes);
       } else if (trayType === 'cardDivider') {
@@ -2249,6 +2296,25 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
   }
 }
 
+export function updateMiniatureRackParams(trayId: string, params: MiniatureRackParams): void {
+  for (const layer of project.layers) {
+    for (const box of layer.boxes) {
+      const tray = box.trays.find((t) => t.id === trayId);
+      if (tray && isMiniatureRackTray(tray)) {
+        tray.params = params;
+        autosave();
+        return;
+      }
+    }
+    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isMiniatureRackTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
 // Reset project
 export function resetProject(): void {
   project = createDefaultProject();
@@ -2290,6 +2356,7 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   }
 
   if (!sourceTray || !sourceLayer) return;
+  if (isMiniatureRackTray(sourceTray)) return;
 
   // Determine target box
   let targetBox: Box;

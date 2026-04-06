@@ -8,6 +8,7 @@
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
+  import type { MiniatureRackParams } from '$lib/models/miniatureRack';
   import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
@@ -35,6 +36,7 @@
     updateCardDividerTrayParams,
     updateCardWellTrayParams,
     updateCupTrayParams,
+    updateMiniatureRackParams,
     updateLayer,
     getTrayLetterById,
     isCounterTray,
@@ -42,6 +44,7 @@
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    isMiniatureRackTray,
     getGlobalSettings,
     updateGlobalSettings,
     moveLayeredBoxToLayer,
@@ -338,6 +341,12 @@
     }
   }
 
+  function handleMiniatureRackParamsChange(newParams: MiniatureRackParams) {
+    if (selectedTray && isMiniatureRackTray(selectedTray)) {
+      updateMiniatureRackParams(selectedTray.id, newParams);
+    }
+  }
+
   // Get tray stats for display
   function getTrayStats(tray: Tray): {
     stacks: number;
@@ -355,6 +364,9 @@
       stacks = countCups(tray.params.layout);
       counters = stacks;
       isCups = true;
+    } else if (isMiniatureRackTray(tray)) {
+      stacks = tray.params.slots.length;
+      counters = stacks;
     } else if (isCardWellTray(tray)) {
       stacks = countCells(tray.params.layout);
       counters = tray.params.stacks.reduce((sum, s) => sum + s.count, 0);
@@ -432,6 +444,8 @@
         <span class="headerStats">
           {stats.isCups
             ? `${stats.stacks} cups`
+            : isMiniatureRackTray(selectedTray)
+              ? `${stats.stacks} slots`
             : `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}
         </span>
       {/if}
@@ -1139,6 +1153,7 @@
             onUpdateCardDividerParams={handleCardDividerParamsChange}
             onUpdateCardWellParams={handleCardWellParamsChange}
             onUpdateCupParams={handleCupParamsChange}
+            onUpdateMiniatureRackParams={handleMiniatureRackParamsChange}
             hideList={true}
           />
         {:else}

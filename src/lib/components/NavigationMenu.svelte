@@ -40,6 +40,7 @@
     isCardDividerTray,
     isCardWellTray,
     isCupTray,
+    isMiniatureRackTray,
     type Board,
     type Box,
     type Layer,
@@ -307,6 +308,16 @@
     isCardWell: boolean;
     isCupTray: boolean;
   } {
+    if (isMiniatureRackTray(tray)) {
+      return {
+        stacks: tray.params.slots.length,
+        counters: tray.params.slots.length,
+        isCardTray: false,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false
+      };
+    }
     if (isCupTray(tray)) {
       const cupTotal = countCups(tray.params.layout);
       return {
@@ -800,6 +811,8 @@
                     ? stats.counters + ' cards/' + stats.stacks + 'c'
                     : stats.isCupTray
                       ? stats.stacks + ' cups'
+                      : isMiniatureRackTray(tray)
+                        ? stats.stacks + ' slots'
                       : stats.counters + 'c in ' + stats.stacks + 's'})"
             >
               <span class="navItemLabel">
@@ -1064,6 +1077,17 @@
               </button>
             {/snippet}
             {#snippet content({ contentProps })}
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'miniatureRack');
+                  contentProps.close();
+                }}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Miniature rack</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Rack with vertical slots for miniature bases</Text>
+              </button>
               <button
                 class="trayTypeOption"
                 onclick={() => {

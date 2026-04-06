@@ -21,9 +21,10 @@ import {
   type CustomCardSize
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
+import { createMiniatureRack } from '$lib/models/miniatureRack';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -336,6 +337,9 @@ function createTrayGeometry(
   if (isCardTray(tray)) {
     return createCardDrawTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight, showEmboss);
   }
+  if (isMiniatureRackTray(tray)) {
+    return createMiniatureRack(tray.params, maxHeight);
+  }
   // Default to counter tray
   return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);
 }
@@ -352,6 +356,9 @@ function getTrayPositions(
 ): CounterStack[] {
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
+    return [];
+  }
+  if (isMiniatureRackTray(tray)) {
     return [];
   }
   if (isCardWellTray(tray)) {

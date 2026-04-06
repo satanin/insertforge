@@ -23,6 +23,7 @@
   import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
+  import { createMiniatureRack } from '$lib/models/miniatureRack';
   import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
   import {
     arrangeLayerContents,
@@ -64,6 +65,7 @@
     isCardTray,
     isCardDividerTray,
     isCupTray,
+    isMiniatureRackTray,
     findTrayLocation,
     saveManualLayout,
     clearManualLayout
@@ -2033,6 +2035,9 @@
         } else if (isCupTray(looseTray)) {
           jscadGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, spacerHeight, showEmboss);
           selectedTrayCounters = []; // Cup trays don't have counter positions
+        } else if (isMiniatureRackTray(looseTray)) {
+          jscadGeom = createMiniatureRack(looseTray.params, maxHeight);
+          selectedTrayCounters = [];
         } else {
           continue;
         }
