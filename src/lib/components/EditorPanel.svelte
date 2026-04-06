@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr } from '@tableslayer/ui';
+  import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -199,15 +199,49 @@
 
   function handleExpandLayeredBoxToAvailableSpace() {
     if (selectedLayeredBox) {
-      expandLayeredBoxToAvailableSpace(selectedLayeredBox.id, gameContainerWidth, gameContainerDepth);
+      const layeredBoxIsEmpty = selectedLayeredBox.layers.every((entry) => entry.sections.length === 0);
+      const layeredBoxIsCupOnly =
+        !layeredBoxIsEmpty &&
+        selectedLayeredBox.layers.every(
+          (entry) => entry.sections.length > 0 && entry.sections.every((section) => section.type === 'cup')
+        );
+
+      if (expandLayeredBoxToAvailableSpace(selectedLayeredBox.id, gameContainerWidth, gameContainerDepth)) {
+        onForceRegenerate?.();
+        return;
+      }
+
+      addToast({
+        data: {
+          title: 'Cannot adapt to gap',
+          body: layeredBoxIsEmpty || layeredBoxIsCupOnly
+            ? 'No suitable gap is available for this layered box.'
+            : 'This layered box contains trays that cannot be shrunk, so it cannot adapt to the available gap.',
+          type: 'danger'
+        }
+      });
     }
   }
 
   function handleExpandBoxToAvailableSpace() {
     if (selectedBox) {
+      const isEmptyBox = selectedBox.trays.length === 0;
+      const isCupOnlyBox = !isEmptyBox && selectedBox.trays.every((tray) => isCupTray(tray));
+
       if (expandBoxToAvailableSpace(selectedBox.id, gameContainerWidth, gameContainerDepth)) {
         onForceRegenerate?.();
+        return;
       }
+
+      addToast({
+        data: {
+          title: 'Cannot adapt to gap',
+          body: isEmptyBox || isCupOnlyBox
+            ? 'No suitable gap is available for this box.'
+            : 'This box contains trays that cannot be shrunk, so it cannot adapt to the available gap.',
+          type: 'danger'
+        }
+      });
     }
   }
 

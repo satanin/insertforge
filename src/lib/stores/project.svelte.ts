@@ -442,6 +442,81 @@ function createDefaultLayeredBox(name: string): LayeredBox {
   };
 }
 
+interface LayoutObstacle {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+}
+
+interface LayoutRect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+function rectsOverlap(a: LayoutRect, b: LayoutObstacle): boolean {
+  return a.left < b.x + b.width && a.right > b.x && a.top < b.y + b.depth && a.bottom > b.y;
+}
+
+function findAvailableGapRects(
+  obstacles: LayoutObstacle[],
+  gameContainerWidth: number,
+  gameContainerDepth: number
+): LayoutRect[] {
+  const xCoords = new Set<number>([0, gameContainerWidth]);
+  const yCoords = new Set<number>([0, gameContainerDepth]);
+
+  for (const obstacle of obstacles) {
+    xCoords.add(Math.max(0, Math.min(gameContainerWidth, obstacle.x)));
+    xCoords.add(Math.max(0, Math.min(gameContainerWidth, obstacle.x + obstacle.width)));
+    yCoords.add(Math.max(0, Math.min(gameContainerDepth, obstacle.y)));
+    yCoords.add(Math.max(0, Math.min(gameContainerDepth, obstacle.y + obstacle.depth)));
+  }
+
+  const xs = [...xCoords].sort((a, b) => a - b);
+  const ys = [...yCoords].sort((a, b) => a - b);
+  const freeRects: LayoutRect[] = [];
+
+  for (let leftIndex = 0; leftIndex < xs.length - 1; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < xs.length; rightIndex += 1) {
+      for (let topIndex = 0; topIndex < ys.length - 1; topIndex += 1) {
+        for (let bottomIndex = topIndex + 1; bottomIndex < ys.length; bottomIndex += 1) {
+          const rect = {
+            left: xs[leftIndex],
+            right: xs[rightIndex],
+            top: ys[topIndex],
+            bottom: ys[bottomIndex]
+          };
+
+          if (rect.left >= rect.right || rect.top >= rect.bottom) continue;
+          if (obstacles.some((obstacle) => rectsOverlap(rect, obstacle))) continue;
+
+          freeRects.push(rect);
+        }
+      }
+    }
+  }
+
+  return freeRects.filter((rect, index) => {
+    return !freeRects.some((otherRect, otherIndex) => {
+      if (otherIndex === index) return false;
+      const contains =
+        otherRect.left <= rect.left &&
+        otherRect.right >= rect.right &&
+        otherRect.top <= rect.top &&
+        otherRect.bottom >= rect.bottom;
+      const strictlyLarger =
+        otherRect.left < rect.left ||
+        otherRect.right > rect.right ||
+        otherRect.top < rect.top ||
+        otherRect.bottom > rect.bottom;
+      return contains && strictlyLarger;
+    });
+  });
+}
+
 function createDefaultBoard(name: string): Board {
   return {
     id: generateId(),
@@ -1007,9 +1082,6 @@ export function expandLayeredBoxToAvailableSpace(
     const currentTop = targetPlacement.y;
     const currentRight = currentLeft + targetPlacement.dimensions.width;
     const currentBottom = currentTop + targetPlacement.dimensions.depth;
-    const centerX = currentLeft + targetPlacement.dimensions.width / 2;
-    const centerY = currentTop + targetPlacement.dimensions.depth / 2;
-
     const obstacles = [
       ...arrangement.boxes.map((placement) => ({
         x: placement.x,
@@ -1033,48 +1105,6 @@ export function expandLayeredBoxToAvailableSpace(
         }))
     ];
 
-    let bestRect = {
-      left: currentLeft,
-      right: currentRight,
-      top: currentTop,
-      bottom: currentBottom
-    };
-
-    for (let i = 0; i < 4; i += 1) {
-      const overlapsVerticalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-        obstacle.y < bestRect.bottom && obstacle.y + obstacle.depth > bestRect.top;
-      const overlapsHorizontalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-        obstacle.x < bestRect.right && obstacle.x + obstacle.width > bestRect.left;
-
-      const nextLeft = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= bestRect.left)
-        .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
-      const nextRight = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= bestRect.right)
-        .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
-      const nextTop = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= bestRect.top)
-        .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
-      const nextBottom = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= bestRect.bottom)
-        .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
-
-      const unchanged =
-        nextLeft === bestRect.left &&
-        nextRight === bestRect.right &&
-        nextTop === bestRect.top &&
-        nextBottom === bestRect.bottom;
-
-      bestRect = {
-        left: nextLeft,
-        right: nextRight,
-        top: nextTop,
-        bottom: nextBottom
-      };
-
-      if (unchanged) break;
-    }
-
     const isEmpty = layeredBox.layers.every((internalLayer) => internalLayer.sections.length === 0);
     const isCupOnly =
       !isEmpty &&
@@ -1084,17 +1114,35 @@ export function expandLayeredBoxToAvailableSpace(
           internalLayer.sections.every((section) => section.type === 'cup' && section.cupParams)
       );
     const canShrinkContent = isEmpty || isCupOnly;
-
-    const effectiveLeftBoundary = canShrinkContent ? bestRect.left : Math.min(bestRect.left, currentLeft);
-    const effectiveRightBoundary = canShrinkContent ? bestRect.right : Math.max(bestRect.right, currentRight);
-    const effectiveTopBoundary = canShrinkContent ? bestRect.top : Math.min(bestRect.top, currentTop);
-    const effectiveBottomBoundary = canShrinkContent ? bestRect.bottom : Math.max(bestRect.bottom, currentBottom);
-
-    const gapWidth = Math.max(effectiveRightBoundary - effectiveLeftBoundary, 1);
-    const gapDepth = Math.max(effectiveBottomBoundary - effectiveTopBoundary, 1);
     const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
     const minBodyWidth = layout.width + layeredBox.wallThickness * 2;
     const minBodyDepth = layout.depth + layeredBox.wallThickness * 2;
+    const cupOnlyMinimums = isCupOnly
+      ? (() => {
+          const minInteriorWidth = Math.max(
+            ...layeredBox.layers.map((internalLayer) => {
+              const cupSections = internalLayer.sections.filter(
+                (section) => section.type === 'cup' && section.cupParams
+              );
+              if (cupSections.length === 0) return 20;
+              return (
+                cupSections.length * 20 +
+                Math.max(cupSections.length - 1, 0) * layeredBox.wallThickness
+              );
+            }),
+            20
+          );
+          const minInteriorDepth = 20;
+          return {
+            minWidth: minInteriorWidth + layeredBox.wallThickness * 2,
+            minDepth: minInteriorDepth + layeredBox.wallThickness * 2
+          };
+        })()
+      : null;
+    const currentLocalWidth = layeredBox.customWidth ?? targetPlacement.dimensions.width;
+    const currentLocalDepth = layeredBox.customDepth ?? targetPlacement.dimensions.depth;
+    const minLocalWidth = canShrinkContent ? (cupOnlyMinimums?.minWidth ?? minBodyWidth) : currentLocalWidth;
+    const minLocalDepth = canShrinkContent ? (cupOnlyMinimums?.minDepth ?? minBodyDepth) : currentLocalDepth;
     const currentRotation = targetPlacement.rotation;
     const isCurrentlySwapped = currentRotation === 90 || currentRotation === 270;
     const matchingRotation = currentRotation;
@@ -1104,29 +1152,67 @@ export function expandLayeredBoxToAvailableSpace(
         ? 180
         : currentRotation + 90;
 
-    const candidates = [
-      {
-        rotation: matchingRotation as 0 | 90 | 180 | 270,
-        localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
-        localDepth: isCurrentlySwapped ? gapWidth : gapDepth,
-        worldMinWidth: isCurrentlySwapped ? minBodyDepth : minBodyWidth,
-        worldMinDepth: isCurrentlySwapped ? minBodyWidth : minBodyDepth
-      },
-      {
-        rotation: swappedRotation as 0 | 90 | 180 | 270,
-        localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
-        localDepth: isCurrentlySwapped ? gapDepth : gapWidth,
-        worldMinWidth: isCurrentlySwapped ? minBodyWidth : minBodyDepth,
-        worldMinDepth: isCurrentlySwapped ? minBodyDepth : minBodyWidth
-      }
-    ];
+    const currentRect = {
+      left: currentLeft,
+      right: currentRight,
+      top: currentTop,
+      bottom: currentBottom
+    };
+    const currentCenterX = (currentLeft + currentRight) / 2;
+    const currentCenterY = (currentTop + currentBottom) / 2;
+    const availableRects = findAvailableGapRects(obstacles, gameContainerWidth, gameContainerDepth);
+    const rectOptions = availableRects
+      .map((rect) => {
+        const gapWidth = rect.right - rect.left;
+        const gapDepth = rect.bottom - rect.top;
+        const candidates = [
+          {
+            rotation: matchingRotation as 0 | 90 | 180 | 270,
+            localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
+            localDepth: isCurrentlySwapped ? gapWidth : gapDepth
+          },
+          {
+            rotation: swappedRotation as 0 | 90 | 180 | 270,
+            localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
+            localDepth: isCurrentlySwapped ? gapDepth : gapWidth
+          }
+        ];
+        const fittingCandidate = candidates.find(
+          (candidate) => candidate.localWidth >= minLocalWidth && candidate.localDepth >= minLocalDepth
+        );
+        const containsCurrent =
+          rect.left <= currentRect.left &&
+          rect.right >= currentRect.right &&
+          rect.top <= currentRect.top &&
+          rect.bottom >= currentRect.bottom;
+        const rectCenterX = (rect.left + rect.right) / 2;
+        const rectCenterY = (rect.top + rect.bottom) / 2;
+        return {
+          rect,
+          gapWidth,
+          gapDepth,
+          fittingCandidate,
+          containsCurrent,
+          area: gapWidth * gapDepth,
+          distance: Math.hypot(rectCenterX - currentCenterX, rectCenterY - currentCenterY)
+        };
+      })
+      .filter((option) => option.fittingCandidate);
 
-    const fittingCandidate =
-      candidates.find((candidate) => candidate.worldMinWidth <= gapWidth && candidate.worldMinDepth <= gapDepth) ??
-      candidates[0];
+    const chosenRectOption = canShrinkContent
+      ? rectOptions.sort((a, b) => b.area - a.area || a.distance - b.distance)[0]
+      : rectOptions
+          .filter((option) => option.containsCurrent)
+          .sort((a, b) => b.area - a.area)[0] ??
+        rectOptions.sort((a, b) => a.distance - b.distance || b.area - a.area)[0];
 
-    const nextCustomWidth = Math.max(fittingCandidate.localWidth, 1);
-    const nextCustomDepth = Math.max(fittingCandidate.localDepth, 1);
+    if (!chosenRectOption?.fittingCandidate) return false;
+
+    const { rect: bestRect, fittingCandidate } = chosenRectOption;
+    const nextCustomWidth = Math.max(fittingCandidate.localWidth, minLocalWidth, 1);
+    const nextCustomDepth = Math.max(fittingCandidate.localDepth, minLocalDepth, 1);
+    const effectiveLeftBoundary = bestRect.left;
+    const effectiveTopBoundary = bestRect.top;
 
     // Internal layered-box sections occupy the body footprint inside the outer walls.
     // Tolerance belongs to lid fit, not to the internal tray area.
@@ -1508,48 +1594,6 @@ export function expandBoxToAvailableSpace(
       }))
     ];
 
-    let bestRect = {
-      left: currentLeft,
-      right: currentRight,
-      top: currentTop,
-      bottom: currentBottom
-    };
-
-    for (let i = 0; i < 4; i += 1) {
-      const overlapsVerticalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-        obstacle.y < bestRect.bottom && obstacle.y + obstacle.depth > bestRect.top;
-      const overlapsHorizontalSpan = (obstacle: { x: number; y: number; width: number; depth: number }) =>
-        obstacle.x < bestRect.right && obstacle.x + obstacle.width > bestRect.left;
-
-      const nextLeft = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x + obstacle.width <= bestRect.left)
-        .reduce((max, obstacle) => Math.max(max, obstacle.x + obstacle.width), 0);
-      const nextRight = obstacles
-        .filter((obstacle) => overlapsVerticalSpan(obstacle) && obstacle.x >= bestRect.right)
-        .reduce((min, obstacle) => Math.min(min, obstacle.x), gameContainerWidth);
-      const nextTop = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y + obstacle.depth <= bestRect.top)
-        .reduce((max, obstacle) => Math.max(max, obstacle.y + obstacle.depth), 0);
-      const nextBottom = obstacles
-        .filter((obstacle) => overlapsHorizontalSpan(obstacle) && obstacle.y >= bestRect.bottom)
-        .reduce((min, obstacle) => Math.min(min, obstacle.y), gameContainerDepth);
-
-      const unchanged =
-        nextLeft === bestRect.left &&
-        nextRight === bestRect.right &&
-        nextTop === bestRect.top &&
-        nextBottom === bestRect.bottom;
-
-      bestRect = {
-        left: nextLeft,
-        right: nextRight,
-        top: nextTop,
-        bottom: nextBottom
-      };
-
-      if (unchanged) break;
-    }
-
     const isEmpty = box.trays.length === 0;
     const isCupOnly = !isEmpty && box.trays.every((tray) => isCupTray(tray));
     const canShrinkContent = isEmpty || isCupOnly;
@@ -1582,14 +1626,6 @@ export function expandBoxToAvailableSpace(
         })()
       : null;
 
-    const effectiveLeftBoundary = canShrinkContent ? bestRect.left : Math.min(bestRect.left, currentLeft);
-    const effectiveRightBoundary = canShrinkContent ? bestRect.right : Math.max(bestRect.right, currentRight);
-    const effectiveTopBoundary = canShrinkContent ? bestRect.top : Math.min(bestRect.top, currentTop);
-    const effectiveBottomBoundary = canShrinkContent ? bestRect.bottom : Math.max(bestRect.bottom, currentBottom);
-
-    const gapWidth = Math.max(effectiveRightBoundary - effectiveLeftBoundary, 1);
-    const gapDepth = Math.max(effectiveBottomBoundary - effectiveTopBoundary, 1);
-
     const minimums = calculateMinimumBoxDimensions(box, project.cardSizes, project.counterShapes);
     const currentRotation = targetPlacement.rotation;
     const isCurrentlySwapped = currentRotation === 90 || currentRotation === 270;
@@ -1600,43 +1636,69 @@ export function expandBoxToAvailableSpace(
         ? 180
         : currentRotation + 90;
 
-    const candidates = [
-      {
-        rotation: matchingRotation as 0 | 90 | 180 | 270,
-        localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
-        localDepth: isCurrentlySwapped ? gapWidth : gapDepth,
-        worldMinWidth: isCurrentlySwapped
-          ? (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
-          : (cupOnlyMinimums?.minWidth ?? minimums.minWidth),
-        worldMinDepth: isCurrentlySwapped
-          ? (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
-          : (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
-      },
-      {
-        rotation: swappedRotation as 0 | 90 | 180 | 270,
-        localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
-        localDepth: isCurrentlySwapped ? gapDepth : gapWidth,
-        worldMinWidth: isCurrentlySwapped
-          ? (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
-          : (cupOnlyMinimums?.minDepth ?? minimums.minDepth),
-        worldMinDepth: isCurrentlySwapped
-          ? (cupOnlyMinimums?.minDepth ?? minimums.minDepth)
-          : (cupOnlyMinimums?.minWidth ?? minimums.minWidth)
-      }
-    ];
+    const currentLocalWidth = box.customWidth ?? minimums.minWidth;
+    const currentLocalDepth = box.customDepth ?? minimums.minDepth;
+    const minLocalWidth = canShrinkContent ? (cupOnlyMinimums?.minWidth ?? minimums.minWidth) : currentLocalWidth;
+    const minLocalDepth = canShrinkContent ? (cupOnlyMinimums?.minDepth ?? minimums.minDepth) : currentLocalDepth;
+    const currentRect = {
+      left: currentLeft,
+      right: currentRight,
+      top: currentTop,
+      bottom: currentBottom
+    };
+    const currentCenterX = (currentLeft + currentRight) / 2;
+    const currentCenterY = (currentTop + currentBottom) / 2;
+    const availableRects = findAvailableGapRects(obstacles, gameContainerWidth, gameContainerDepth);
+    const rectOptions = availableRects
+      .map((rect) => {
+        const gapWidth = rect.right - rect.left;
+        const gapDepth = rect.bottom - rect.top;
+        const candidates = [
+          {
+            rotation: matchingRotation as 0 | 90 | 180 | 270,
+            localWidth: isCurrentlySwapped ? gapDepth : gapWidth,
+            localDepth: isCurrentlySwapped ? gapWidth : gapDepth
+          },
+          {
+            rotation: swappedRotation as 0 | 90 | 180 | 270,
+            localWidth: isCurrentlySwapped ? gapWidth : gapDepth,
+            localDepth: isCurrentlySwapped ? gapDepth : gapWidth
+          }
+        ];
+        const fittingCandidate = candidates.find(
+          (candidate) => candidate.localWidth >= minLocalWidth && candidate.localDepth >= minLocalDepth
+        );
+        const containsCurrent =
+          rect.left <= currentRect.left &&
+          rect.right >= currentRect.right &&
+          rect.top <= currentRect.top &&
+          rect.bottom >= currentRect.bottom;
+        const rectCenterX = (rect.left + rect.right) / 2;
+        const rectCenterY = (rect.top + rect.bottom) / 2;
+        return {
+          rect,
+          fittingCandidate,
+          area: gapWidth * gapDepth,
+          containsCurrent,
+          distance: Math.hypot(rectCenterX - currentCenterX, rectCenterY - currentCenterY)
+        };
+      })
+      .filter((option) => option.fittingCandidate);
 
-    const fittingCandidate =
-      candidates.find((candidate) => candidate.worldMinWidth <= gapWidth && candidate.worldMinDepth <= gapDepth) ??
-      candidates[0];
+    const chosenRectOption = canShrinkContent
+      ? rectOptions.sort((a, b) => b.area - a.area || a.distance - b.distance)[0]
+      : rectOptions
+          .filter((option) => option.containsCurrent)
+          .sort((a, b) => b.area - a.area)[0] ??
+        rectOptions.sort((a, b) => a.distance - b.distance || b.area - a.area)[0];
 
-    const nextCustomWidth = Math.max(
-      fittingCandidate.localWidth,
-      cupOnlyMinimums?.minWidth ?? minimums.minWidth
-    );
-    const nextCustomDepth = Math.max(
-      fittingCandidate.localDepth,
-      cupOnlyMinimums?.minDepth ?? minimums.minDepth
-    );
+    if (!chosenRectOption?.fittingCandidate) return false;
+
+    const { rect: bestRect, fittingCandidate } = chosenRectOption;
+    const nextCustomWidth = Math.max(fittingCandidate.localWidth, minLocalWidth);
+    const nextCustomDepth = Math.max(fittingCandidate.localDepth, minLocalDepth);
+    const effectiveLeftBoundary = bestRect.left;
+    const effectiveTopBoundary = bestRect.top;
 
     const targetInteriorWidth = Math.max(nextCustomWidth - box.wallThickness * 2 - box.tolerance * 2, 1);
     const targetInteriorDepth = Math.max(nextCustomDepth - box.wallThickness * 2 - box.tolerance * 2, 1);

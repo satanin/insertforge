@@ -87,6 +87,9 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - vacia o solo `Cup Trays`: puede crecer y encoger
   - con contenido fijo: solo crecer
 - redimensionado de `Cup Trays` internas cuando aplica
+- calcula huecos libres reales de la layer para elegir el espacio util
+- corrige deteccion del hueco cuando la caja actual ya invade otro elemento de la layer
+- feedback al usuario cuando no existe un hueco valido o el contenido no puede encogerse
 
 #### Box
 
@@ -94,6 +97,9 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - mismo criterio funcional que `Layered Box`
 - soporte para `Empty box`
 - soporte para cajas con solo `Cup Trays`
+- calcula huecos libres reales de la layer para elegir el espacio util
+- corrige deteccion del hueco cuando la caja actual ya invade otro elemento de la layer
+- feedback al usuario cuando no existe un hueco valido o el contenido no puede encogerse
 
 ### Box
 
