@@ -6,6 +6,7 @@ import { getSafeEmbossDepth } from './emboss';
 
 export interface MiniatureRackSlot {
   id: string;
+  label?: string;
   baseWidth: number;
   baseHeight: number;
   slotSpacingLeft: number;
@@ -149,11 +150,81 @@ export function getMiniatureRackDimensions(
 export function createDefaultMiniatureRackSlot(index: number): MiniatureRackSlot {
   return {
     id: `slot-${index}`,
+    label: `S${index}`,
     baseWidth: DEFAULT_MINIATURE_RACK_SLOT_WIDTH,
     baseHeight: DEFAULT_MINIATURE_RACK_SLOT_HEIGHT,
     slotSpacingLeft: DEFAULT_MINIATURE_RACK_SPACING,
     slotSpacingRight: DEFAULT_MINIATURE_RACK_SPACING
   };
+}
+
+function createMiniatureRackSlotLabelGeometry(
+  label: string,
+  slotCenterX: number,
+  slotWidth: number,
+  rackHeight: number,
+  wallThickness: number
+): Geom3 | null {
+  const trimmedLabel = label.trim();
+  if (trimmedLabel.length === 0) return null;
+
+  const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(wallThickness);
+  if (!embossEnabled) return null;
+
+  const strokeWidth = 1.0;
+  const baseTextHeight = 5;
+  const verticalMargin = 2;
+  const horizontalMargin = 1;
+  const wallHeight = rackHeight - wallThickness;
+  const availableVertical = wallHeight - verticalMargin * 2;
+  const availableHorizontal = slotWidth - horizontalMargin * 2;
+  if (availableVertical < 3 || availableHorizontal < 2) return null;
+
+  const textSegments = vectorText({ height: baseTextHeight, align: 'center' }, trimmedLabel.toUpperCase());
+  if (textSegments.length === 0) return null;
+
+  const textShapes: ReturnType<typeof extrudeLinear>[] = [];
+  for (const segment of textSegments) {
+    if (segment.length >= 2) {
+      const pathObj = path2.fromPoints({ closed: false }, segment);
+      const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+      const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+      textShapes.push(extruded);
+    }
+  }
+  if (textShapes.length === 0) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const segment of textSegments) {
+    for (const point of segment) {
+      minX = Math.min(minX, point[0]);
+      maxX = Math.max(maxX, point[0]);
+      minY = Math.min(minY, point[1]);
+      maxY = Math.max(maxY, point[1]);
+    }
+  }
+
+  const textWidth = maxX - minX + strokeWidth;
+  const textHeight = maxY - minY + strokeWidth;
+  const scaleH = Math.min(1, availableHorizontal / textHeight);
+  const scaleV = Math.min(1, availableVertical / textWidth);
+  const textScale = Math.min(scaleH, scaleV);
+  if (textScale <= 0) return null;
+
+  let combinedText = union(...textShapes);
+  const textCenterX = (minX + maxX) / 2;
+  const textCenterY = (minY + maxY) / 2;
+  combinedText = translate([-textCenterX, -textCenterY, 0], combinedText);
+  combinedText = scale([textScale, textScale, 1], combinedText);
+  combinedText = mirrorY(combinedText);
+  combinedText = jscad.transforms.rotateZ(-Math.PI / 2, combinedText);
+  combinedText = jscad.transforms.rotateX(-Math.PI / 2, combinedText);
+  combinedText = translate([slotCenterX, -0.1, wallThickness + wallHeight / 2], combinedText);
+
+  return combinedText;
 }
 
 export function createMiniatureRack(
@@ -217,6 +288,7 @@ export function createMiniatureRack(
 
   // Vertical guide rails for each slot.
   let cursorX = normalized.sideWallThickness;
+  const slotLabelCuts: Geom3[] = [];
   for (const slot of normalized.slots) {
     const railWallThickness = normalized.railWallThickness;
     const effectiveBaseWidth = slot.baseWidth + normalized.baseWidthTolerance;
@@ -247,6 +319,7 @@ export function createMiniatureRack(
     const rightStemCenterX = slotInnerStartX + effectiveBaseWidth + railWallThickness / 2;
     const leftLipCenterX = slotInnerStartX + lipReach / 2;
     const rightLipCenterX = slotInnerStartX + effectiveBaseWidth - lipReach / 2;
+    const slotCenterX = slotInnerStartX + effectiveBaseWidth / 2;
 
     const railStems = [
       { centerX: leftStemCenterX },
@@ -285,6 +358,20 @@ export function createMiniatureRack(
         )
       );
     }
+
+    if (showEmboss) {
+      const labelCut = createMiniatureRackSlotLabelGeometry(
+        slot.label ?? '',
+        slotCenterX,
+        effectiveBaseWidth,
+        dimensions.height,
+        normalized.wallThickness
+      );
+      if (labelCut) {
+        slotLabelCuts.push(labelCut);
+      }
+    }
+
     cursorX +=
       slot.slotSpacingLeft +
       railWallThickness * 2 +
@@ -294,6 +381,10 @@ export function createMiniatureRack(
   }
 
   let result = union(...parts);
+
+  if (slotLabelCuts.length > 0) {
+    result = subtract(result, ...slotLabelCuts);
+  }
 
   if (showEmboss && trayName && trayName.trim().length > 0) {
     const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(normalized.wallThickness);

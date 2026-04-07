@@ -219,6 +219,16 @@
               <Icon Icon={IconX} color="var(--fgMuted)" />
             </IconButton>
           </div>
+          <FormControl label="Label" name={`slotLabel-${slot.id}`}>
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                value={slot.label ?? ''}
+                onchange={(e) => updateSlot(slot.id, { label: e.currentTarget.value })}
+              />
+            {/snippet}
+          </FormControl>
+          <Spacer size="0.5rem" />
           <div class="formGrid">
             <FormControl label="Base Width" name={`slotBaseWidth-${slot.id}`}>
               {#snippet input({ inputProps })}
