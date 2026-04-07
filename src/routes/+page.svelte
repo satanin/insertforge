@@ -2036,7 +2036,7 @@
           jscadGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, spacerHeight, showEmboss);
           selectedTrayCounters = []; // Cup trays don't have counter positions
         } else if (isMiniatureRackTray(looseTray)) {
-          jscadGeom = createMiniatureRack(looseTray.params, maxHeight);
+          jscadGeom = createMiniatureRack(looseTray.params, looseTray.name, maxHeight, showEmboss);
           selectedTrayCounters = getMiniatureRackPreviewPositions(looseTray.params);
         } else {
           continue;

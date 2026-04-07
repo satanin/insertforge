@@ -338,7 +338,7 @@ function createTrayGeometry(
     return createCardDrawTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight, showEmboss);
   }
   if (isMiniatureRackTray(tray)) {
-    return createMiniatureRack(tray.params, maxHeight);
+    return createMiniatureRack(tray.params, tray.name, maxHeight, showEmboss);
   }
   // Default to counter tray
   return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);

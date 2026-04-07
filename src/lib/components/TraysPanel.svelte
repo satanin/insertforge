@@ -433,13 +433,11 @@
 
         <Spacer size="1rem" />
 
-        {#if !isMiniatureRackTray(selectedTray)}
-          <InputCheckbox
-            label="Emboss name on tray bottom"
-            checked={selectedTray.showEmboss ?? true}
-            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-          />
-        {/if}
+        <InputCheckbox
+          label="Emboss name on tray bottom"
+          checked={selectedTray.showEmboss ?? true}
+          onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+        />
       </div>
 
       <Hr />

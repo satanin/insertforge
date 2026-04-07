@@ -408,7 +408,7 @@ function createDefaultMiniatureRack(name: string, color: string): MiniatureRackT
     name,
     color,
     rotationOverride: 'auto',
-    showEmboss: false,
+    showEmboss: true,
     params
   };
 }

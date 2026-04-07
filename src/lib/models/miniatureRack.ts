@@ -2,6 +2,7 @@ import jscad from '@jscad/modeling';
 
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
+import { getSafeEmbossDepth } from './emboss';
 
 export interface MiniatureRackSlot {
   id: string;
@@ -30,9 +31,13 @@ export interface MiniatureRackDimensions {
 }
 
 const { cuboid } = jscad.primitives;
-const { union } = jscad.booleans;
-const { translate } = jscad.transforms;
+const { union, subtract } = jscad.booleans;
+const { translate, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
+const { vectorText } = jscad.text;
+const { path2 } = jscad.geometries;
+const { expand } = jscad.expansions;
+const { extrudeLinear } = jscad.extrusions;
 
 export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
@@ -153,7 +158,9 @@ export function createDefaultMiniatureRackSlot(index: number): MiniatureRackSlot
 
 export function createMiniatureRack(
   params: MiniatureRackParams,
-  targetHeight?: number
+  trayName?: string,
+  targetHeight?: number,
+  showEmboss: boolean = true
 ): Geom3 {
   const normalized = normalizeMiniatureRackParams(params);
   const dimensions = getMiniatureRackDimensions(normalized, targetHeight);
@@ -286,7 +293,69 @@ export function createMiniatureRack(
       normalized.wallThickness;
   }
 
-  return union(...parts);
+  let result = union(...parts);
+
+  if (showEmboss && trayName && trayName.trim().length > 0) {
+    const { enabled: embossEnabled, depth: textDepth } = getSafeEmbossDepth(normalized.wallThickness);
+    if (!embossEnabled) return result;
+
+    const strokeWidth = 1.2;
+    const textHeightParam = 6;
+    const margin = normalized.wallThickness * 2;
+    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+
+    if (textSegments.length > 0) {
+      const textShapes: ReturnType<typeof extrudeLinear>[] = [];
+      for (const segment of textSegments) {
+        if (segment.length >= 2) {
+          const pathObj = path2.fromPoints({ closed: false }, segment);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
+          textShapes.push(extruded);
+        }
+      }
+
+      if (textShapes.length > 0) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (const segment of textSegments) {
+          for (const point of segment) {
+            minX = Math.min(minX, point[0]);
+            maxX = Math.max(maxX, point[0]);
+            minY = Math.min(minY, point[1]);
+            maxY = Math.max(maxY, point[1]);
+          }
+        }
+
+        const textWidthCalc = maxX - minX + strokeWidth;
+        const textHeightCalc = maxY - minY + strokeWidth;
+        const availableWidth = dimensions.width - margin * 2;
+        const availableDepth = dimensions.depth - margin * 2;
+        const scaleX = Math.min(1, availableWidth / textWidthCalc);
+        const scaleY = Math.min(1, availableDepth / textHeightCalc);
+        const textScale = Math.min(scaleX, scaleY);
+        const centerX = dimensions.width / 2;
+        const centerY = dimensions.depth / 2;
+        const textCenterX = (minX + maxX) / 2;
+        const textCenterY = (minY + maxY) / 2;
+
+        let combinedText = union(...textShapes);
+        combinedText = mirrorY(combinedText);
+
+        const positionedText = translate(
+          [centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
+          scale([textScale, textScale, 1], combinedText)
+        );
+
+        result = subtract(result, positionedText);
+      }
+    }
+  }
+
+  return result;
 }
 
 export function getMiniatureRackPreviewPositions(params: MiniatureRackParams): CounterStack[] {
