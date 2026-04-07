@@ -307,24 +307,28 @@ export function getMiniatureRackPreviewPositions(params: MiniatureRackParams): C
       Math.max(railDepth - lipThickness, normalized.baseHeightTolerance)
     );
     const previewYOffset = normalized.wallThickness + (lipRearGap - slot.baseHeight) / 2;
+    const usableHeight = Math.max(dimensions.height - normalized.wallThickness, slot.baseWidth);
+    const previewCount = Math.max(1, Math.floor(usableHeight / slot.baseWidth));
 
-    previewStacks.push({
-      shape: 'circle',
-      x: slotInnerStartX + (effectiveBaseWidth - slot.baseWidth) / 2,
-      y: previewYOffset,
-      z: normalized.wallThickness,
-      width: slot.baseWidth,
-      length: slot.baseWidth,
-      thickness: slot.baseHeight,
-      count: 1,
-      hexPointyTop: false,
-      color: '#7d8f6a',
-      isEdgeLoaded: true,
-      edgeOrientation: 'crosswise',
-      slotWidth: slot.baseWidth,
-      slotDepth: slot.baseHeight,
-      label: 'Miniature base'
-    });
+    for (let index = 0; index < previewCount; index += 1) {
+      previewStacks.push({
+        shape: 'circle',
+        x: slotInnerStartX + (effectiveBaseWidth - slot.baseWidth) / 2,
+        y: previewYOffset,
+        z: normalized.wallThickness + index * slot.baseWidth,
+        width: slot.baseWidth,
+        length: slot.baseWidth,
+        thickness: slot.baseHeight,
+        count: 1,
+        hexPointyTop: false,
+        color: '#7d8f6a',
+        isEdgeLoaded: true,
+        edgeOrientation: 'crosswise',
+        slotWidth: slot.baseWidth,
+        slotDepth: slot.baseHeight,
+        label: 'Miniature base'
+      });
+    }
 
     cursorX +=
       slot.slotSpacingLeft +
