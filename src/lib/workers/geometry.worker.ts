@@ -21,7 +21,7 @@ import {
   type CustomCardSize
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
-import { createMiniatureRack } from '$lib/models/miniatureRack';
+import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
@@ -359,7 +359,7 @@ function getTrayPositions(
     return [];
   }
   if (isMiniatureRackTray(tray)) {
-    return [];
+    return getMiniatureRackPreviewPositions(tray.params);
   }
   if (isCardWellTray(tray)) {
     // Convert card well positions to CounterStack format for visualization

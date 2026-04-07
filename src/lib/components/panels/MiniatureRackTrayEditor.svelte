@@ -3,6 +3,8 @@
   import { IconX } from '@tabler/icons-svelte';
 
   import {
+    DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
+    DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
     createDefaultMiniatureRackSlot,
     DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
     DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
@@ -94,10 +96,10 @@
           <Input
             {...inputProps}
             type="number"
-            min="2"
+            min="1"
             step="0.5"
             value={tray.params.wallThickness}
-            onchange={(e) => updateParams({ wallThickness: parseFloat(e.currentTarget.value) || 2 })}
+            onchange={(e) => updateParams({ wallThickness: parseFloat(e.currentTarget.value) || 1 })}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}
@@ -107,10 +109,10 @@
           <Input
             {...inputProps}
             type="number"
-            min="2"
+            min="1"
             step="0.5"
             value={tray.params.sideWallThickness}
-            onchange={(e) => updateParams({ sideWallThickness: parseFloat(e.currentTarget.value) || 2 })}
+            onchange={(e) => updateParams({ sideWallThickness: parseFloat(e.currentTarget.value) || 1 })}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}
@@ -145,6 +147,48 @@
                 railLipInset:
                   parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET
               })}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Base Width Tolerance" name="baseWidthTolerance">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            min="0"
+            step="0.1"
+            value={tray.params.baseWidthTolerance ?? DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE}
+            onchange={(e) =>
+              updateParams((() => {
+                const value = parseFloat(e.currentTarget.value);
+                return {
+                  baseWidthTolerance: Number.isFinite(value)
+                    ? value
+                    : DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE
+                };
+              })())}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <FormControl label="Base Height Tolerance" name="baseHeightTolerance">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            min="0"
+            step="0.1"
+            value={tray.params.baseHeightTolerance ?? DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE}
+            onchange={(e) =>
+              updateParams((() => {
+                const value = parseFloat(e.currentTarget.value);
+                return {
+                  baseHeightTolerance: Number.isFinite(value)
+                    ? value
+                    : DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE
+                };
+              })())}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}

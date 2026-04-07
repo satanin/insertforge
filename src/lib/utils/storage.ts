@@ -408,6 +408,14 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'miniatureRack') {
+    return {
+      ...tray,
+      type: 'miniatureRack',
+      color
+    } as Tray;
+  }
+
   // Counter tray (either explicit or migrated from old format)
   return {
     ...tray,

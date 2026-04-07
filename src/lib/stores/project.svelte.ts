@@ -13,6 +13,8 @@ import { defaultLidParams } from '$lib/models/lid';
 import {
   createDefaultMiniatureRackSlot,
   DEFAULT_MINIATURE_RACK_BASE_DEPTH,
+  DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
+  DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
   DEFAULT_MINIATURE_RACK_HEIGHT,
   DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
   DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
@@ -396,6 +398,8 @@ function createDefaultMiniatureRack(name: string, color: string): MiniatureRackT
     sideWallThickness: DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
     railWallThickness: DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
     railLipInset: DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
+    baseWidthTolerance: DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
+    baseHeightTolerance: DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
     slots: [createDefaultMiniatureRackSlot(1)]
   };
   return {

@@ -1,6 +1,7 @@
 import jscad from '@jscad/modeling';
 
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+import type { CounterStack } from './counterTray';
 
 export interface MiniatureRackSlot {
   id: string;
@@ -17,6 +18,8 @@ export interface MiniatureRackParams {
   sideWallThickness: number;
   railWallThickness: number;
   railLipInset: number;
+  baseWidthTolerance: number;
+  baseHeightTolerance: number;
   slots: MiniatureRackSlot[];
 }
 
@@ -34,21 +37,23 @@ export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
 export const DEFAULT_MINIATURE_RACK_SPACING = 4;
 export const DEFAULT_MINIATURE_RACK_HEIGHT = 60;
-export const DEFAULT_MINIATURE_RACK_WALL_THICKNESS = 3;
-export const DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS = 5;
-export const DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS = 2;
-export const DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET = 4;
-export const DEFAULT_MINIATURE_RACK_BASE_DEPTH = 24;
+export const DEFAULT_MINIATURE_RACK_WALL_THICKNESS = 2;
+export const DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS = 2;
+export const DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS = 1.5;
+export const DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET = 1.5;
+export const DEFAULT_MINIATURE_RACK_BASE_DEPTH = 50;
+export const DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE = 1.8;
+export const DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE = 1;
 const MIN_SLOT_BASE_WIDTH = 10;
 const MIN_SLOT_BASE_HEIGHT = 1;
 const MIN_SLOT_SPACING = 0;
 const MIN_RACK_HEIGHT = 20;
-const MIN_WALL_THICKNESS = 2;
-const MIN_SIDE_WALL_THICKNESS = 2;
+const MIN_WALL_THICKNESS = 1;
+const MIN_SIDE_WALL_THICKNESS = 1;
 const MIN_RAIL_WALL_THICKNESS = 1;
 const MIN_RAIL_LIP_INSET = 0.5;
+const MIN_BASE_TOLERANCE = 0;
 const MIN_BASE_DEPTH_ABSOLUTE = 12;
-const MINIATURE_RACK_BASE_TOLERANCE = 0.3;
 
 function clampPositive(value: number, minimum: number): number {
   return Number.isFinite(value) ? Math.max(value, minimum) : minimum;
@@ -74,6 +79,18 @@ export function normalizeMiniatureRackParams(params: MiniatureRackParams): Minia
     railLipInset: clampPositive(
       Number.isFinite(params.railLipInset) ? params.railLipInset : DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
       MIN_RAIL_LIP_INSET
+    ),
+    baseWidthTolerance: clampPositive(
+      Number.isFinite(params.baseWidthTolerance)
+        ? params.baseWidthTolerance
+        : DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
+      MIN_BASE_TOLERANCE
+    ),
+    baseHeightTolerance: clampPositive(
+      Number.isFinite(params.baseHeightTolerance)
+        ? params.baseHeightTolerance
+        : DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
+      MIN_BASE_TOLERANCE
     ),
     slots:
       params.slots.length > 0
@@ -110,6 +127,7 @@ export function getMiniatureRackDimensions(
         slot.slotSpacingLeft +
         normalized.railWallThickness * 2 +
         slot.baseWidth +
+        normalized.baseWidthTolerance +
         slot.slotSpacingRight +
         (index > 0 ? normalized.wallThickness : 0),
       0
@@ -183,17 +201,18 @@ export function createMiniatureRack(
   let cursorX = normalized.sideWallThickness;
   for (const slot of normalized.slots) {
     const railWallThickness = normalized.railWallThickness;
+    const effectiveBaseWidth = slot.baseWidth + normalized.baseWidthTolerance;
     const slotOuterStartX = cursorX + slot.slotSpacingLeft;
     const slotInnerStartX = slotOuterStartX + railWallThickness;
     const lipReach = Math.min(
       Math.max(normalized.railLipInset, MIN_RAIL_LIP_INSET),
-      Math.max(slot.baseWidth / 2 - railWallThickness * 0.5, MIN_RAIL_LIP_INSET)
+      Math.max(effectiveBaseWidth / 2 - railWallThickness * 0.5, MIN_RAIL_LIP_INSET)
     );
     const lipThickness = Math.min(
       railWallThickness,
       Math.max(dimensions.depth * 0.18, railWallThickness)
     );
-    const desiredLipRearGap = slot.baseHeight + MINIATURE_RACK_BASE_TOLERANCE;
+    const desiredLipRearGap = slot.baseHeight + normalized.baseHeightTolerance;
     const railDepth = Math.min(
       Math.max(
         desiredLipRearGap + lipThickness,
@@ -204,12 +223,12 @@ export function createMiniatureRack(
     );
     const lipRearGap = Math.min(
       desiredLipRearGap,
-      Math.max(railDepth - lipThickness, MINIATURE_RACK_BASE_TOLERANCE)
+      Math.max(railDepth - lipThickness, normalized.baseHeightTolerance)
     );
     const leftStemCenterX = slotOuterStartX + railWallThickness / 2;
-    const rightStemCenterX = slotInnerStartX + slot.baseWidth + railWallThickness / 2;
+    const rightStemCenterX = slotInnerStartX + effectiveBaseWidth + railWallThickness / 2;
     const leftLipCenterX = slotInnerStartX + lipReach / 2;
-    const rightLipCenterX = slotInnerStartX + slot.baseWidth - lipReach / 2;
+    const rightLipCenterX = slotInnerStartX + effectiveBaseWidth - lipReach / 2;
 
     const railStems = [
       { centerX: leftStemCenterX },
@@ -251,10 +270,69 @@ export function createMiniatureRack(
     cursorX +=
       slot.slotSpacingLeft +
       railWallThickness * 2 +
-      slot.baseWidth +
+      effectiveBaseWidth +
       slot.slotSpacingRight +
       normalized.wallThickness;
   }
 
   return union(...parts);
+}
+
+export function getMiniatureRackPreviewPositions(params: MiniatureRackParams): CounterStack[] {
+  const normalized = normalizeMiniatureRackParams(params);
+  const dimensions = getMiniatureRackDimensions(normalized);
+  const previewStacks: CounterStack[] = [];
+
+  let cursorX = normalized.sideWallThickness;
+  for (const slot of normalized.slots) {
+    const railWallThickness = normalized.railWallThickness;
+    const effectiveBaseWidth = slot.baseWidth + normalized.baseWidthTolerance;
+    const slotOuterStartX = cursorX + slot.slotSpacingLeft;
+    const slotInnerStartX = slotOuterStartX + railWallThickness;
+    const lipThickness = Math.min(
+      railWallThickness,
+      Math.max(dimensions.depth * 0.18, railWallThickness)
+    );
+    const desiredLipRearGap = slot.baseHeight + normalized.baseHeightTolerance;
+    const railDepth = Math.min(
+      Math.max(
+        desiredLipRearGap + lipThickness,
+        slot.baseHeight + normalized.wallThickness * 0.75,
+        normalized.wallThickness * 1.2
+      ),
+      Math.max(dimensions.depth - normalized.wallThickness * 1.5, normalized.wallThickness * 1.2)
+    );
+    const lipRearGap = Math.min(
+      desiredLipRearGap,
+      Math.max(railDepth - lipThickness, normalized.baseHeightTolerance)
+    );
+    const previewYOffset = normalized.wallThickness + (lipRearGap - slot.baseHeight) / 2;
+
+    previewStacks.push({
+      shape: 'circle',
+      x: slotInnerStartX + (effectiveBaseWidth - slot.baseWidth) / 2,
+      y: previewYOffset,
+      z: normalized.wallThickness,
+      width: slot.baseWidth,
+      length: slot.baseWidth,
+      thickness: slot.baseHeight,
+      count: 1,
+      hexPointyTop: false,
+      color: '#7d8f6a',
+      isEdgeLoaded: true,
+      edgeOrientation: 'crosswise',
+      slotWidth: slot.baseWidth,
+      slotDepth: slot.baseHeight,
+      label: 'Miniature base'
+    });
+
+    cursorX +=
+      slot.slotSpacingLeft +
+      railWallThickness * 2 +
+      effectiveBaseWidth +
+      slot.slotSpacingRight +
+      normalized.wallThickness;
+  }
+
+  return previewStacks;
 }
