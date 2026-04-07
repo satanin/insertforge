@@ -32,10 +32,11 @@ export interface MiniatureRackDimensions {
 const { cuboid } = jscad.primitives;
 const { union } = jscad.booleans;
 const { translate } = jscad.transforms;
+const { hull } = jscad.hulls;
 
 export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
-export const DEFAULT_MINIATURE_RACK_SPACING = 4;
+export const DEFAULT_MINIATURE_RACK_SPACING = 6;
 export const DEFAULT_MINIATURE_RACK_HEIGHT = 60;
 export const DEFAULT_MINIATURE_RACK_WALL_THICKNESS = 2;
 export const DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS = 2;
@@ -156,10 +157,6 @@ export function createMiniatureRack(
 ): Geom3 {
   const normalized = normalizeMiniatureRackParams(params);
   const dimensions = getMiniatureRackDimensions(normalized, targetHeight);
-  const reinforcementDepth = Math.max(
-    normalized.wallThickness * 3,
-    Math.min(dimensions.depth * 0.55, dimensions.depth - normalized.wallThickness)
-  );
   const parts: Geom3[] = [];
 
   // Base shelf of the L-shaped rack.
@@ -182,20 +179,34 @@ export function createMiniatureRack(
     )
   );
 
-  // Side reinforcements.
-  for (const sideX of [
-    normalized.sideWallThickness / 2,
-    dimensions.width - normalized.sideWallThickness / 2
-  ]) {
-    parts.push(
-      translate(
-        [sideX, reinforcementDepth / 2, dimensions.height / 2],
-        cuboid({
-          size: [normalized.sideWallThickness, reinforcementDepth, dimensions.height]
-        })
-      )
+  // Side walls as triangular reinforcements for a more stable rack.
+  const createSideWall = (startX: number): Geom3 => {
+    const vertexSize = 0.01;
+    const centerX = startX + normalized.sideWallThickness / 2;
+    const baseRearVertex = translate(
+      [centerX, normalized.wallThickness, normalized.wallThickness],
+      cuboid({
+        size: [normalized.sideWallThickness, vertexSize, vertexSize]
+      })
     );
-  }
+    const topRearVertex = translate(
+      [centerX, normalized.wallThickness, dimensions.height],
+      cuboid({
+        size: [normalized.sideWallThickness, vertexSize, vertexSize]
+      })
+    );
+    const baseFrontVertex = translate(
+      [centerX, dimensions.depth, normalized.wallThickness],
+      cuboid({
+        size: [normalized.sideWallThickness, vertexSize, vertexSize]
+      })
+    );
+
+    return hull(baseRearVertex, topRearVertex, baseFrontVertex);
+  };
+
+  parts.push(createSideWall(0));
+  parts.push(createSideWall(dimensions.width - normalized.sideWallThickness));
 
   // Vertical guide rails for each slot.
   let cursorX = normalized.sideWallThickness;
