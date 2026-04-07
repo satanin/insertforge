@@ -9,6 +9,7 @@ export interface MiniatureRackSlot {
   label?: string;
   baseWidth: number;
   baseHeight: number;
+  lipAngle?: number;
   slotSpacingLeft: number;
   slotSpacingRight: number;
 }
@@ -33,7 +34,7 @@ export interface MiniatureRackDimensions {
 
 const { cuboid } = jscad.primitives;
 const { union, subtract } = jscad.booleans;
-const { translate, scale, mirrorY } = jscad.transforms;
+const { translate, scale, mirrorY, rotateZ } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
@@ -43,6 +44,7 @@ const { extrudeLinear } = jscad.extrusions;
 export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
 export const DEFAULT_MINIATURE_RACK_SPACING = 6;
+export const DEFAULT_MINIATURE_RACK_LIP_ANGLE = 45;
 export const DEFAULT_MINIATURE_RACK_HEIGHT = 60;
 export const DEFAULT_MINIATURE_RACK_WALL_THICKNESS = 2;
 export const DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS = 2;
@@ -53,6 +55,8 @@ export const DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE = 1.8;
 export const DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE = 1;
 const MIN_SLOT_BASE_WIDTH = 10;
 const MIN_SLOT_BASE_HEIGHT = 1;
+const MIN_SLOT_LIP_ANGLE = 0;
+const MAX_SLOT_LIP_ANGLE = 80;
 const MIN_SLOT_SPACING = 0;
 const MIN_RACK_HEIGHT = 20;
 const MIN_WALL_THICKNESS = 1;
@@ -64,6 +68,10 @@ const MIN_BASE_DEPTH_ABSOLUTE = 12;
 
 function clampPositive(value: number, minimum: number): number {
   return Number.isFinite(value) ? Math.max(value, minimum) : minimum;
+}
+
+function clampRange(value: number, minimum: number, maximum: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(value, minimum), maximum) : minimum;
 }
 
 export function getMiniatureRackMinimumBaseDepth(height: number): number {
@@ -105,14 +113,17 @@ export function normalizeMiniatureRackParams(params: MiniatureRackParams): Minia
             ...slot,
             baseWidth: clampPositive(slot.baseWidth, MIN_SLOT_BASE_WIDTH),
             baseHeight: clampPositive(slot.baseHeight, MIN_SLOT_BASE_HEIGHT),
+            lipAngle: clampRange(slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE, MIN_SLOT_LIP_ANGLE, MAX_SLOT_LIP_ANGLE),
             slotSpacingLeft: clampPositive(slot.slotSpacingLeft, MIN_SLOT_SPACING),
             slotSpacingRight: clampPositive(slot.slotSpacingRight, MIN_SLOT_SPACING)
           }))
         : [
             {
               id: 'slot-1',
+              label: 'S1',
               baseWidth: DEFAULT_MINIATURE_RACK_SLOT_WIDTH,
               baseHeight: DEFAULT_MINIATURE_RACK_SLOT_HEIGHT,
+              lipAngle: DEFAULT_MINIATURE_RACK_LIP_ANGLE,
               slotSpacingLeft: DEFAULT_MINIATURE_RACK_SPACING,
               slotSpacingRight: DEFAULT_MINIATURE_RACK_SPACING
             }
@@ -153,6 +164,7 @@ export function createDefaultMiniatureRackSlot(index: number): MiniatureRackSlot
     label: `S${index}`,
     baseWidth: DEFAULT_MINIATURE_RACK_SLOT_WIDTH,
     baseHeight: DEFAULT_MINIATURE_RACK_SLOT_HEIGHT,
+    lipAngle: DEFAULT_MINIATURE_RACK_LIP_ANGLE,
     slotSpacingLeft: DEFAULT_MINIATURE_RACK_SPACING,
     slotSpacingRight: DEFAULT_MINIATURE_RACK_SPACING
   };
@@ -303,6 +315,7 @@ export function createMiniatureRack(
       Math.max(dimensions.depth * 0.18, railWallThickness)
     );
     const desiredLipRearGap = slot.baseHeight + normalized.baseHeightTolerance;
+    const requestedLipAngleRadians = ((slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE) * Math.PI) / 180;
     const railDepth = Math.min(
       Math.max(
         desiredLipRearGap + lipThickness,
@@ -317,9 +330,14 @@ export function createMiniatureRack(
     );
     const leftStemCenterX = slotOuterStartX + railWallThickness / 2;
     const rightStemCenterX = slotInnerStartX + effectiveBaseWidth + railWallThickness / 2;
-    const leftLipCenterX = slotInnerStartX + lipReach / 2;
-    const rightLipCenterX = slotInnerStartX + effectiveBaseWidth - lipReach / 2;
     const slotCenterX = slotInnerStartX + effectiveBaseWidth / 2;
+    const lipBaseCenterY = normalized.wallThickness + lipRearGap + lipThickness / 2;
+    const maxLipAdvance = Math.max(dimensions.depth - normalized.wallThickness - lipRearGap - lipThickness, 0);
+    const lipAdvance = Math.min(
+      Math.tan(requestedLipAngleRadians) * Math.max(lipReach, 0),
+      maxLipAdvance
+    );
+    const lipAngleRadians = lipReach > 0 ? Math.atan2(lipAdvance, lipReach) : 0;
 
     const railStems = [
       { centerX: leftStemCenterX },
@@ -341,23 +359,31 @@ export function createMiniatureRack(
       );
     }
 
-    // Lips attached directly to the inner face of each rail wall.
-    // In top view this should read as a hooked profile growing from the side wall,
-    // not as a detached step sitting inside the slot.
-    for (const lipCenterX of [leftLipCenterX, rightLipCenterX]) {
-      parts.push(
-        translate(
-          [
-            lipCenterX,
-            normalized.wallThickness + lipRearGap + lipThickness / 2,
-            dimensions.height / 2
-          ],
-          cuboid({
-            size: [lipReach, lipThickness, dimensions.height]
-          })
-        )
-      );
-    }
+    const lipLength = lipReach + railWallThickness;
+    const lipPivotY = lipBaseCenterY + lipThickness / 2;
+    const leftLip = translate(
+      [slotOuterStartX, lipPivotY, dimensions.height / 2],
+      rotateZ(
+        lipAngleRadians,
+        cuboid({
+          size: [lipLength, lipThickness, dimensions.height],
+          center: [lipLength / 2, -lipThickness / 2, 0]
+        })
+      )
+    );
+    const rightLip = translate(
+      [slotInnerStartX + effectiveBaseWidth + railWallThickness, lipPivotY, dimensions.height / 2],
+      rotateZ(
+        -lipAngleRadians,
+        cuboid({
+          size: [lipLength, lipThickness, dimensions.height],
+          center: [-lipLength / 2, -lipThickness / 2, 0]
+        })
+      )
+    );
+
+    parts.push(leftLip);
+    parts.push(rightLip);
 
     if (showEmboss) {
       const labelCut = createMiniatureRackSlotLabelGeometry(

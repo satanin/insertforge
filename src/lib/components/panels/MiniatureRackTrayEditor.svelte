@@ -6,6 +6,7 @@
     DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
     DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
     createDefaultMiniatureRackSlot,
+    DEFAULT_MINIATURE_RACK_LIP_ANGLE,
     DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
     DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
     getMiniatureRackDimensions,
@@ -219,15 +220,40 @@
               <Icon Icon={IconX} color="var(--fgMuted)" />
             </IconButton>
           </div>
-          <FormControl label="Label" name={`slotLabel-${slot.id}`}>
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                value={slot.label ?? ''}
-                onchange={(e) => updateSlot(slot.id, { label: e.currentTarget.value })}
-              />
-            {/snippet}
-          </FormControl>
+          <div class="formGrid">
+            <FormControl label="Label" name={`slotLabel-${slot.id}`}>
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  value={slot.label ?? ''}
+                  onchange={(e) => updateSlot(slot.id, { label: e.currentTarget.value })}
+                />
+              {/snippet}
+            </FormControl>
+            <FormControl label="Lip Angle" name={`slotLipAngle-${slot.id}`}>
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min="0"
+                  max="80"
+                  step="1"
+                  value={slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE}
+                  onchange={(e) =>
+                    updateSlot(
+                      slot.id,
+                      (() => {
+                        const value = parseFloat(e.currentTarget.value);
+                        return {
+                          lipAngle: Number.isFinite(value) ? value : DEFAULT_MINIATURE_RACK_LIP_ANGLE
+                        };
+                      })()
+                    )}
+                />
+              {/snippet}
+              {#snippet end()}deg{/snippet}
+            </FormControl>
+          </div>
           <Spacer size="0.5rem" />
           <div class="formGrid">
             <FormControl label="Base Width" name={`slotBaseWidth-${slot.id}`}>
