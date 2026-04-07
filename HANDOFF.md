@@ -3,7 +3,7 @@
 ## Proyecto
 
 - Workspace: `/Users/raul/projects/counterslayer`
-- Rama actual: `codex/fix-counter-tray-selection`
+- Rama actual: `codex/insertforge`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
 
@@ -108,6 +108,21 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - fix de `Add box` para crear correctamente el tipo seleccionado
 - fix de preview incorrecta de `Empty box`
 
+### Miniature Rack
+
+- nuevo tipo `Miniature Rack` disponible en `Add loose tray`
+- solo `loose tray` por ahora
+- editor dedicado con parametros de rack y lista manual de `slots`
+- soporte de export y render 3D
+- fix de persistencia tras recarga para no degradarse a `Counter Tray`
+- preview de bases de miniatura dentro del rail
+- preview apilada para mostrar cuantas bases caben por rail
+- tolerancias de `Base Width` y `Base Height` editables
+- defaults recalibrados para impresion
+- `Side Walls` triangulares
+- `Slot Spacing Left` y `Slot Spacing Right` por defecto a `6mm`
+- fix para no generar paredes laterales internas al anadir multiples slots
+
 ### Layer / Layout
 
 - `Edit layout` recuperado en layers normales
@@ -123,6 +138,11 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Commits recientes relevantes
 
+- `7f93d2f` Add triangular rack side walls and spacing defaults
+- `3d7cfd9` Fill miniature rack preview with stacked bases
+- `9d68c0c` Refine miniature rack tolerances and preview
+- `d2b6305` Remove inner side walls from miniature rack
+- `05a9bad` Add initial miniature rack tray support
 - `65de715` Match layered box rendering to box assembly
 - `9a87bdf` Align box and layered box panels and explode
 - `c5cc405` Align layered box creation with box menu
@@ -154,6 +174,10 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - `/Users/raul/projects/counterslayer/src/lib/components/BoxesPanel.svelte`
 - Render principal 3D:
   - `/Users/raul/projects/counterslayer/src/lib/components/TrayScene.svelte`
+- Modelo de miniature rack:
+  - `/Users/raul/projects/counterslayer/src/lib/models/miniatureRack.ts`
+- Editor de miniature rack:
+  - `/Users/raul/projects/counterslayer/src/lib/components/panels/MiniatureRackTrayEditor.svelte`
 - Render de contenido de layer:
   - `/Users/raul/projects/counterslayer/src/lib/components/three/LayerContent.svelte`
 - Editor visual de layout de layer:
@@ -166,6 +190,10 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
+- seguir afinando tolerancias reales de impresion de `Miniature Rack`
+- seguir puliendo geometria del rail/labio de `Miniature Rack`
+- decidir si `Miniature Rack` debe vivir tambien dentro de `Box` o `Layered Box`
+- valorar labels / emboss para `Miniature Rack`
 - revisar si `Layered Box` debe dejar de usar proxies en `Edit layout`
 - seguir puliendo consistencia visual y de UX entre `Box` y `Layered Box`
 - trabajar el `README` publico con creditos y cambios introducidos en el fork

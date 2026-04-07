@@ -1,51 +1,106 @@
-# Counter Slayer
+# InsertForge
 
-Counter Slayer is a small Svelte / JSCad application to help you build box and tray inserts for your war games. It generates clean STLs and even references which counters go where in a PDF you can include with your game. Try it out at [counterslayer.com](https://counteslayer.com).
+InsertForge is a Svelte + JSCad application for designing 3D printable board game inserts.
 
-![Screenshot](https://github.com/Siege-Perilous/counterslayer/blob/main/screenshot.png)
+It started as a fork of [Counter Slayer](https://github.com/Siege-Perilous/counterslayer) by [Dave Snider](https://davesnider.com), and the app keeps visible attribution to the original project.
+
+![Screenshot](./screenshot.png)
+
+## What It Supports
+
+- `Box`
+- `Empty box`
+- `Layered Box`
+- `Board`
+- `Loose tray`
+- multiple tray types for box and layered-box workflows
+
+Supported tray families currently include:
+
+- `Counter Tray`
+- `Card Draw Tray`
+- `Card Divider Tray`
+- `Card Well Tray`
+- `Cup Tray`
+- `Miniature Rack` as a loose-tray-only item for now
+
+## Current Capabilities
+
+- Generate printable insert geometry with configurable dimensions and tolerances.
+- Design regular boxes with trays, lids, embossing, and optional honeycomb lid structure.
+- Design layered boxes with multiple internal layers and mixed section types.
+- Place `Board`, `Box`, `Layered Box`, and `Loose tray` items directly in a layer.
+- Use `Edit layout` to manually arrange items inside a layer.
+- Use `Adapt to gap` for `Box` and `Layered Box` to grow or shrink into available layer space when valid.
+- Export printable geometry and PDF reference material.
+- Preview counters, cards, and miniature-base occupancy in supported tray types.
+
+## Miniature Rack
+
+`Miniature Rack` is an in-progress tray type intended for storing miniatures by their bases.
+
+Current status:
+
+- available from `Add loose tray`
+- dedicated editor with manual slot list
+- configurable rail wall thickness, lip inset, slot spacing, and base tolerances
+- stacked preview showing how many miniature bases fit in each rail
+- triangular side-wall reinforcement
+- exportable as printable geometry
+
+Current limitation:
+
+- it is `loose tray` only for now
 
 ## Credits
 
-[Dave Snider](https://davesnider.com) designs and builds Counter Slayer. You might also enjoy [Table Slayer](https://tableslayer.com), a tool to create animated battle maps for in person RPG games.
-
-## Features
-
-- Layout individual trays with stacks of counters.
-- Layout stacks as top-loading, edge-crosswise, or edge-lengthwize across a tray.
-- Counters can be custom sized in hex, square, rectangle, circle and triangles.
-- Add playing card trays that support custom sized cards.
-- Generate boxes for groups of trays with "snap to close" lids.
-- Optional honeycomb pattern for boxes to save on filament.
-- Bin-packing autosorts for the counters and trays so you don't need to think too much about layouts.
-- Generate a PDF reference diagram to let you know which counters go in which stack.
-- Export printable STLs with built in tolerances to make sure everything fits together well.
+- Original project: [Counter Slayer](https://github.com/Siege-Perilous/counterslayer)
+- Original author: [Dave Snider](https://davesnider.com)
+- Related project by the original author: [Table Slayer](https://tableslayer.com)
 
 ## Development
 
-Counter Slayer uses typical Node / Svelte tooling with `pnpm`. Run `pnpm install`, then `pnpm run dev` or `pnpm run build` to start working.
+InsertForge uses `pnpm`.
 
-### Claude Code Integration
+```bash
+pnpm install
+pnpm dev
+```
 
-This project includes tooling for [Claude Code](https://github.com/anthropics/claude-code) to help with geometry debugging. See [CLAUDE.md](https://github.com/Siege-Perilous/counterslayer/blob/main/CLAUDE.md) for details.
+Type-checking:
 
-**Auto-save**: In dev mode, clicking "Regenerate" automatically saves `project.json` with computed layout positions to `mesh-analysis/`.
+```bash
+pnpm run check
+```
 
-**Full export**: Click "Import / Export" → "Debug for Claude" to export STLs, screenshots, and layout data.
+Production build:
 
-**View capture**: Use Playwright to capture views at different angles:
+```bash
+pnpm run build
+```
+
+Typical dev server:
+
+- `http://localhost:5175/`
+
+## Debug / Analysis Workflow
+
+This repo still includes the geometry-debugging workflow used during development.
+
+- In dev mode, `Regenerate` can save layout/debug artifacts into `mesh-analysis/`.
+- `Import / Export` includes debug-oriented export paths used for geometry inspection.
+- View capture tooling is available through the scripts in `scripts/`.
+
+Example:
 
 ```bash
 npx tsx scripts/capture-view.ts --angle iso
 ```
 
-The app also includes a TinkerCAD-style ViewCube for quick camera navigation.
+## License
 
-## License & open source contributions
+Counter Slayer / InsertForge is available under the functional source [license](./LICENSE.md) that becomes Apache 2.0 after two years.
 
-Counter Slayer is available under a functional source [license](LICENSE.md) that becomes Apache 2 after two years. You are free to host and modify Counter Slayer on your own as long as you don't try to monetize it. The primary intention of the source being open is so hobbyists can get familiar with a large Svelte codebase. We welcome PRs and bug reports.
+You can host and modify it for personal use under that license, but not monetize the app itself during the restricted period.
 
-Any STL models you generate with Counter Slayer are yours to do with as you wish, and can be hosted or sold without permission.
-
-## Share your projects with others
-
-Feel free to create a PR to contribute code changes or add a new game to the pre-built trays. You can find these in [`static/projects`](https://github.com/Siege-Perilous/counterslayer/tree/main/static/projects).
+Generated STL files and printable models remain yours.
