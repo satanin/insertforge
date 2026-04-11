@@ -23,6 +23,11 @@ pnpm dev
 pnpm run check
 ```
 
+## Nota de ramas
+
+- Rama estable actual: `codex/insertforge`
+- Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
+
 ## Estado funcional actual
 
 La app ya no es solo un generador de `counter trays`. Ahora soporta:
