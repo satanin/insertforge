@@ -1,5 +1,7 @@
 # InsertForge Handoff
 
+Este documento es un indice operativo corto. Los planes largos y decisiones extensas van en `docs/plans/`.
+
 ## Proyecto
 
 - Workspace: `/Users/raul/projects/counterslayer`
@@ -23,6 +25,12 @@ pnpm dev
 pnpm run check
 ```
 
+## Documentos relacionados
+
+- Guia estable para agentes y colaboracion: `/Users/raul/projects/counterslayer/AGENTS.md`
+- Plan de integracion de `Game Mat Tube`: `/Users/raul/projects/counterslayer/docs/plans/game-mat-tube-integration.md`
+- Handoff especifico de `Game Mat Tube`: `/Users/raul/projects/counterslayer/docs/plans/game-mat-tube-handoff.md`
+
 ## Estado funcional actual
 
 La app ya no es solo un generador de `counter trays`. Ahora soporta:
@@ -32,112 +40,22 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - `Layered Box`
 - `Board`
 - `Loose tray`
+- `Miniature Rack`
 - multiples tipos de trays dentro de `Layered Box`
 
-## Funcionalidades implementadas
+## Resumen de estado
 
-### Base
-
-- Fix del bug original donde la edicion de una `Counter Tray` aplicaba cambios a la tray incorrecta.
-
-### Branding
-
-- Renombrado visible de la app a `InsertForge`
-- atribucion al proyecto original en la cabecera
-
-### Layered Box
-
-- nuevo tipo `Layered Box`
-- layers internas
-- secciones internas por layer
-- render de caja real con shell y lid
-- contenido interno visible
-- panel de edicion alineado visualmente con `Box`
-- slider `Explode` alineado con el comportamiento de `Box`
-- creacion alineada con `Add box`, incluyendo menu de tipo inicial
-
-### Tipos soportados dentro de Layered Box
-
-- `counter`
-- `cardWell`
-- `cardDraw`
-- `cardDivider`
-- `cup`
-- `playerBoard`
-
-### Player Board
-
-- categoria propia en `Dimensions`
-- selector filtrado de shapes
-- soporte dentro de `Layered Box`
-
-### Filler y reliefs
-
-- pieza de relleno por internal layer
-- opcion `Fill empty space solid`
-- opcion `Generate relief cutouts`
-- reliefs corregidos para aparecer solo donde corresponde
-
-### Adapt to gap
-
-#### Layered Box
-
-- boton `Adapt to gap`
-- comportamiento distinto segun contenido:
-  - vacia o solo `Cup Trays`: puede crecer y encoger
-  - con contenido fijo: solo crecer
-- redimensionado de `Cup Trays` internas cuando aplica
-- calcula huecos libres reales de la layer para elegir el espacio util
-- corrige deteccion del hueco cuando la caja actual ya invade otro elemento de la layer
-- feedback al usuario cuando no existe un hueco valido o el contenido no puede encogerse
-
-#### Box
-
-- boton `Adapt to gap`
-- mismo criterio funcional que `Layered Box`
-- soporte para `Empty box`
-- soporte para cajas con solo `Cup Trays`
-- calcula huecos libres reales de la layer para elegir el espacio util
-- corrige deteccion del hueco cuando la caja actual ya invade otro elemento de la layer
-- feedback al usuario cuando no existe un hueco valido o el contenido no puede encogerse
-
-### Box
-
-- soporte para crear `Empty box`
-- `Empty box` hueca real cuando `Fill empty space solid` esta desactivado
-- fix de `Add box` para crear correctamente el tipo seleccionado
-- fix de preview incorrecta de `Empty box`
-
-### Miniature Rack
-
-- nuevo tipo `Miniature Rack` disponible en `Add loose tray`
-- solo `loose tray` por ahora
-- editor dedicado con parametros de rack y lista manual de `slots`
-- soporte de export y render 3D
-- fix de persistencia tras recarga para no degradarse a `Counter Tray`
-- preview de bases de miniatura dentro del rail
-- preview apilada para mostrar cuantas bases caben por rail
-- tolerancias de `Base Width` y `Base Height` editables
-- defaults recalibrados para impresion
-- `Side Walls` triangulares
-- `Slot Spacing Left` y `Slot Spacing Right` por defecto a `6mm`
-- fix para no generar paredes laterales internas al anadir multiples slots
-
-### Layer / Layout
-
-- `Edit layout` recuperado en layers normales
-- soporte de `Board` en `Edit layout`
-- soporte de `Layered Box` en `Edit layout` de layer normal
-- render de `Layered Box` en `Edit layout` alineado con la vista normal para distinguir multiples cajas
-- posicion y rotacion de `Board` guardadas correctamente
-
-### Emboss
-
-- clamp comun de profundidad de emboss para paredes finas
-- aplicado a multiples trays con emboss
+- La app fue rebrandada a `InsertForge` con atribucion visible al proyecto original.
+- `Layered Box` ya esta integrado con layers internas, secciones por layer y flujo de edicion alineado con `Box`.
+- `Empty box`, `Board` y `Miniature Rack` ya estan soportados.
+- `Miniature Rack` sigue siendo solo `loose tray`.
+- `Adapt to gap`, render 3D, `Edit layout` y clamp de `emboss` ya estan implementados.
+- El bug original de edicion sobre la `Counter Tray` incorrecta ya esta corregido.
 
 ## Commits recientes relevantes
 
+- `d480e3c` Add slot labels to miniature racks
+- `4080bcd` Add emboss support for miniature racks
 - `7f93d2f` Add triangular rack side walls and spacing defaults
 - `3d7cfd9` Fill miniature rack preview with stacked bases
 - `9d68c0c` Refine miniature rack tolerances and preview
@@ -186,14 +104,17 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 ## Cosas a vigilar
 
 - A veces Vite/HMR deja estados visuales raros. Antes de diagnosticar algo raro, conviene recargar fuerte o reiniciar `pnpm dev`.
-- `issues-next-iterations.md` es un fichero de trabajo del usuario y no debe meterse en commits salvo que el usuario lo pida.
+- No meter en commits documentos de trabajo del usuario salvo que el usuario lo pida.
 
 ## Pendientes razonables
 
-- seguir afinando tolerancias reales de impresion de `Miniature Rack`
 - seguir puliendo geometria del rail/labio de `Miniature Rack`
 - decidir si `Miniature Rack` debe vivir tambien dentro de `Box` o `Layered Box`
-- valorar labels / emboss para `Miniature Rack`
 - revisar si `Layered Box` debe dejar de usar proxies en `Edit layout`
 - seguir puliendo consistencia visual y de UX entre `Box` y `Layered Box`
 - trabajar el `README` publico con creditos y cambios introducidos en el fork
+
+## Nota sobre ramas
+
+- `codex/insertforge` debe quedar como rama estable para continuar desde otros equipos.
+- El trabajo experimental de `Game Mat Tube` se separa en `codex/game-mat-tube`.

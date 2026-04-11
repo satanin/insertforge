@@ -23,6 +23,12 @@
   import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
+  import {
+    createGameMatTubeParts,
+    createGameMatTubePreview,
+    getGameMatTubePartFilename,
+    type GameMatTubePart
+  } from '$lib/models/gameMatTube';
   import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
   import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
   import {
@@ -47,6 +53,7 @@
   import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
   import {
     initProject,
+    getSelectedAccessory,
     getSelectedBoard,
     getSelectedTray,
     getSelectedBox,
@@ -58,6 +65,7 @@
     importProject,
     resetProject,
     getTrayLetterById,
+    getAllAccessories,
     getAllBoxes,
     getAllLooseTrays,
     getSelectedLayeredBox,
@@ -70,11 +78,12 @@
     saveManualLayout,
     clearManualLayout
   } from '$lib/stores/project.svelte';
-  import type { Box, CupTray, Project, Tray } from '$lib/types/project';
+  import type { Box, CupTray, GameMatTubeAccessory, Project, Tray } from '$lib/types/project';
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
   import jscad from '@jscad/modeling';
   import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+  import stlSerializer from '@jscad/stl-serializer';
   import LayoutEditorOverlay from '$lib/components/LayoutEditorOverlay.svelte';
   import LayerLayoutEditorOverlay from '$lib/components/LayerLayoutEditorOverlay.svelte';
   import {
@@ -100,7 +109,7 @@
   import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection' | 'accessory';
 
   interface CommunityProject {
     id: string;
@@ -148,6 +157,41 @@
     interiorDimensions: { width: number; depth: number; height: number };
     dimensions: { width: number; depth: number; height: number; bodyHeight: number };
     sections: LayeredBoxSectionGeometryData[];
+  }
+
+  function createAccessoryPreviewTrayData(accessory: GameMatTubeAccessory, part: GameMatTubePart, index: number): TrayGeometryData {
+    const previewId = `${accessory.id}-${part.id}`;
+    const rotated = part.suggestedPrintPosition?.rotation === 90;
+    const geometry = jscadToBufferGeometry(
+      rotated ? jscad.transforms.rotateZ(Math.PI / 2, part.printGeometry) : part.printGeometry
+    );
+    return {
+      trayId: previewId,
+      name: part.name,
+      color: accessory.color,
+      geometry,
+      placement: {
+        tray: {
+          id: previewId,
+          type: 'counter',
+          name: part.name,
+          color: accessory.color,
+          rotationOverride: 'auto',
+          params: {} as Tray['params']
+        } as Tray,
+        x: part.suggestedPrintPosition?.x ?? index * (part.dimensions.width + 10),
+        y: part.suggestedPrintPosition?.y ?? 0,
+        rotated,
+        dimensions: part.dimensions
+      },
+      counterStacks: [],
+      trayLetter: `${index + 1}`
+    };
+  }
+
+  async function serializeGeomToArrayBuffer(geom: Geom3): Promise<ArrayBuffer> {
+    const stlData = stlSerializer.serialize({ binary: true }, geom);
+    return new Blob(stlData, { type: 'application/octet-stream' }).arrayBuffer();
   }
 
   const { intersect, subtract, union } = jscad.booleans;
@@ -920,6 +964,8 @@
     switch (type) {
       case 'dimensions':
         return 'all-no-lid';
+      case 'accessory':
+        return 'tray';
       case 'layer':
       case 'board':
       case 'layeredBox':
@@ -1055,6 +1101,7 @@
   }
 
   let selectedTray = $derived(getSelectedTray());
+  let selectedAccessory = $derived(getSelectedAccessory());
   let selectedBox = $derived(getSelectedBox());
   let selectedBoard = $derived(getSelectedBoard());
   let selectedLayer = $derived(getSelectedLayer());
@@ -1064,9 +1111,11 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+  let hasStlExportables = $derived(getAllBoxes().length > 0 || getAllLooseTrays().length > 0 || getAllAccessories().length > 0);
   let selectedTrayLetter = $derived.by(() => {
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;
+    if (selectedAccessory) return 'A';
     const proj = getProject();
     if (!selectedTray) return 'A';
     return getTrayLetterById(proj.layers, selectedTray.id) || 'A';
@@ -1075,6 +1124,9 @@
   // Title for the print bed based on current view
   let viewTitle = $derived.by(() => {
     if (viewMode === 'tray') {
+      if (selectionType === 'accessory') {
+        return selectedAccessory?.name ?? '';
+      }
       return selectedTray?.name ?? '';
     }
     if (viewMode === 'layer') {
@@ -1203,7 +1255,16 @@
 
     switch (viewMode) {
       case 'tray':
-        result.tray = selectedTrayGeometry;
+        if (selectionType === 'accessory' && selectedAccessory?.type === 'gameMatTube') {
+          if ((selectedAccessory.previewMode ?? 'assembled') === 'printBed') {
+            result.allTrays = allTrayGeometries;
+            result.showAllTrays = true;
+          } else {
+            result.tray = selectedTrayGeometry;
+          }
+        } else {
+          result.tray = selectedTrayGeometry;
+        }
         break;
       case 'all':
         result.allTrays = allTrayGeometries;
@@ -1381,8 +1442,39 @@
     if (!browser) return;
 
     const project = getProject();
+    const selectedAccessory = getSelectedAccessory();
     const selectedBox = getSelectedBox();
     const selectedTray = getSelectedTray();
+
+    if (selectedAccessory?.type === 'gameMatTube') {
+      generating = true;
+      generationProgress = null;
+      error = '';
+
+      try {
+        const previewMode = selectedAccessory.previewMode ?? 'assembled';
+        const parts = createGameMatTubeParts(selectedAccessory.params, selectedAccessory.name);
+        selectedTrayGeometry =
+          previewMode === 'assembled'
+            ? jscadToBufferGeometry(createGameMatTubePreview(selectedAccessory.params, 'assembled'))
+            : null;
+        selectedTrayCounters = [];
+        allTrayGeometries =
+          previewMode === 'printBed'
+            ? parts.map((part, index) => createAccessoryPreviewTrayData(selectedAccessory, part, index))
+            : [];
+        boxGeometry = null;
+        lidGeometry = null;
+        generationProgress = null;
+        isDirty = false;
+      } catch (e) {
+        error = e instanceof Error ? e.message : 'Failed to generate accessory preview';
+        console.error('Accessory generation error:', e);
+      } finally {
+        generating = false;
+      }
+      return;
+    }
 
     let generationTray = selectedTray;
     let generationBox = selectedBox;
@@ -1679,7 +1771,8 @@
   async function handleExportAll() {
     const allBoxes = getAllBoxes();
     const allLooseTrays = getAllLooseTrays();
-    if (allBoxes.length === 0 && allLooseTrays.length === 0) return;
+    const allAccessories = getAllAccessories();
+    if (allBoxes.length === 0 && allLooseTrays.length === 0 && allAccessories.length === 0) return;
 
     exportingStl = true;
     exportStlProgress = 'Generating STL files...';
@@ -1694,7 +1787,20 @@
 
     try {
       // Get all STL files from worker
-      const files = await geometryWorker.exportAllStls();
+      const files = allBoxes.length > 0 || allLooseTrays.length > 0 ? await geometryWorker.exportAllStls() : [];
+      for (const accessory of allAccessories) {
+        if (accessory.type !== 'gameMatTube') continue;
+        const parts = createGameMatTubeParts(accessory.params, accessory.name);
+        let middleIndex = 1;
+        let labelIndex = 1;
+        for (const part of parts) {
+          const index = part.kind === 'middle' ? middleIndex++ : part.kind === 'label' ? labelIndex++ : 1;
+          files.push({
+            filename: getGameMatTubePartFilename(accessory.name, part.kind, index),
+            data: await serializeGeomToArrayBuffer(part.printGeometry)
+          });
+        }
+      }
 
       if (files.length === 0) {
         throw new Error('No geometry available for export');
@@ -1717,6 +1823,7 @@
       const projectName =
         allBoxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
         allLooseTrays[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
+        allAccessories[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
         'counterslayer';
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
@@ -2360,8 +2467,18 @@
   let currentStateHash = $derived.by(() => {
     const project = getProject();
     const allBoxes = getAllBoxes();
-    if (allBoxes.length === 0) return '';
+    const allLooseTrays = getAllLooseTrays();
+    const allAccessories = getAllAccessories();
+    if (allBoxes.length === 0 && allLooseTrays.length === 0 && allAccessories.length === 0) return '';
     return JSON.stringify({
+      accessories: (project.accessories ?? []).map((accessory) => ({
+        id: accessory.id,
+        name: accessory.name,
+        type: accessory.type,
+        color: accessory.color,
+        previewMode: accessory.previewMode,
+        params: accessory.params
+      })),
       layers: project.layers.map((layer) => ({
         id: layer.id,
         boxes: layer.boxes.map((box) => ({
@@ -2411,7 +2528,8 @@
       selectedLayeredBoxLayerId: project.selectedLayeredBoxLayerId ?? null,
       selectedLayeredBoxSectionId: project.selectedLayeredBoxSectionId ?? null,
       selectedTrayId: project.selectedTrayId,
-      selectedBoardId: project.selectedBoardId
+      selectedBoardId: project.selectedBoardId,
+      selectedAccessoryId: project.selectedAccessoryId ?? null
     });
   });
 
@@ -2420,6 +2538,7 @@
     const project = getProject();
     return JSON.stringify({
       layerIds: project.layers.map((l) => l.id),
+      accessoryIds: (project.accessories ?? []).map((accessory) => accessory.id),
       // Include full layer->box->tray mapping to detect moves
       layerMapping: project.layers.map((l) => ({
         layerId: l.id,
@@ -2451,6 +2570,7 @@
       const project = untrack(() => getProject());
 
       let selectedTray = null;
+      const selectedAccessory = (project.accessories ?? []).find((accessory) => accessory.id === project.selectedAccessoryId);
       for (const layer of project.layers) {
         const box = layer.boxes.find((b) => b.id === project.selectedBoxId);
         if (box) {
@@ -2466,7 +2586,7 @@
       }
 
       const hasSelectedLayer = project.layers.some((layer) => layer.id === project.selectedLayerId);
-      const canRenderCurrentSelection = Boolean(selectedTray || hasSelectedLayer);
+      const canRenderCurrentSelection = Boolean(selectedTray || selectedAccessory || hasSelectedLayer);
 
       if (canRenderCurrentSelection) {
         const selectionChanged = selHash !== lastSelectionHash;
@@ -2799,7 +2919,7 @@
               {showCounters}
               {selectedTrayCounters}
               {selectedTrayLetter}
-              selectedTrayId={selectedTray?.id ?? ''}
+              selectedTrayId={selectedTray?.id ?? selectedAccessory?.id ?? ''}
               {selectionType}
               selectedLayeredBoxId={getProject().selectedLayeredBoxId ?? ''}
               selectedLayeredBoxLayerId={getProject().selectedLayeredBoxLayerId ?? ''}
@@ -2954,9 +3074,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportAll}
-                    disabled={generating ||
-                      exportingStl ||
-                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                    disabled={generating || exportingStl || !hasStlExportables}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -3072,7 +3190,7 @@
               {showCounters}
               {selectedTrayCounters}
               {selectedTrayLetter}
-              selectedTrayId={selectedTray?.id ?? ''}
+              selectedTrayId={selectedTray?.id ?? selectedAccessory?.id ?? ''}
               {selectionType}
               selectedLayeredBoxId={getProject().selectedLayeredBoxId ?? ''}
               selectedLayeredBoxLayerId={getProject().selectedLayeredBoxLayerId ?? ''}
@@ -3227,9 +3345,7 @@
                   <Button
                     variant="ghost"
                     onclick={handleExportAll}
-                    disabled={generating ||
-                      exportingStl ||
-                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                    disabled={generating || exportingStl || !hasStlExportables}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >

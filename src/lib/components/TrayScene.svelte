@@ -1101,6 +1101,9 @@
   // Get live tray color from project store (for reactive updates)
   function getTrayColor(trayId: string, fallbackIndex: number): string {
     const project = getProject();
+    for (const accessory of project.accessories ?? []) {
+      if (accessory.id === trayId || trayId.startsWith(`${accessory.id}-`)) return accessory.color;
+    }
     for (const layer of project.layers) {
       for (const box of layer.boxes) {
         const tray = box.trays.find((t) => t.id === trayId);

@@ -3,6 +3,7 @@ import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
+import type { GameMatTubeParams, GameMatTubePreviewMode } from '$lib/models/gameMatTube';
 import type { MiniatureRackParams } from '$lib/models/miniatureRack';
 
 // Base shape types for counter shapes
@@ -39,6 +40,20 @@ interface BaseTray {
   rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
   showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
 }
+
+interface BaseAccessory {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface GameMatTubeAccessory extends BaseAccessory {
+  type: 'gameMatTube';
+  params: GameMatTubeParams;
+  previewMode?: GameMatTubePreviewMode;
+}
+
+export type Accessory = GameMatTubeAccessory;
 
 // Visual-only board item for layer planning
 export interface Board {
@@ -260,6 +275,7 @@ export interface GlobalSettings {
 export interface Project {
   version?: number; // For migration (2 = layers format)
   layers: Layer[];
+  accessories?: Accessory[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
   selectedLayerId: string | null;
@@ -269,6 +285,7 @@ export interface Project {
   selectedLayeredBoxSectionId?: string | null;
   selectedTrayId: string | null;
   selectedBoardId?: string | null;
+  selectedAccessoryId?: string | null;
   globalSettings?: GlobalSettings;
 }
 

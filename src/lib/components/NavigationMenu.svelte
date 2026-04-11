@@ -6,7 +6,9 @@
   import TrayTypePreview from './TrayTypePreview.svelte';
   import {
     getProject,
+    getAllAccessories,
     getSelectedBox,
+    getSelectedAccessory,
     getSelectedBoard,
     getSelectedLayeredBox,
     getSelectedLayeredBoxLayer,
@@ -14,6 +16,7 @@
     getSelectedTray,
     getSelectedLayer,
     selectBox,
+    selectAccessory,
     selectBoard,
     selectLayeredBox,
     selectLayeredBoxLayer,
@@ -21,6 +24,7 @@
     selectTray,
     selectLayer,
     addBox,
+    addAccessory,
     addBoard,
     addLayeredBox,
     addSectionToLayeredBoxLayer,
@@ -32,6 +36,7 @@
     deleteTray,
     addLayer,
     deleteBoard,
+    deleteAccessory,
     deleteLayer,
     addLooseTray,
     deleteLooseTray,
@@ -52,7 +57,7 @@
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection' | 'accessory';
   type LayeredBoxInitialSectionType =
     | 'empty'
     | 'counter'
@@ -75,6 +80,7 @@
   let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
   let selectedBoard = $derived(getSelectedBoard());
+  let selectedAccessory = $derived(getSelectedAccessory());
   let selectedLayeredBox = $derived(getSelectedLayeredBox());
   let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
   let selectedLayeredBoxSection = $derived(getSelectedLayeredBoxSection());
@@ -127,6 +133,18 @@
   function handleLayerClick(layer: Layer) {
     selectLayer(layer.id);
     onSelectionChange('layer');
+    onExpandPanel();
+  }
+
+  function handleAccessoryClick(accessoryId: string) {
+    selectAccessory(accessoryId);
+    onSelectionChange('accessory');
+    onExpandPanel();
+  }
+
+  function handleAddAccessory() {
+    addAccessory('gameMatTube');
+    onSelectionChange('accessory');
     onExpandPanel();
   }
 
@@ -386,6 +404,64 @@
     </span>
     Project & dimensions
   </button>
+  <Hr />
+
+  {#if getAllAccessories().length > 0}
+    <div class="navTree">
+      <div class="navLayerGroup">
+        <button class="navItem navItem--layer" disabled>
+          <span class="navItemIcon">
+            <Icon Icon={IconRectangle} size="1rem" />
+          </span>
+          Accessories
+        </button>
+        <div class="navLayerContent">
+          {#each getAllAccessories() as accessory (accessory.id)}
+            <button
+              class="navItem navItem--looseTray {selectedAccessory?.id === accessory.id && selectionType === 'accessory' ? 'navItem--selected' : ''}"
+              onclick={() => handleAccessoryClick(accessory.id)}
+            >
+              <span class="navItemLabel">
+                <span class="trayLetter">A</span>
+                {accessory.name}
+                <span class="looseBadge">{accessory.type}</span>
+              </span>
+              <span
+                class="navItemDelete"
+                role="none"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+              >
+                <ConfirmActionButton
+                  action={() => deleteAccessory(accessory.id)}
+                  actionButtonText="Delete accessory"
+                  positioning={{ placement: 'right' }}
+                  portal=".appContainer"
+                >
+                  {#snippet trigger({ triggerProps })}
+                    <IconButton {...triggerProps} size="sm" variant="ghost" title="Delete accessory">
+                      <Icon Icon={IconX} size="1rem" color="var(--fgMuted)" />
+                    </IconButton>
+                  {/snippet}
+                  {#snippet actionMessage()}
+                    <p>Delete this accessory?</p>
+                  {/snippet}
+                </ConfirmActionButton>
+              </span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
+    <Hr />
+  {/if}
+
+  <div class="navTree">
+    <button class="navItem navItem--add" onclick={handleAddAccessory}>
+      <span class="addIcon">+</span>
+      <span class="addLabel">Add game mat tube</span>
+    </button>
+  </div>
   <Hr />
 
   <!-- Layers, Boxes, and Trays -->

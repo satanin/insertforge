@@ -23,6 +23,10 @@ import {
   type MiniatureRackParams
 } from '$lib/models/miniatureRack';
 import {
+  DEFAULT_GAME_MAT_TUBE_PARAMS,
+  type GameMatTubeParams
+} from '$lib/models/gameMatTube';
+import {
   DEFAULT_EMPTY_BOX_BODY_HEIGHT,
   DEFAULT_EMPTY_BOX_DEPTH,
   DEFAULT_EMPTY_BOX_WIDTH,
@@ -35,6 +39,7 @@ import { saveNow, scheduleSave } from '$lib/stores/saveManager';
 import type {
   Board,
   Box,
+  Accessory,
   CardDividerTray,
   CardDrawTray,
   CardSize,
@@ -43,6 +48,7 @@ import type {
   CounterShape,
   CounterTray,
   CupTray,
+  GameMatTubeAccessory,
   Layer,
   LayeredBox,
   LayeredBoxLayer,
@@ -83,6 +89,7 @@ export {
 export type {
   Board,
   Box,
+  Accessory,
   CardDividerTray,
   CardDrawTray,
   CardSize,
@@ -91,6 +98,7 @@ export type {
   CounterShape,
   CounterTray,
   CupTray,
+  GameMatTubeAccessory,
   Layer,
   LayeredBox,
   LayeredBoxLayer,
@@ -413,6 +421,17 @@ function createDefaultMiniatureRack(name: string, color: string): MiniatureRackT
   };
 }
 
+function createDefaultGameMatTubeAccessory(name: string): GameMatTubeAccessory {
+  return {
+    id: generateId(),
+    type: 'gameMatTube',
+    name,
+    color: '#8a6f52',
+    previewMode: 'assembled',
+    params: { ...DEFAULT_GAME_MAT_TUBE_PARAMS }
+  };
+}
+
 // Legacy alias for backwards compatibility
 function _createDefaultCardTray(name: string, color: string): CardDrawTray {
   return createDefaultCardDrawTray(name, color);
@@ -579,6 +598,8 @@ function createDefaultLayer(name: string): Layer {
 
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
+  project.accessories = project.accessories ?? [];
+  project.selectedAccessoryId = null;
   project.selectedBoardId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
@@ -673,6 +694,10 @@ export function getAllBoards(): Board[] {
   return boards;
 }
 
+export function getAllAccessories(): Accessory[] {
+  return project.accessories ?? [];
+}
+
 /**
  * Legacy: Get all boxes (backwards compatibility).
  * @deprecated Use getAllBoxes instead
@@ -748,9 +773,15 @@ export function getSelectedBoard(): Board | null {
   return null;
 }
 
+export function getSelectedAccessory(): Accessory | null {
+  if (!project.selectedAccessoryId) return null;
+  return (project.accessories ?? []).find((accessory) => accessory.id === project.selectedAccessoryId) ?? null;
+}
+
 // Selection
 export function selectLayer(layerId: string): void {
   project.selectedLayerId = layerId;
+  project.selectedAccessoryId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
   project.selectedLayeredBoxSectionId = null;
@@ -788,6 +819,7 @@ export function selectLayer(layerId: string): void {
 
 export function selectBox(boxId: string): void {
   project.selectedBoxId = boxId;
+  project.selectedAccessoryId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
   project.selectedLayeredBoxSectionId = null;
@@ -810,6 +842,7 @@ export function selectBox(boxId: string): void {
 
 export function selectLayeredBox(layeredBoxId: string): void {
   project.selectedLayeredBoxId = layeredBoxId;
+  project.selectedAccessoryId = null;
   project.selectedBoxId = null;
   project.selectedTrayId = null;
   project.selectedLayeredBoxSectionId = null;
@@ -833,6 +866,7 @@ export function selectLayeredBoxLayer(layeredBoxId: string, layeredBoxLayerId: s
     if (!layeredBox.layers.some((boxLayer) => boxLayer.id === layeredBoxLayerId)) continue;
     project.selectedLayerId = layer.id;
     project.selectedLayeredBoxId = layeredBoxId;
+    project.selectedAccessoryId = null;
     project.selectedLayeredBoxLayerId = layeredBoxLayerId;
     project.selectedLayeredBoxSectionId = layeredBox.layers.find((boxLayer) => boxLayer.id === layeredBoxLayerId)?.sections[0]?.id ?? null;
     project.selectedBoxId = null;
@@ -845,6 +879,7 @@ export function selectLayeredBoxLayer(layeredBoxId: string, layeredBoxLayerId: s
 
 export function selectTray(trayId: string): void {
   project.selectedTrayId = trayId;
+  project.selectedAccessoryId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
   project.selectedLayeredBoxSectionId = null;
@@ -860,6 +895,7 @@ export function selectTray(trayId: string): void {
 
 export function selectBoard(boardId: string): void {
   project.selectedBoardId = boardId;
+  project.selectedAccessoryId = null;
   project.selectedBoxId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
@@ -871,6 +907,18 @@ export function selectBoard(boardId: string): void {
       break;
     }
   }
+  autosave();
+}
+
+export function selectAccessory(accessoryId: string): void {
+  if (!(project.accessories ?? []).some((accessory) => accessory.id === accessoryId)) return;
+  project.selectedAccessoryId = accessoryId;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedBoardId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
   autosave();
 }
 
@@ -886,6 +934,7 @@ export function addLayer(): Layer {
   project.selectedLayeredBoxSectionId = null;
   project.selectedTrayId = null;
   project.selectedBoardId = null;
+  project.selectedAccessoryId = null;
   autosave();
   return layer;
 }
@@ -969,8 +1018,52 @@ export function addBoard(layerId?: string): Board | null {
   project.selectedLayeredBoxSectionId = null;
   project.selectedTrayId = null;
   project.selectedBoardId = board.id;
+  project.selectedAccessoryId = null;
   autosave();
   return board;
+}
+
+export function addAccessory(type: 'gameMatTube' = 'gameMatTube'): Accessory {
+  const accessoryNumber = (project.accessories?.length ?? 0) + 1;
+  const accessory =
+    type === 'gameMatTube'
+      ? createDefaultGameMatTubeAccessory(`Game Mat Tube ${accessoryNumber}`)
+      : createDefaultGameMatTubeAccessory(`Game Mat Tube ${accessoryNumber}`);
+  project.accessories = [...(project.accessories ?? []), accessory];
+  project.selectedAccessoryId = accessory.id;
+  project.selectedBoxId = null;
+  project.selectedTrayId = null;
+  project.selectedBoardId = null;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  autosave();
+  return accessory;
+}
+
+export function updateAccessory(accessoryId: string, updates: Partial<Omit<Accessory, 'id' | 'type' | 'params'>>): void {
+  const accessory = (project.accessories ?? []).find((entry) => entry.id === accessoryId);
+  if (!accessory) return;
+  Object.assign(accessory, updates);
+  autosave();
+}
+
+export function updateGameMatTubeParams(accessoryId: string, params: GameMatTubeParams): void {
+  const accessory = (project.accessories ?? []).find((entry) => entry.id === accessoryId);
+  if (!accessory || accessory.type !== 'gameMatTube') return;
+  accessory.params = params;
+  autosave();
+}
+
+export function deleteAccessory(accessoryId: string): void {
+  const accessories = project.accessories ?? [];
+  const index = accessories.findIndex((entry) => entry.id === accessoryId);
+  if (index === -1) return;
+  accessories.splice(index, 1);
+  if (project.selectedAccessoryId === accessoryId) {
+    project.selectedAccessoryId = accessories[Math.min(index, accessories.length - 1)]?.id ?? null;
+  }
+  autosave();
 }
 
 export function updateBoard(boardId: string, updates: Partial<Omit<Board, 'id'>>): void {
@@ -1542,6 +1635,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   project.selectedBoxId = box.id;
   project.selectedTrayId = box.trays[0]?.id ?? null;
   project.selectedBoardId = null;
+  project.selectedAccessoryId = null;
 
   autosave();
   return box;
@@ -1876,6 +1970,7 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   project.selectedBoxId = null;
   project.selectedTrayId = tray.id;
   project.selectedBoardId = null;
+  project.selectedAccessoryId = null;
 
   autosave();
   return tray;
@@ -2611,8 +2706,14 @@ export function importProject(data: Project): void {
     if (!selectedLayer) {
       project.selectedLayerId = project.layers[0].id;
     }
-    const layer = project.layers.find((l) => l.id === project.selectedLayerId);
-    if (layer) {
+      const layer = project.layers.find((l) => l.id === project.selectedLayerId);
+      if (layer) {
+      if (project.selectedAccessoryId) {
+        const selectedAccessory = (project.accessories ?? []).find((entry) => entry.id === project.selectedAccessoryId);
+        if (!selectedAccessory) {
+          project.selectedAccessoryId = null;
+        }
+      }
       if (project.selectedLayeredBoxId) {
         const selectedLayeredBox = layer.layeredBoxes.find((b) => b.id === project.selectedLayeredBoxId);
         if (!selectedLayeredBox) {
@@ -2643,8 +2744,12 @@ export function importProject(data: Project): void {
           }
         }
       }
-      // Ensure selectedTrayId is valid (or set default if not set)
-      const needsTraySelection = !project.selectedTrayId || !findTrayLocation(project, project.selectedTrayId);
+      const hasValidAccessorySelection = Boolean(
+        project.selectedAccessoryId && (project.accessories ?? []).some((entry) => entry.id === project.selectedAccessoryId)
+      );
+      // Ensure selectedTrayId is valid (or set default if not set), unless an accessory is selected
+      const needsTraySelection =
+        !hasValidAccessorySelection && (!project.selectedTrayId || !findTrayLocation(project, project.selectedTrayId));
       if (needsTraySelection) {
         // Find first available tray
         if (layer.boxes.length > 0 && layer.boxes[0].trays.length > 0) {
@@ -2692,6 +2797,7 @@ export function importProject(data: Project): void {
     project.selectedLayeredBoxSectionId = null;
     project.selectedTrayId = null;
     project.selectedBoardId = null;
+    project.selectedAccessoryId = (project.accessories ?? [])[0]?.id ?? null;
   }
   autosave();
 }

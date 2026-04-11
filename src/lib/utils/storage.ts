@@ -572,12 +572,14 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     return {
       version: 2,
       layers: [layer],
+      accessories: [],
       counterShapes,
       cardSizes,
       selectedLayerId: layerId,
       selectedBoxId: project.selectedBoxId,
       selectedTrayId: project.selectedTrayId,
       selectedBoardId: null,
+      selectedAccessoryId: null,
       selectedLayeredBoxSectionId: null,
       globalSettings
     };
@@ -618,12 +620,14 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     ...project,
     version: 2,
     layers: migratedLayers,
+    accessories: project.accessories ?? [],
     counterShapes,
     cardSizes,
     selectedLayeredBoxId: project.selectedLayeredBoxId ?? null,
     selectedLayeredBoxLayerId: project.selectedLayeredBoxLayerId ?? null,
     selectedLayeredBoxSectionId: project.selectedLayeredBoxSectionId ?? null,
     selectedBoardId: project.selectedBoardId ?? null,
+    selectedAccessoryId: project.selectedAccessoryId ?? null,
     globalSettings
   };
 }

@@ -8,11 +8,13 @@
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
+  import GameMatTubeEditor from './panels/GameMatTubeEditor.svelte';
   import type { MiniatureRackParams } from '$lib/models/miniatureRack';
   import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
     getSelectedBox,
+    getSelectedAccessory,
     getSelectedBoard,
     getSelectedLayeredBox,
     getSelectedLayeredBoxLayer,
@@ -24,6 +26,7 @@
     addLayerToLayeredBox,
     deleteLayerFromLayeredBox,
     updateBoard,
+    updateAccessory,
     moveBoardToLayer,
     updateBox,
     updateLayeredBox,
@@ -37,6 +40,7 @@
     updateCardWellTrayParams,
     updateCupTrayParams,
     updateMiniatureRackParams,
+    updateGameMatTubeParams,
     updateLayer,
     getTrayLetterById,
     isCounterTray,
@@ -50,6 +54,7 @@
     moveLayeredBoxToLayer,
     expandLayeredBoxToAvailableSpace,
     expandBoxToAvailableSpace,
+    type Accessory,
     type Board,
     type Box,
     type Layer,
@@ -72,7 +77,7 @@
   import { getBoxDimensions, calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
   import { getLidHeight } from '$lib/models/box';
 
-  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
+  type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection' | 'accessory';
 
   interface Props {
     selectionType: SelectionType;
@@ -97,6 +102,7 @@
   let project = $derived(getProject());
   let selectedLayer = $derived(getSelectedLayer());
   let selectedBox = $derived(getSelectedBox());
+  let selectedAccessory = $derived(getSelectedAccessory());
   let selectedBoard = $derived(getSelectedBoard());
   let selectedLayeredBox = $derived(getSelectedLayeredBox());
   let selectedLayeredBoxLayer = $derived(getSelectedLayeredBoxLayer());
@@ -167,6 +173,12 @@
   function handleBoardUpdate(updates: Partial<Omit<Board, 'id'>>) {
     if (selectedBoard) {
       updateBoard(selectedBoard.id, updates);
+    }
+  }
+
+  function handleAccessoryUpdate(updates: Partial<Omit<Accessory, 'id' | 'type' | 'params'>>) {
+    if (selectedAccessory) {
+      updateAccessory(selectedAccessory.id, updates);
     }
   }
 
@@ -412,6 +424,8 @@
         return selectedTray?.name ?? 'Tray';
       case 'board':
         return selectedBoard?.name ?? 'Board';
+      case 'accessory':
+        return selectedAccessory?.name ?? 'Accessory';
     }
   });
 </script>
@@ -439,6 +453,8 @@
         <span class="headerStats">
           {selectedBoard.width} × {selectedBoard.depth} × {selectedBoard.height}mm
         </span>
+      {:else if selectionType === 'accessory' && selectedAccessory}
+        <span class="headerStats">{selectedAccessory.type}</span>
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
         <span class="headerStats">
@@ -1137,6 +1153,18 @@
         {:else}
           <div class="emptyState">
             <p>No board selected</p>
+          </div>
+        {/if}
+      {:else if selectionType === 'accessory'}
+        {#if selectedAccessory?.type === 'gameMatTube'}
+          <GameMatTubeEditor
+            accessory={selectedAccessory}
+            onUpdateAccessory={handleAccessoryUpdate}
+            onUpdateParams={(params) => updateGameMatTubeParams(selectedAccessory.id, params)}
+          />
+        {:else}
+          <div class="emptyState">
+            <p>No accessory selected</p>
           </div>
         {/if}
       {:else if selectionType === 'tray'}
