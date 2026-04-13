@@ -1376,6 +1376,7 @@
   .buttonRow {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .secondaryButton {
@@ -1386,6 +1387,11 @@
     cursor: pointer;
     padding: 0.4rem 0.75rem;
     font: inherit;
+    min-width: 0;
+    flex: 1 1 8.5rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
   }
 
   .secondaryButton:hover {

@@ -1096,6 +1096,10 @@ export function updateLayeredBox(
   }
 }
 
+function floorToSingleDecimal(value: number): number {
+  return Math.floor((value + 1e-6) * 10) / 10;
+}
+
 export function expandLayeredBoxToAvailableSpace(
   layeredBoxId: string,
   gameContainerWidth: number,
@@ -1153,8 +1157,8 @@ export function expandLayeredBoxToAvailableSpace(
       );
     const canShrinkContent = isEmpty || isCupOnly;
     const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
-    const minBodyWidth = layout.width + layeredBox.wallThickness * 2;
-    const minBodyDepth = layout.depth + layeredBox.wallThickness * 2;
+    const minBodyWidth = layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+    const minBodyDepth = layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
     const cupOnlyMinimums = isCupOnly
       ? (() => {
           const minInteriorWidth = Math.max(
@@ -1172,8 +1176,8 @@ export function expandLayeredBoxToAvailableSpace(
           );
           const minInteriorDepth = 20;
           return {
-            minWidth: minInteriorWidth + layeredBox.wallThickness * 2,
-            minDepth: minInteriorDepth + layeredBox.wallThickness * 2
+            minWidth: minInteriorWidth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2,
+            minDepth: minInteriorDepth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2
           };
         })()
       : null;
@@ -1247,15 +1251,19 @@ export function expandLayeredBoxToAvailableSpace(
     if (!chosenRectOption?.fittingCandidate) return false;
 
     const { rect: bestRect, fittingCandidate } = chosenRectOption;
-    const nextCustomWidth = Math.max(fittingCandidate.localWidth, minLocalWidth, 1);
-    const nextCustomDepth = Math.max(fittingCandidate.localDepth, minLocalDepth, 1);
+    const nextCustomWidth = floorToSingleDecimal(Math.max(fittingCandidate.localWidth, minLocalWidth, 1));
+    const nextCustomDepth = floorToSingleDecimal(Math.max(fittingCandidate.localDepth, minLocalDepth, 1));
     const effectiveLeftBoundary = bestRect.left;
     const effectiveTopBoundary = bestRect.top;
 
-    // Internal layered-box sections occupy the body footprint inside the outer walls.
-    // Tolerance belongs to lid fit, not to the internal tray area.
-    const targetInteriorWidth = Math.max(nextCustomWidth - layeredBox.wallThickness * 2, 1);
-    const targetInteriorDepth = Math.max(nextCustomDepth - layeredBox.wallThickness * 2, 1);
+    const targetInteriorWidth = Math.max(
+      nextCustomWidth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+      1
+    );
+    const targetInteriorDepth = Math.max(
+      nextCustomDepth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+      1
+    );
 
     const resizedLayers = layeredBox.layers.map((internalLayer) => {
       const cupSections = internalLayer.sections.filter(
@@ -1281,8 +1289,8 @@ export function expandLayeredBoxToAvailableSpace(
             ...section,
             cupParams: {
               ...section.cupParams,
-              trayWidth: Math.max(section.cupParams.trayWidth * widthScale, 20),
-              trayDepth: Math.max(targetInteriorDepth, 20)
+              trayWidth: floorToSingleDecimal(Math.max(section.cupParams.trayWidth * widthScale, 20)),
+              trayDepth: floorToSingleDecimal(Math.max(targetInteriorDepth, 20))
             }
           };
         })
