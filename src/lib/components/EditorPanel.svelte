@@ -69,7 +69,13 @@
   import { countCells } from '$lib/types/cardWellLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
   import { getTrayDimensionsForTray } from '$lib/models/box';
-  import { getBoxDimensions, calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
+  import {
+    getBoxDimensions,
+    calculateLayerHeight,
+    getLayeredBoxExteriorDimensions,
+    getLayeredBoxRenderLayout,
+    getLayeredBoxSectionDimensions
+  } from '$lib/models/layer';
   import { getLidHeight } from '$lib/models/box';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
@@ -273,6 +279,10 @@
         });
       }
     }
+  }
+
+  function formatRoundedDimension(value: number): string {
+    return value.toFixed(0);
   }
 
   function handleLayeredBoxSectionUpdate(updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>) {
@@ -537,10 +547,35 @@
                     {/each}
                   {/each}
                   {#each selectedLayer.layeredBoxes as layeredBox (layeredBox.id)}
+                    {@const layeredBoxDims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes)}
+                    {@const layeredBoxLayout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes)}
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{layeredBox.name}</span>
-                      <span class="treeItemDims">{layeredBox.layers.length} {layeredBox.layers.length === 1 ? 'layer' : 'layers'}</span>
+                      <span class="treeItemDims">
+                        {formatRoundedDimension(layeredBoxDims.width)} ×
+                        {formatRoundedDimension(layeredBoxDims.depth)} ×
+                        {formatRoundedDimension(layeredBoxDims.height)}
+                      </span>
                     </div>
+                    {#each layeredBox.layers as boxLayer (boxLayer.id)}
+                      <div class="treeItem treeItem--tray treeItem--nested">
+                        <span class="treeItemName">{boxLayer.name}</span>
+                        <span class="treeItemDims">{boxLayer.sections.length} {boxLayer.sections.length === 1 ? 'section' : 'sections'}</span>
+                      </div>
+                      {#each boxLayer.sections as section (section.id)}
+                        {@const sectionDims = getLayeredBoxSectionDimensions(section, cardSizes, counterShapes)}
+                        {@const internalLayerHeight =
+                          layeredBoxLayout.internalLayers.find((entry) => entry.id === boxLayer.id)?.height ?? sectionDims.height}
+                        <div class="treeItem treeItem--tray treeItem--nested treeItem--doubleNested">
+                          <span class="treeItemName">{section.name}</span>
+                          <span class="treeItemDims">
+                            {formatRoundedDimension(sectionDims.width)} ×
+                            {formatRoundedDimension(sectionDims.depth)} ×
+                            {formatRoundedDimension(internalLayerHeight)}
+                          </span>
+                        </div>
+                      {/each}
+                    {/each}
                   {/each}
                   {#each selectedLayer.looseTrays as tray (tray.id)}
                     {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
@@ -1352,6 +1387,11 @@
     margin-left: 1rem;
     background: transparent;
     border-left: 2px solid var(--borderColor);
+  }
+
+  .treeItem--doubleNested {
+    margin-left: 2rem;
+    border-left-color: var(--borderSubtle);
   }
 
   .treeItem--looseTray {
