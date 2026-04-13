@@ -720,15 +720,6 @@ function handleGenerate(msg: GenerateMessage): void {
     const tray = selectedTrayId ? findTrayById(project.layers, selectedTrayId) : undefined;
     const isEmptySelectedBox = !!box && box.trays.length === 0 && !tray;
 
-    if (!tray && !isEmptySelectedBox) {
-      self.postMessage({
-        type: 'generate-result',
-        id,
-        error: 'No tray selected'
-      } as GenerateResult);
-      return;
-    }
-
     // Get card sizes and counter shapes from project level (global)
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
@@ -844,13 +835,9 @@ function handleGenerate(msg: GenerateMessage): void {
 
       boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
       lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
-    } else {
+    } else if (tray) {
       // Loose tray - no box context
       // Find the layer containing this loose tray and get the unified layer height
-      if (!tray) {
-        throw new Error('No tray selected');
-      }
-
       const looseTrayLayer = findLayerForLooseTray(tray.id);
       const looseTrayLayerHeight = looseTrayLayer ? (layerHeights.get(looseTrayLayer.id) ?? 0) : 0;
 
@@ -889,6 +876,12 @@ function handleGenerate(msg: GenerateMessage): void {
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, tray.id))
         }
       ];
+    } else {
+      cachedSelectedTray = null;
+      cachedAllTrays = [];
+      cachedBox = null;
+      cachedLid = null;
+      cachedBoxName = '';
     }
 
     // Get all boxes from all layers

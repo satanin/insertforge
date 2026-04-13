@@ -1378,8 +1378,34 @@
     }
   }
 
+  function shouldSkipWorkerGenerationForCurrentSelection() {
+    return (
+      viewMode === 'layer' &&
+      (selectionType === 'layeredBox' ||
+        selectionType === 'layeredBoxLayer' ||
+        selectionType === 'layeredBoxSection')
+    );
+  }
+
+  async function refreshExportGeometryCache() {
+    const project = getProject();
+    return geometryWorker.generate(project, '', '', () => {});
+  }
+
   async function regenerate(force = false) {
     if (!browser) return;
+
+    if (shouldSkipWorkerGenerationForCurrentSelection()) {
+      selectedTrayGeometry = null;
+      selectedTrayCounters = [];
+      allTrayGeometries = [];
+      boxGeometry = null;
+      lidGeometry = null;
+      error = '';
+      generating = false;
+      generationProgress = null;
+      return;
+    }
 
     const project = getProject();
     const selectedBox = getSelectedBox();
@@ -1695,6 +1721,9 @@
     });
 
     try {
+      exportStlProgress = 'Refreshing geometry cache...';
+      await refreshExportGeometryCache();
+
       // Get all STL files from worker
       const files = await geometryWorker.exportAllStls();
 
@@ -1753,7 +1782,7 @@
   }
 
   async function handleExport3mf() {
-    if (getAllBoxes().length === 0 && getAllLooseTrays().length === 0) return;
+    if (getAllBoxes().length === 0 && getAllLayeredBoxes().length === 0 && getAllLooseTrays().length === 0) return;
 
     exporting3mf = true;
 
@@ -1766,6 +1795,7 @@
     });
 
     try {
+      await refreshExportGeometryCache();
       const { data, filename } = await geometryWorker.export3mf();
 
       if (data.byteLength === 0) {
