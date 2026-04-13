@@ -30,8 +30,14 @@ import {
   calculateMinimumBoxDimensions,
   getBoxInteriorDimensions
 } from '$lib/models/box';
-import { arrangeLayerContents, arrangementToManualPlacements, getLayeredBoxRenderLayout } from '$lib/models/layer';
+import {
+  arrangeLayerContents,
+  arrangementToManualPlacements,
+  getLayeredBoxRenderLayout,
+  getLayeredBoxSectionDimensions
+} from '$lib/models/layer';
 import { saveNow, scheduleSave } from '$lib/stores/saveManager';
+import { createDefaultCupLayout } from '$lib/types/cupLayout';
 import type {
   Board,
   Box,
@@ -456,6 +462,56 @@ function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: strin
     cardWellParams: type === 'cardWell' ? cardWellTray.params : undefined,
     cupParams: type === 'cup' ? cupTray.params : undefined
   };
+}
+
+function createFitAwareLayeredBoxSection(
+  layeredBox: LayeredBox,
+  boxLayer: LayeredBoxLayer,
+  type: LayeredBoxSectionType,
+  name: string
+): LayeredBoxSection | null {
+  const section = createDefaultLayeredBoxSection(type, name);
+  const hasFixedSize = layeredBox.customWidth !== undefined && layeredBox.customDepth !== undefined;
+  const isEmptyLayer = boxLayer.sections.length === 0;
+
+  if (!hasFixedSize || !isEmptyLayer) {
+    return section;
+  }
+
+  const availableWidth = Math.max(
+    (layeredBox.customWidth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+    20
+  );
+  const availableDepth = Math.max(
+    (layeredBox.customDepth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+    20
+  );
+
+  if (type === 'cup' && section.cupParams) {
+    section.cupParams = {
+      ...section.cupParams,
+      layout: createDefaultCupLayout(),
+      trayWidth: floorToSingleDecimal(availableWidth),
+      trayDepth: floorToSingleDecimal(availableDepth)
+    };
+    return section;
+  }
+
+  if ((type === 'counter' || type === 'playerBoard') && section.counterParams) {
+    section.counterParams = {
+      ...section.counterParams,
+      topLoadedStacks: section.counterParams.topLoadedStacks.slice(0, 1).map(([shapeId]) => [shapeId, 1]),
+      edgeLoadedStacks: [],
+      trayWidthOverride: floorToSingleDecimal(availableWidth)
+    };
+  }
+
+  const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+  if (sectionDims.width > availableWidth + 0.01 || sectionDims.depth > availableDepth + 0.01) {
+    return null;
+  }
+
+  return section;
 }
 
 function createDefaultLayeredBoxLayer(name: string): LayeredBoxLayer {
@@ -1074,7 +1130,11 @@ export function addLayeredBox(
               : initialSectionType === 'cup'
                 ? `Cup Tray ${sectionCountOfType}`
                 : `Player Board ${sectionCountOfType}`;
-    const section = createDefaultLayeredBoxSection(initialSectionType, sectionName);
+    const section = createFitAwareLayeredBoxSection(layeredBox, layeredBox.layers[0], initialSectionType, sectionName);
+    if (!section) {
+      autosave();
+      return layeredBox;
+    }
     layeredBox.layers[0].sections.push(section);
     project.selectedLayeredBoxSectionId = section.id;
   }
@@ -1415,7 +1475,10 @@ export function addSectionToLayeredBoxLayer(
           : type === 'cup'
             ? `Cup Tray ${sectionCountOfType}`
           : `Player Board ${sectionCountOfType}`;
-    const section = createDefaultLayeredBoxSection(type, sectionName);
+    const section = createFitAwareLayeredBoxSection(layeredBox, boxLayer, type, sectionName);
+    if (!section) {
+      return null;
+    }
     boxLayer.sections.push(section);
     project.selectedLayerId = layer.id;
     project.selectedLayeredBoxId = layeredBox.id;

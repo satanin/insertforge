@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text } from '@tableslayer/ui';
+  import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text, addToast } from '@tableslayer/ui';
   import { IconX, IconPackage, IconRuler, IconStack2, IconRectangle } from '@tabler/icons-svelte';
   import { computePosition, offset, flip, shift } from '@floating-ui/dom';
   import { tick } from 'svelte';
@@ -212,7 +212,17 @@
     layer: LayeredBoxLayer,
     type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard'
   ) {
-    addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
+    const section = addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
+    if (!section) {
+      addToast({
+        data: {
+          title: 'Section does not fit',
+          body: 'This layered box already has a fixed size, and the default section for this tray type does not fit inside it.',
+          type: 'danger'
+        }
+      });
+      return;
+    }
     onSelectionChange('layeredBoxSection');
     onExpandPanel();
   }

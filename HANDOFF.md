@@ -60,6 +60,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - panel de edicion alineado visualmente con `Box`
 - slider `Explode` alineado con el comportamiento de `Box`
 - creacion alineada con `Add box`, incluyendo menu de tipo inicial
+- si una `Layered Box` ya tiene `customWidth/customDepth`, la primera seccion nueva en una layer vacia intenta nacer ajustada al interior disponible para no forzar un resize inmediato
+- si un tipo de seccion no cabe con un default razonable dentro de una `Layered Box` ya fijada, no se crea y se muestra feedback al usuario
 
 ### Tipos soportados dentro de Layered Box
 
