@@ -56,6 +56,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - layers internas
 - secciones internas por layer
 - render de caja real con shell y lid
+- shell y export alineados para generar el cuerpo con `bodyHeight`
+- posicion visual de la tapa en explode alineada con `Box`
 - contenido interno visible
 - panel de edicion alineado visualmente con `Box`
 - slider `Explode` alineado con el comportamiento de `Box`

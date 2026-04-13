@@ -449,7 +449,10 @@
         boxDimensions={{
           width: layeredBoxGeometry.dimensions.width,
           depth: layeredBoxGeometry.dimensions.depth,
-          height: layeredBoxGeometry.dimensions.height
+          height:
+            layeredBoxGeometry.dimensions.bodyHeight -
+            layeredBoxGeometry.wallThickness +
+            (layeredBoxGeometry.dimensions.height - layeredBoxGeometry.dimensions.bodyHeight)
         }}
         boxId={layeredBoxGeometry.layeredBoxId}
         boxName={layeredBoxGeometry.name}

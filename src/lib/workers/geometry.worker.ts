@@ -22,7 +22,10 @@ import {
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
-import { getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
+import {
+  getLayeredBoxExteriorDimensions,
+  getLayeredBoxRenderLayout
+} from '$lib/models/layer';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
@@ -1014,7 +1017,7 @@ function handleGenerate(msg: GenerateMessage): void {
       let boxJscad: Geom3 | null = null;
       let lidJscad: Geom3 | null = null;
       time(`createBoxWithLidGrooves (${layeredBox.name})`, () => {
-        boxJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes, exterior.height);
+        boxJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes, exterior.bodyHeight);
       });
       time(`createLid (${layeredBox.name})`, () => {
         lidJscad = createLid(syntheticBox, cardSizes, counterShapes);

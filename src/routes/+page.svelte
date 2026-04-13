@@ -419,11 +419,10 @@
         const assemblyTrayGeometries: TrayGeometryData[] = [];
         const sectionGeometryMap = new Map<string, Geom3>();
         const sectionReliefGeometryMap = new Map<string, Geom3>();
-        const internalLayerHeightById = new Map(layout.internalLayers.map((layer) => [layer.id, layer.height]));
 
         for (const placement of layout.sections) {
           try {
-            const sectionTargetHeight = internalLayerHeightById.get(placement.internalLayerId) ?? placement.dimensions.height;
+            const sectionTargetHeight = placement.dimensions.height;
             const jscadGeometry = createLayeredBoxSectionJscadGeometry(
               placement,
               cardSizes,
@@ -835,7 +834,12 @@
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-        const shellJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes, exterior.height);
+        const shellJscad = createBoxWithLidGrooves(
+          syntheticBox,
+          cardSizes,
+          counterShapes,
+          exterior.bodyHeight
+        );
         const lidJscad = createLid(syntheticBox, cardSizes, counterShapes);
         if (!shellJscad || !lidJscad) {
           continue;
