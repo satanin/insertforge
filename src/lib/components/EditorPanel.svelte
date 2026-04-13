@@ -281,8 +281,12 @@
     }
   }
 
-  function formatRoundedDimension(value: number): string {
-    return value.toFixed(0);
+  function formatLayerContentDimension(value: number): string {
+    return value.toFixed(1);
+  }
+
+  function getLayeredBoxLayerViewHeight(totalHeight: number, wallThickness: number): number {
+    return Math.max(totalHeight - wallThickness, 0);
   }
 
   function handleLayeredBoxSectionUpdate(updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>) {
@@ -533,7 +537,9 @@
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{box.name}</span>
                       <span class="treeItemDims">
-                        {boxDims.width.toFixed(0)} × {boxDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                        {formatLayerContentDimension(boxDims.width)} ×
+                        {formatLayerContentDimension(boxDims.depth)} ×
+                        {formatLayerContentDimension(layerHeight)}
                       </span>
                     </div>
                     {#each box.trays as tray (tray.id)}
@@ -541,7 +547,9 @@
                       <div class="treeItem treeItem--tray treeItem--nested">
                         <span class="treeItemName">{tray.name}</span>
                         <span class="treeItemDims">
-                          {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {boxInteriorHeight.toFixed(0)}
+                          {formatLayerContentDimension(trayDims.width)} ×
+                          {formatLayerContentDimension(trayDims.depth)} ×
+                          {formatLayerContentDimension(boxInteriorHeight)}
                         </span>
                       </div>
                     {/each}
@@ -552,9 +560,9 @@
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{layeredBox.name}</span>
                       <span class="treeItemDims">
-                        {formatRoundedDimension(layeredBoxDims.width)} ×
-                        {formatRoundedDimension(layeredBoxDims.depth)} ×
-                        {formatRoundedDimension(layeredBoxDims.height)}
+                        {formatLayerContentDimension(layeredBoxDims.width)} ×
+                        {formatLayerContentDimension(layeredBoxDims.depth)} ×
+                        {formatLayerContentDimension(getLayeredBoxLayerViewHeight(layeredBoxDims.height, layeredBox.wallThickness))}
                       </span>
                     </div>
                     {#each layeredBox.layers as boxLayer (boxLayer.id)}
@@ -569,9 +577,9 @@
                         <div class="treeItem treeItem--tray treeItem--nested treeItem--doubleNested">
                           <span class="treeItemName">{section.name}</span>
                           <span class="treeItemDims">
-                            {formatRoundedDimension(sectionDims.width)} ×
-                            {formatRoundedDimension(sectionDims.depth)} ×
-                            {formatRoundedDimension(internalLayerHeight)}
+                            {formatLayerContentDimension(sectionDims.width)} ×
+                            {formatLayerContentDimension(sectionDims.depth)} ×
+                            {formatLayerContentDimension(internalLayerHeight)}
                           </span>
                         </div>
                       {/each}
@@ -582,7 +590,9 @@
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{tray.name}</span>
                       <span class="treeItemDims">
-                        {trayDims.width.toFixed(0)} × {trayDims.depth.toFixed(0)} × {layerHeight.toFixed(0)}
+                        {formatLayerContentDimension(trayDims.width)} ×
+                        {formatLayerContentDimension(trayDims.depth)} ×
+                        {formatLayerContentDimension(layerHeight)}
                       </span>
                     </div>
                   {/each}
@@ -590,7 +600,9 @@
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{board.name}</span>
                       <span class="treeItemDims">
-                        {board.width.toFixed(0)} × {board.depth.toFixed(0)} × {board.height.toFixed(0)}
+                        {formatLayerContentDimension(board.width)} ×
+                        {formatLayerContentDimension(board.depth)} ×
+                        {formatLayerContentDimension(board.height)}
                       </span>
                     </div>
                   {/each}

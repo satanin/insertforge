@@ -142,6 +142,7 @@
     selectedLayeredBoxSectionId?: string;
     triangleCornerRadius?: number;
     showReferenceLabels?: boolean;
+    showPreviewSizes?: boolean;
     hidePrintBed?: boolean;
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
@@ -204,6 +205,7 @@
     selectedLayeredBoxSectionId = '',
     triangleCornerRadius = 1.5,
     showReferenceLabels = false,
+    showPreviewSizes = false,
     hidePrintBed = false,
     viewTitle = '',
     onCaptureReady,
@@ -301,6 +303,7 @@
       {selectedLayeredBoxSectionId}
       {triangleCornerRadius}
       {showReferenceLabels}
+      {showPreviewSizes}
       {hidePrintBed}
       {viewTitle}
       {onCaptureReady}

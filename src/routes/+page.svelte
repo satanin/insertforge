@@ -891,6 +891,7 @@
   let showCounters = $state(false);
   let communityProjects = $state<CommunityProject[]>([]);
   let showReferenceLabels = $state(false);
+  let showPreviewSizes = $state(false);
   let hidePrintBed = $state(false);
   let isMobile = $state(false);
   let captureFunction = $state<
@@ -2842,6 +2843,7 @@
               selectedLayeredBoxSectionId={getProject().selectedLayeredBoxSectionId ?? ''}
               triangleCornerRadius={1.5}
               {showReferenceLabels}
+              {showPreviewSizes}
               {hidePrintBed}
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
@@ -3117,6 +3119,7 @@
               selectedLayeredBoxSectionId={getProject().selectedLayeredBoxSectionId ?? ''}
               triangleCornerRadius={1.5}
               {showReferenceLabels}
+              {showPreviewSizes}
               {hidePrintBed}
               {viewTitle}
               onCaptureReady={(fn) => (captureFunction = fn)}
@@ -3327,6 +3330,11 @@
                   checked={showReferenceLabels}
                   onchange={(e) => (showReferenceLabels = e.currentTarget.checked)}
                   label="Preview labels"
+                />
+                <InputCheckbox
+                  checked={showPreviewSizes}
+                  onchange={(e) => (showPreviewSizes = e.currentTarget.checked)}
+                  label="Preview sizes"
                 />
                 <span class="regenerateButton {isDirty && !generating ? 'regenerateButton--dirty' : ''}">
                   <Button

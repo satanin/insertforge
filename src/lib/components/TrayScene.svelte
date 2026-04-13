@@ -151,6 +151,7 @@
     selectedLayeredBoxSectionId?: string;
     triangleCornerRadius?: number;
     showReferenceLabels?: boolean;
+    showPreviewSizes?: boolean;
     hidePrintBed?: boolean;
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
@@ -217,6 +218,7 @@
     selectedLayeredBoxSectionId = '',
     triangleCornerRadius = 1.5,
     showReferenceLabels = false,
+    showPreviewSizes = false,
     hidePrintBed = false,
     viewTitle = '',
     onCaptureReady,
@@ -1283,6 +1285,7 @@
         {selectedLayeredBoxSectionId}
         horizontalExplosion={horizontalPhase * layerMultiplier}
         layerBaseOffset={baseOffset}
+        showSizePreview={false}
       />
     </T.Group>
   {/each}
@@ -1354,6 +1357,7 @@
       {selectedLayeredBoxLayerId}
       {selectedLayeredBoxSectionId}
       horizontalExplosion={selectionType === 'layeredBox' ? explosionAmount / 100 : 0}
+      showSizePreview={showPreviewSizes}
     />
   {/if}
 {/if}

@@ -8,6 +8,7 @@
   import { Text, type IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
+  import DimensionOverlay from './DimensionOverlay.svelte';
   import TrayInBox from './TrayInBox.svelte';
   import type { BoardPlacement, BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { TrayPlacement } from '$lib/models/box';
@@ -118,6 +119,7 @@
     layerName?: string;
     layerHeight?: number;
     showLabel?: boolean;
+    showSizePreview?: boolean;
     labelQuaternion?: [number, number, number, number];
     monoFont?: string;
     onTrayClick?: (info: TrayClickInfo | null) => void;
@@ -149,6 +151,7 @@
     layerName = '',
     layerHeight = 0,
     showLabel = false,
+    showSizePreview = false,
     labelQuaternion = [0, 0, 0, 1],
     monoFont = '/fonts/JetBrainsMono-Regular.ttf',
     onTrayClick,
@@ -161,6 +164,23 @@
   // Layer content offset (center on game container)
   let layerOffsetX = $derived(-gameContainerWidth / 2);
   let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
+
+  function getDimensionOverlaySides(centerX: number, centerZ: number, width: number, depth: number) {
+    const minX = layerOffsetX;
+    const maxX = layerOffsetX + gameContainerWidth;
+    const maxZ = layerOffsetZ;
+    const minZ = layerOffsetZ - gameContainerDepth;
+
+    const leftGap = centerX - width / 2 - minX;
+    const rightGap = maxX - (centerX + width / 2);
+    const backGap = centerZ - depth / 2 - minZ;
+    const frontGap = maxZ - (centerZ + depth / 2);
+
+    return {
+      depthSide: leftGap <= rightGap ? ('negative' as const) : ('positive' as const),
+      widthSide: backGap <= frontGap ? ('negative' as const) : ('positive' as const)
+    };
+  }
 
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
@@ -250,6 +270,7 @@
   )}
   {@const baseX = layerOffsetX + boxPlacement.x + boxPlacement.dimensions.width / 2 + explosion.offsetX}
   {@const baseZ = layerOffsetZ - boxPlacement.y - boxPlacement.dimensions.depth / 2 - explosion.offsetZ}
+  {@const overlaySides = getDimensionOverlaySides(baseX, baseZ, boxPlacement.dimensions.width, boxPlacement.dimensions.depth)}
 
   <!-- Group for entire box assembly - rotation applied to group -->
   <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
@@ -312,6 +333,20 @@
       anchorY="bottom"
     />
   {/if}
+
+  {#if showSizePreview}
+    <DimensionOverlay
+      centerX={baseX}
+      centerZ={baseZ}
+      width={boxPlacement.dimensions.width}
+      depth={boxPlacement.dimensions.depth}
+      height={boxHeight}
+      widthSide={overlaySides.widthSide}
+      depthSide={overlaySides.depthSide}
+      {labelQuaternion}
+      {monoFont}
+    />
+  {/if}
 {/each}
 
 <!-- Render visual-only boards -->
@@ -329,7 +364,12 @@
   )}
   {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2 + explosion.offsetX}
   {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2 - explosion.offsetZ}
+  {@const overlaySides = getDimensionOverlaySides(baseX, baseZ, boardPlacement.dimensions.width, boardPlacement.dimensions.depth)}
   {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
+  {@const dimensionHeight =
+    layeredBoxGeometry
+      ? Math.max(layeredBoxGeometry.dimensions.height - layeredBoxGeometry.wallThickness, 0)
+      : boardHeight}
   {@const isLayeredBoxSelection =
     selectionType === 'layeredBox' ||
     selectionType === 'layeredBoxLayer' ||
@@ -602,6 +642,20 @@
       anchorY="bottom"
     />
   {/if}
+
+  {#if showSizePreview}
+    <DimensionOverlay
+      centerX={baseX}
+      centerZ={baseZ}
+      width={boardPlacement.dimensions.width}
+      depth={boardPlacement.dimensions.depth}
+      height={dimensionHeight}
+      widthSide={overlaySides.widthSide}
+      depthSide={overlaySides.depthSide}
+      {labelQuaternion}
+      {monoFont}
+    />
+  {/if}
 {/each}
 
 <!-- Render loose trays with actual geometry -->
@@ -668,6 +722,23 @@
       color="#ffffff"
       anchorX="center"
       anchorY="bottom"
+    />
+  {/if}
+
+  {#if showSizePreview}
+    {@const labelX = layerOffsetX + trayPlacement.x + trayPlacement.dimensions.width / 2 + explosion.offsetX}
+    {@const labelZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
+    {@const overlaySides = getDimensionOverlaySides(labelX, labelZ, trayPlacement.dimensions.width, trayPlacement.dimensions.depth)}
+    <DimensionOverlay
+      centerX={labelX}
+      centerZ={labelZ}
+      width={trayPlacement.dimensions.width}
+      depth={trayPlacement.dimensions.depth}
+      height={trayHeight}
+      widthSide={overlaySides.widthSide}
+      depthSide={overlaySides.depthSide}
+      {labelQuaternion}
+      {monoFont}
     />
   {/if}
 {/each}
