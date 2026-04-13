@@ -59,6 +59,7 @@
     resetProject,
     getTrayLetterById,
     getAllBoxes,
+    getAllLayeredBoxes,
     getAllLooseTrays,
     getSelectedLayeredBox,
     isCounterTray,
@@ -1678,8 +1679,9 @@
 
   async function handleExportAll() {
     const allBoxes = getAllBoxes();
+    const allLayeredBoxes = getAllLayeredBoxes();
     const allLooseTrays = getAllLooseTrays();
-    if (allBoxes.length === 0 && allLooseTrays.length === 0) return;
+    if (allBoxes.length === 0 && allLayeredBoxes.length === 0 && allLooseTrays.length === 0) return;
 
     exportingStl = true;
     exportStlProgress = 'Generating STL files...';
@@ -2956,7 +2958,9 @@
                     onclick={handleExportAll}
                     disabled={generating ||
                       exportingStl ||
-                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                      (getAllBoxes().length === 0 &&
+                        getAllLayeredBoxes().length === 0 &&
+                        getAllLooseTrays().length === 0)}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -3229,7 +3233,9 @@
                     onclick={handleExportAll}
                     disabled={generating ||
                       exportingStl ||
-                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                      (getAllBoxes().length === 0 &&
+                        getAllLayeredBoxes().length === 0 &&
+                        getAllLooseTrays().length === 0)}
                     isLoading={exportingStl}
                     style="width: 100%; justify-content: flex-start;"
                   >
@@ -3240,7 +3246,9 @@
                     onclick={handleExport3mf}
                     disabled={generating ||
                       exporting3mf ||
-                      (getAllBoxes().length === 0 && getAllLooseTrays().length === 0)}
+                      (getAllBoxes().length === 0 &&
+                        getAllLayeredBoxes().length === 0 &&
+                        getAllLooseTrays().length === 0)}
                     isLoading={exporting3mf}
                     style="width: 100%; justify-content: flex-start;"
                   >

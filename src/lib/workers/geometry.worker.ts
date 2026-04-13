@@ -22,8 +22,9 @@ import {
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
+import { getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
 import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
-import type { Box, CardSize, CounterShape, Layer, Tray } from '$lib/types/project';
+import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
@@ -71,6 +72,168 @@ function getAllBoxes(layers: Layer[]): Box[] {
   return boxes;
 }
 
+function getAllLayeredBoxes(layers: Layer[]): LayeredBox[] {
+  const layeredBoxes: LayeredBox[] = [];
+  for (const layer of layers) {
+    layeredBoxes.push(...(layer.layeredBoxes ?? []));
+  }
+  return layeredBoxes;
+}
+
+function createTrayFromLayeredBoxSection(section: LayeredBoxSection): Tray | null {
+  const color = section.color ?? '#c9503c';
+
+  if ((section.type === 'counter' || section.type === 'playerBoard') && section.counterParams) {
+    return {
+      id: section.id,
+      type: 'counter',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.counterParams
+    };
+  }
+
+  if (section.type === 'cardDraw' && section.cardDrawParams) {
+    return {
+      id: section.id,
+      type: 'cardDraw',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardDrawParams
+    };
+  }
+
+  if (section.type === 'cardDivider' && section.cardDividerParams) {
+    return {
+      id: section.id,
+      type: 'cardDivider',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardDividerParams
+    };
+  }
+
+  if (section.type === 'cardWell' && section.cardWellParams) {
+    return {
+      id: section.id,
+      type: 'cardWell',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardWellParams
+    };
+  }
+
+  if (section.type === 'cup' && section.cupParams) {
+    return {
+      id: section.id,
+      type: 'cup',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cupParams
+    };
+  }
+
+  return null;
+}
+
+function createSyntheticLayeredBoxBox(
+  layeredBox: LayeredBox,
+  layout: ReturnType<typeof getLayeredBoxRenderLayout>,
+  cardSizes: CardSize[],
+  counterShapes: CounterShape[]
+): Box {
+  const exteriorWidth =
+    layeredBox.customWidth ??
+    layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+  const exteriorDepth =
+    layeredBox.customDepth ??
+    layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+  const boxBodyHeight =
+    layeredBox.customBoxHeight ?? layout.height + layeredBox.floorThickness + layeredBox.tolerance;
+  const interiorWidth = Math.max(exteriorWidth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
+  const interiorDepth = Math.max(exteriorDepth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
+  const interiorHeight = Math.max(boxBodyHeight - layeredBox.floorThickness, 0.1);
+  const bottomInternalLayer = [...layout.internalLayers].sort((a, b) => a.z - b.z)[0];
+  const bottomLayerPlacements = bottomInternalLayer
+    ? layout.sections.filter((section) => section.internalLayerId === bottomInternalLayer.id)
+    : [];
+  const bottomLayerTrays = bottomLayerPlacements
+    .map((placement) => {
+      const tray = createTrayFromLayeredBoxSection(placement.section);
+      if (!tray) return null;
+      return { placement, tray };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (bottomLayerTrays.length > 0) {
+    const manualLayout = bottomLayerTrays.map(({ placement, tray }) => {
+      const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
+      const rotated =
+        Math.abs(trayDims.width - placement.dimensions.width) > 0.01 ||
+        Math.abs(trayDims.depth - placement.dimensions.depth) > 0.01;
+
+      return {
+        trayId: tray.id,
+        x: placement.x,
+        y: placement.y,
+        rotation: rotated ? 90 : 0
+      } as const;
+    });
+
+    return {
+      id: layeredBox.id,
+      name: layeredBox.name,
+      trays: bottomLayerTrays.map(({ tray }) => tray),
+      tolerance: layeredBox.tolerance,
+      wallThickness: layeredBox.wallThickness,
+      floorThickness: layeredBox.floorThickness,
+      lidParams: layeredBox.lidParams,
+      customWidth: exteriorWidth,
+      customDepth: exteriorDepth,
+      customBoxHeight: boxBodyHeight,
+      fillSolidEmpty: false,
+      manualLayout
+    };
+  }
+
+  const cavityTray: CupTray = {
+    id: `${layeredBox.id}-cavity`,
+    type: 'cup',
+    name: `${layeredBox.name} cavity`,
+    color: '#c9503c',
+    params: {
+      layout: {
+        root: { type: 'cup', id: `${layeredBox.id}-cup` }
+      },
+      trayWidth: interiorWidth,
+      trayDepth: interiorDepth,
+      cupCavityHeight: interiorHeight,
+      wallThickness: 0,
+      floorThickness: 0,
+      cornerRadius: 0
+    }
+  };
+
+  return {
+    id: layeredBox.id,
+    name: layeredBox.name,
+    trays: [cavityTray],
+    tolerance: layeredBox.tolerance,
+    wallThickness: layeredBox.wallThickness,
+    floorThickness: layeredBox.floorThickness,
+    lidParams: layeredBox.lidParams,
+    customWidth: exteriorWidth,
+    customDepth: exteriorDepth,
+    customBoxHeight: boxBodyHeight,
+    fillSolidEmpty: false
+  };
+}
+
 /**
  * Get cumulative tray index across all layers.
  * Order: For each layer, count box trays first, then loose trays.
@@ -115,6 +278,10 @@ function calculateUnifiedLayerHeight(layer: Layer, cardSizes: CardSize[], counte
     const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
     return dims.height;
   });
+  const layeredBoxHeights = layer.layeredBoxes.map((layeredBox) => {
+    const dims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
+    return dims.height;
+  });
 
   // Get all loose tray content heights
   const looseTrayHeights = layer.looseTrays.map((tray) => {
@@ -123,7 +290,7 @@ function calculateUnifiedLayerHeight(layer: Layer, cardSizes: CardSize[], counte
   });
 
   // Layer height = max of all items
-  return Math.max(...boxHeights, ...looseTrayHeights, 0);
+  return Math.max(...boxHeights, ...layeredBoxHeights, ...looseTrayHeights, 0);
 }
 
 /**
@@ -726,10 +893,11 @@ function handleGenerate(msg: GenerateMessage): void {
 
     // Get all boxes from all layers
     const allBoxes = getAllBoxes(project.layers);
+    const allLayeredBoxes = getAllLayeredBoxes(project.layers);
 
     // Count all loose trays for progress tracking
     const allLooseTrays = project.layers.flatMap((layer) => layer.looseTrays);
-    const totalOperations = allBoxes.length + allLooseTrays.length;
+    const totalOperations = allBoxes.length + allLayeredBoxes.length + allLooseTrays.length;
     let currentOperation = 0;
 
     // Generate geometries for ALL boxes (for all-no-lid view) and cache JSCAD for STL export
@@ -833,6 +1001,51 @@ function handleGenerate(msg: GenerateMessage): void {
         lidGeometry: lidBufferGeom,
         trayGeometries: trayGeoms,
         boxDimensions: { width: projectBox.customWidth ?? 0, depth: projectBox.customDepth ?? 0, height: layerHeight }
+      });
+    }
+
+    for (const layeredBox of allLayeredBoxes) {
+      currentOperation++;
+      self.postMessage({
+        type: 'generation-progress',
+        id,
+        current: currentOperation,
+        total: totalOperations,
+        currentItem: layeredBox.name
+      } as GenerationProgressMessage);
+
+      const layout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes);
+      const exterior = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
+      const syntheticBox = createSyntheticLayeredBoxBox(layeredBox, layout, cardSizes, counterShapes);
+
+      let boxJscad: Geom3 | null = null;
+      let lidJscad: Geom3 | null = null;
+      time(`createBoxWithLidGrooves (${layeredBox.name})`, () => {
+        boxJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes, exterior.height);
+      });
+      time(`createLid (${layeredBox.name})`, () => {
+        lidJscad = createLid(syntheticBox, cardSizes, counterShapes);
+      });
+      const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
+
+      for (const placement of layout.sections) {
+        const tray = createTrayFromLayeredBoxSection(placement.section);
+        if (!tray) continue;
+        const jscadGeom = createTrayGeometry(
+          tray,
+          cardSizes,
+          counterShapes,
+          placement.dimensions.height,
+          0
+        );
+        cachedTraysForBox.push({ jscadGeom, name: placement.section.name });
+      }
+
+      cachedAllBoxes.push({
+        boxName: layeredBox.name,
+        boxGeom: boxJscad,
+        lidGeom: lidJscad,
+        trays: cachedTraysForBox
       });
     }
 
