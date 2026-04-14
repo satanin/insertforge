@@ -9,6 +9,7 @@
   import * as THREE from 'three';
   import BoxAssembly from './BoxAssembly.svelte';
   import DimensionOverlay from './DimensionOverlay.svelte';
+  import GapDimensionOverlay from './GapDimensionOverlay.svelte';
   import TrayInBox from './TrayInBox.svelte';
   import type { BoardPlacement, BoxPlacement, LooseTrayPlacement } from '$lib/models/layer';
   import type { TrayPlacement } from '$lib/models/box';
@@ -95,6 +96,40 @@
     height: number;
     color: string;
     type?: 'tray' | 'box';
+  }
+
+  interface SizePreviewRect {
+    id: string;
+    centerX: number;
+    centerZ: number;
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+    height: number;
+  }
+
+  interface GapOverlayData {
+    id: string;
+    startX: number;
+    startZ: number;
+    endX: number;
+    endZ: number;
+    y: number;
+    kind?: 'edge' | 'between';
+    labelT?: number;
+    labelOffset?: number;
+  }
+
+  interface Range {
+    min: number;
+    max: number;
+  }
+
+  interface LabelAnchor {
+    axis: 'x' | 'z';
+    x: number;
+    z: number;
   }
 
   interface Props {
@@ -209,6 +244,70 @@
     return geometry.boundingBox;
   }
 
+  function createPreviewRect(
+    id: string,
+    centerX: number,
+    centerZ: number,
+    width: number,
+    depth: number,
+    height: number
+  ): SizePreviewRect {
+    return {
+      id,
+      centerX,
+      centerZ,
+      minX: centerX - width / 2,
+      maxX: centerX + width / 2,
+      minZ: centerZ - depth / 2,
+      maxZ: centerZ + depth / 2,
+      height
+    };
+  }
+
+  function getOverlapRange(aMin: number, aMax: number, bMin: number, bMax: number): Range | null {
+    const min = Math.max(aMin, bMin);
+    const max = Math.min(aMax, bMax);
+    return max > min ? { min, max } : null;
+  }
+
+  function getDimensionLabelAnchors(rect: SizePreviewRect): LabelAnchor[] {
+    const sides = getDimensionOverlaySides(rect.centerX, rect.centerZ, rect.maxX - rect.minX, rect.maxZ - rect.minZ);
+    const widthSideSign = sides.widthSide === 'positive' ? 1 : -1;
+    const depthSideSign = sides.depthSide === 'positive' ? 1 : -1;
+    const width = rect.maxX - rect.minX;
+    const depth = rect.maxZ - rect.minZ;
+
+    return [
+      {
+        axis: 'x',
+        x: rect.centerX,
+        z: rect.centerZ + (depth / 2) * widthSideSign
+      },
+      {
+        axis: 'z',
+        x: rect.centerX + (width / 2) * depthSideSign,
+        z: rect.centerZ
+      }
+    ];
+  }
+
+  function subtractRanges(source: Range[], blocker: Range): Range[] {
+    const result: Range[] = [];
+    for (const range of source) {
+      if (blocker.max <= range.min || blocker.min >= range.max) {
+        result.push(range);
+        continue;
+      }
+      if (blocker.min > range.min) {
+        result.push({ min: range.min, max: blocker.min });
+      }
+      if (blocker.max < range.max) {
+        result.push({ min: blocker.max, max: range.max });
+      }
+    }
+    return result.filter((range) => range.max - range.min > 0.1);
+  }
+
   // Calculate max height across all visible layer items for label positioning
   let maxItemHeight = $derived.by(() => {
     const boxHeight = boxPlacements.reduce((max, bp) => Math.max(max, bp.dimensions.height), 0);
@@ -252,6 +351,283 @@
       offsetZ: normalizedZ * explosionDistance + baseZ
     };
   }
+
+  const previewRects = $derived.by(() => {
+    const boxRects = boxPlacements.map((boxPlacement) => {
+      const itemCenterX = boxPlacement.x + boxPlacement.dimensions.width / 2;
+      const itemCenterZ = boxPlacement.y + boxPlacement.dimensions.depth / 2;
+      const explosion = calculateExplosionOffset(
+        itemCenterX,
+        itemCenterZ,
+        gameContainerWidth,
+        gameContainerDepth,
+        horizontalExplosion
+      );
+      return createPreviewRect(
+        boxPlacement.box.id,
+        layerOffsetX + itemCenterX + explosion.offsetX,
+        layerOffsetZ - itemCenterZ - explosion.offsetZ,
+        boxPlacement.dimensions.width,
+        boxPlacement.dimensions.depth,
+        boxPlacement.dimensions.height
+      );
+    });
+
+    const boardRects = boardPlacements.map((boardPlacement) => {
+      const itemCenterX = boardPlacement.x + boardPlacement.dimensions.width / 2;
+      const itemCenterZ = boardPlacement.y + boardPlacement.dimensions.depth / 2;
+      const explosion = calculateExplosionOffset(
+        itemCenterX,
+        itemCenterZ,
+        gameContainerWidth,
+        gameContainerDepth,
+        horizontalExplosion
+      );
+      const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id);
+      const height = layeredBoxGeometry
+        ? Math.max(layeredBoxGeometry.dimensions.height - layeredBoxGeometry.wallThickness, 0)
+        : boardPlacement.dimensions.height;
+      return createPreviewRect(
+        boardPlacement.board.id,
+        layerOffsetX + itemCenterX + explosion.offsetX,
+        layerOffsetZ - itemCenterZ - explosion.offsetZ,
+        boardPlacement.dimensions.width,
+        boardPlacement.dimensions.depth,
+        height
+      );
+    });
+
+    const trayRects = looseTrayPlacements.map((trayPlacement) => {
+      const itemCenterX = trayPlacement.x + trayPlacement.dimensions.width / 2;
+      const itemCenterZ = trayPlacement.y + trayPlacement.dimensions.depth / 2;
+      const explosion = calculateExplosionOffset(
+        itemCenterX,
+        itemCenterZ,
+        gameContainerWidth,
+        gameContainerDepth,
+        horizontalExplosion
+      );
+      return createPreviewRect(
+        trayPlacement.tray.id,
+        layerOffsetX + itemCenterX + explosion.offsetX,
+        layerOffsetZ - itemCenterZ - explosion.offsetZ,
+        trayPlacement.dimensions.width,
+        trayPlacement.dimensions.depth,
+        trayPlacement.dimensions.height
+      );
+    });
+
+    return [...boxRects, ...boardRects, ...trayRects];
+  });
+
+  const gapOverlays = $derived.by(() => {
+    if (!showSizePreview) return [] as GapOverlayData[];
+
+    const overlays: GapOverlayData[] = [];
+    const seen = new Set<string>();
+    const layerMinX = layerOffsetX;
+    const layerMaxX = layerOffsetX + gameContainerWidth;
+    const layerMinZ = layerOffsetZ - gameContainerDepth;
+    const layerMaxZ = layerOffsetZ;
+
+    const pushOverlay = (overlay: GapOverlayData) => {
+      const length = Math.hypot(overlay.endX - overlay.startX, overlay.endZ - overlay.startZ);
+      if (length < 0.1) return;
+
+      const axis = Math.abs(overlay.endX - overlay.startX) >= Math.abs(overlay.endZ - overlay.startZ) ? 'x' : 'z';
+      const a =
+        axis === 'x'
+          ? { p: Math.min(overlay.startX, overlay.endX), s: overlay.startZ }
+          : { p: Math.min(overlay.startZ, overlay.endZ), s: overlay.startX };
+      const b =
+        axis === 'x'
+          ? { p: Math.max(overlay.startX, overlay.endX), s: overlay.endZ }
+          : { p: Math.max(overlay.startZ, overlay.endZ), s: overlay.endX };
+      const geometryKey = `${axis}:${a.p.toFixed(1)}:${a.s.toFixed(1)}:${b.p.toFixed(1)}:${b.s.toFixed(1)}`;
+
+      if (seen.has(geometryKey)) return;
+      seen.add(geometryKey);
+      overlays.push(overlay);
+    };
+
+    for (const item of previewRects) {
+      const rightCandidates = previewRects
+        .filter((other) => other.id !== item.id && other.minX >= item.maxX)
+        .map((other) => ({ other, overlap: getOverlapRange(item.minZ, item.maxZ, other.minZ, other.maxZ) }))
+        .filter((entry): entry is { other: SizePreviewRect; overlap: Range } => entry.overlap !== null)
+        .sort((a, b) => a.other.minX - b.other.minX);
+      let uncoveredRight: Range[] = [{ min: item.minZ, max: item.maxZ }];
+      for (const candidate of rightCandidates) {
+        const visibleRanges = subtractRanges(uncoveredRight, { min: -Infinity, max: candidate.overlap.min }).flatMap((r) =>
+          subtractRanges([r], { min: candidate.overlap.max, max: Infinity })
+        );
+        for (const range of visibleRanges) {
+        pushOverlay({
+          id: `gap-x:${item.id}:${candidate.other.id}:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: item.maxX,
+          startZ: (range.min + range.max) / 2,
+          endX: candidate.other.minX,
+          endZ: (range.min + range.max) / 2,
+          y: 0.6,
+          kind: 'between'
+        });
+        }
+        uncoveredRight = subtractRanges(uncoveredRight, candidate.overlap);
+      }
+      for (const range of uncoveredRight) {
+        pushOverlay({
+          id: `gap-x:${item.id}:right-edge:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: item.maxX,
+          startZ: (range.min + range.max) / 2,
+          endX: layerMaxX,
+          endZ: (range.min + range.max) / 2,
+          y: 0.6,
+          kind: 'edge'
+        });
+      }
+
+      const leftCandidates = previewRects
+        .filter((other) => other.id !== item.id && other.maxX <= item.minX)
+        .map((other) => ({ other, overlap: getOverlapRange(item.minZ, item.maxZ, other.minZ, other.maxZ) }))
+        .filter((entry): entry is { other: SizePreviewRect; overlap: Range } => entry.overlap !== null)
+        .sort((a, b) => b.other.maxX - a.other.maxX);
+      let uncoveredLeft: Range[] = [{ min: item.minZ, max: item.maxZ }];
+      for (const candidate of leftCandidates) {
+        const visibleRanges = subtractRanges(uncoveredLeft, { min: -Infinity, max: candidate.overlap.min }).flatMap((r) =>
+          subtractRanges([r], { min: candidate.overlap.max, max: Infinity })
+        );
+        for (const range of visibleRanges) {
+        pushOverlay({
+          id: `gap-x:${candidate.other.id}:${item.id}:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: candidate.other.maxX,
+          startZ: (range.min + range.max) / 2,
+          endX: item.minX,
+          endZ: (range.min + range.max) / 2,
+          y: 0.6,
+          kind: 'between'
+        });
+        }
+        uncoveredLeft = subtractRanges(uncoveredLeft, candidate.overlap);
+      }
+      for (const range of uncoveredLeft) {
+        pushOverlay({
+          id: `gap-x:${item.id}:left-edge:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: layerMinX,
+          startZ: (range.min + range.max) / 2,
+          endX: item.minX,
+          endZ: (range.min + range.max) / 2,
+          y: 0.6,
+          kind: 'edge'
+        });
+      }
+
+      const frontCandidates = previewRects
+        .filter((other) => other.id !== item.id && other.minZ >= item.maxZ)
+        .map((other) => ({ other, overlap: getOverlapRange(item.minX, item.maxX, other.minX, other.maxX) }))
+        .filter((entry): entry is { other: SizePreviewRect; overlap: Range } => entry.overlap !== null)
+        .sort((a, b) => a.other.minZ - b.other.minZ);
+      let uncoveredFront: Range[] = [{ min: item.minX, max: item.maxX }];
+      for (const candidate of frontCandidates) {
+        const visibleRanges = subtractRanges(uncoveredFront, { min: -Infinity, max: candidate.overlap.min }).flatMap((r) =>
+          subtractRanges([r], { min: candidate.overlap.max, max: Infinity })
+        );
+        for (const range of visibleRanges) {
+        pushOverlay({
+          id: `gap-z:${item.id}:${candidate.other.id}:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: (range.min + range.max) / 2,
+          startZ: item.maxZ,
+          endX: (range.min + range.max) / 2,
+          endZ: candidate.other.minZ,
+          y: 0.6,
+          kind: 'between'
+        });
+        }
+        uncoveredFront = subtractRanges(uncoveredFront, candidate.overlap);
+      }
+      for (const range of uncoveredFront) {
+        pushOverlay({
+          id: `gap-z:${item.id}:front-edge:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: (range.min + range.max) / 2,
+          startZ: item.maxZ,
+          endX: (range.min + range.max) / 2,
+          endZ: layerMaxZ,
+          y: 0.6,
+          kind: 'edge'
+        });
+      }
+
+      const backCandidates = previewRects
+        .filter((other) => other.id !== item.id && other.maxZ <= item.minZ)
+        .map((other) => ({ other, overlap: getOverlapRange(item.minX, item.maxX, other.minX, other.maxX) }))
+        .filter((entry): entry is { other: SizePreviewRect; overlap: Range } => entry.overlap !== null)
+        .sort((a, b) => b.other.maxZ - a.other.maxZ);
+      let uncoveredBack: Range[] = [{ min: item.minX, max: item.maxX }];
+      for (const candidate of backCandidates) {
+        const visibleRanges = subtractRanges(uncoveredBack, { min: -Infinity, max: candidate.overlap.min }).flatMap((r) =>
+          subtractRanges([r], { min: candidate.overlap.max, max: Infinity })
+        );
+        for (const range of visibleRanges) {
+        pushOverlay({
+          id: `gap-z:${candidate.other.id}:${item.id}:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: (range.min + range.max) / 2,
+          startZ: candidate.other.maxZ,
+          endX: (range.min + range.max) / 2,
+          endZ: item.minZ,
+          y: 0.6,
+          kind: 'between'
+        });
+        }
+        uncoveredBack = subtractRanges(uncoveredBack, candidate.overlap);
+      }
+      for (const range of uncoveredBack) {
+        pushOverlay({
+          id: `gap-z:${item.id}:back-edge:${range.min.toFixed(2)}:${range.max.toFixed(2)}`,
+          startX: (range.min + range.max) / 2,
+          startZ: layerMinZ,
+          endX: (range.min + range.max) / 2,
+          endZ: item.minZ,
+          y: 0.6,
+          kind: 'edge'
+        });
+      }
+    }
+
+    const placedLabels: Array<{ axis: 'x' | 'z'; x: number; z: number }> = previewRects.flatMap(getDimensionLabelAnchors);
+    const alongPattern = [0.5, 0.32, 0.68, 0.22, 0.78];
+    const offsetPattern = [0, 4, -4, 8, -8, 12, -12];
+
+    const prioritizedOverlays = [...overlays].sort((a, b) => {
+      const aPriority = a.kind === 'between' ? 0 : 1;
+      const bPriority = b.kind === 'between' ? 0 : 1;
+      return aPriority - bPriority;
+    });
+
+    for (const overlay of prioritizedOverlays) {
+      const axis = Math.abs(overlay.endX - overlay.startX) >= Math.abs(overlay.endZ - overlay.startZ) ? 'x' : 'z';
+      let placementIndex = 0;
+
+      while (true) {
+        const labelT = alongPattern[placementIndex] ?? 0.5;
+        const labelOffset =
+          offsetPattern[placementIndex] ?? ((placementIndex % 2 === 0 ? 1 : -1) * (Math.floor(placementIndex / 2) + 1) * 4);
+        const x = axis === 'x' ? overlay.startX + (overlay.endX - overlay.startX) * labelT : (overlay.startX + overlay.endX) / 2 + labelOffset;
+        const z = axis === 'x' ? (overlay.startZ + overlay.endZ) / 2 + labelOffset : overlay.startZ + (overlay.endZ - overlay.startZ) * labelT;
+
+        const collides = placedLabels.some((placed) => Math.abs(placed.x - x) < 42 && Math.abs(placed.z - z) < 20);
+
+        if (!collides || placementIndex > 8) {
+          overlay.labelT = labelT;
+          overlay.labelOffset = labelOffset;
+          placedLabels.push({ axis, x, z });
+          break;
+        }
+
+        placementIndex++;
+      }
+    }
+
+    return prioritizedOverlays;
+  });
 </script>
 
 <!-- Render boxes with actual geometry -->
@@ -742,6 +1118,23 @@
     />
   {/if}
 {/each}
+
+{#if showSizePreview}
+  {#each gapOverlays as gap (gap.id)}
+    <GapDimensionOverlay
+      startX={gap.startX}
+      startZ={gap.startZ}
+      endX={gap.endX}
+      endZ={gap.endZ}
+      y={gap.y}
+      labelT={gap.labelT ?? 0.5}
+      labelOffset={gap.labelOffset ?? 0}
+      {labelQuaternion}
+      {monoFont}
+      color="#79b983"
+    />
+  {/each}
+{/if}
 
 <!-- Layer height indicator and label (offset from bed edge, at front) -->
 {#if showLabel && layerName}
