@@ -23,6 +23,11 @@
     getSelectedLayer,
     addLayerToLayeredBox,
     deleteLayerFromLayeredBox,
+    duplicateBoard,
+    duplicateBox,
+    duplicateLayeredBox,
+    duplicateLayeredBoxSection,
+    duplicateTray,
     updateBoard,
     moveBoardToLayer,
     updateBox,
@@ -176,6 +181,24 @@
     }
   }
 
+  function handleDuplicateSelectedBox() {
+    if (selectedBox) {
+      duplicateBox(selectedBox.id);
+    }
+  }
+
+  function handleDuplicateSelectedTray() {
+    if (selectedTray) {
+      duplicateTray(selectedTray.id);
+    }
+  }
+
+  function handleDuplicateSelectedBoard() {
+    if (selectedBoard) {
+      duplicateBoard(selectedBoard.id);
+    }
+  }
+
   function handleLayeredBoxUpdate(updates: Partial<Omit<LayeredBox, 'id' | 'layers'>>) {
     if (selectedLayeredBox) {
       updateLayeredBox(selectedLayeredBox.id, updates);
@@ -203,6 +226,18 @@
   function handleLayeredBoxLayerUpdate(updates: Partial<Omit<LayeredBoxLayer, 'id' | 'sections'>>) {
     if (selectedLayeredBox && selectedLayeredBoxLayer) {
       updateLayeredBoxLayerOptions(selectedLayeredBox.id, selectedLayeredBoxLayer.id, updates);
+    }
+  }
+
+  function handleDuplicateSelectedLayeredBox() {
+    if (selectedLayeredBox) {
+      duplicateLayeredBox(selectedLayeredBox.id);
+    }
+  }
+
+  function handleDuplicateSelectedLayeredBoxSection() {
+    if (selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection) {
+      duplicateLayeredBoxSection(selectedLayeredBox.id, selectedLayeredBoxLayer.id, selectedLayeredBoxSection.id);
     }
   }
 
@@ -625,6 +660,7 @@
             onSelectBox={() => {}}
             onAddBox={() => {}}
             onDeleteBox={() => {}}
+            onDuplicateBox={handleDuplicateSelectedBox}
             onUpdateBox={handleBoxUpdate}
             onAdaptToGap={handleExpandBoxToAvailableSpace}
             hideList={true}
@@ -697,6 +733,10 @@
                 />
               {/snippet}
             </FormControl>
+            <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={handleDuplicateSelectedLayeredBox}>Duplicate box</button>
+            </div>
             <Spacer size="1rem" />
             <div class="formGrid">
               <FormControl label="Tolerance" name="layeredBoxTolerance">
@@ -987,6 +1027,7 @@
             </FormControl>
             <Spacer size="1rem" />
             <div class="buttonRow">
+              <button class="secondaryButton" onclick={handleDuplicateSelectedLayeredBoxSection}>Duplicate section</button>
               <button class="secondaryButton" onclick={handleDeleteSelectedLayeredBoxSection}>Delete section</button>
             </div>
             <Spacer size="1rem" />
@@ -1134,6 +1175,10 @@
               {/snippet}
             </FormControl>
             <Spacer size="1rem" />
+            <div class="buttonRow">
+              <button class="secondaryButton" onclick={handleDuplicateSelectedBoard}>Duplicate board</button>
+            </div>
+            <Spacer size="1rem" />
             <div class="formGrid">
               <FormControl label="Width" name="boardWidth">
                 {#snippet input({ inputProps })}
@@ -1203,6 +1248,7 @@
             onSelectTray={() => {}}
             onAddTray={() => {}}
             onDeleteTray={() => {}}
+            onDuplicateTray={handleDuplicateSelectedTray}
             onUpdateTray={handleTrayUpdate}
             onUpdateCounterParams={handleCounterParamsChange}
             onUpdateCardParams={handleCardParamsChange}

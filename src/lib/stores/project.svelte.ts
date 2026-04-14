@@ -59,6 +59,7 @@ import type {
   ManualBoxPlacement,
   ManualBoardPlacement,
   ManualLooseTrayPlacement,
+  ManualTrayPlacement,
   Project,
   Tray
 } from '$lib/types/project';
@@ -104,7 +105,9 @@ export type {
   LayeredBoxSectionType,
   LidParams,
   ManualBoxPlacement,
+  ManualBoardPlacement,
   ManualLooseTrayPlacement,
+  ManualTrayPlacement,
   Project,
   Tray
 };
@@ -633,6 +636,182 @@ function createDefaultLayer(name: string): Layer {
   };
 }
 
+function duplicateName(name: string): string {
+  return `${name} Copy`;
+}
+
+function cloneCupLayoutNodeWithFreshIds(node: ReturnType<typeof createDefaultCupLayout>['root']): ReturnType<typeof createDefaultCupLayout>['root'] {
+  if (node.type === 'cup') {
+    return { ...node, id: generateId() };
+  }
+  return {
+    ...node,
+    first: cloneCupLayoutNodeWithFreshIds(node.first),
+    second: cloneCupLayoutNodeWithFreshIds(node.second)
+  };
+}
+
+function cloneCupParamsWithFreshIds(params: CupTrayParams): CupTrayParams {
+  return {
+    ...params,
+    layout: {
+      root: cloneCupLayoutNodeWithFreshIds(params.layout.root)
+    }
+  };
+}
+
+function cloneCardWellParamsWithFreshIds(params: CardWellTrayParams): CardWellTrayParams {
+  const cellIdMap = new Map<string, string>();
+  const columns = params.layout.columns.map((column) =>
+    column.map((cellId) => {
+      const nextId = generateId();
+      cellIdMap.set(cellId, nextId);
+      return nextId;
+    })
+  );
+
+  return {
+    ...params,
+    layout: { columns },
+    stacks: params.stacks.map((stack) => ({
+      ...stack,
+      id: generateId(),
+      cellId: cellIdMap.get(stack.cellId) ?? stack.cellId
+    }))
+  };
+}
+
+function cloneMiniatureRackParamsWithFreshIds(params: MiniatureRackParams): MiniatureRackParams {
+  return {
+    ...params,
+    slots: params.slots.map((slot) => ({
+      ...slot,
+      id: generateId()
+    }))
+  };
+}
+
+function cloneTrayWithFreshIds<T extends Tray>(tray: T, name: string = duplicateName(tray.name)): T {
+  if (isCupTray(tray)) {
+    return {
+      ...tray,
+      id: generateId(),
+      name,
+      params: cloneCupParamsWithFreshIds(tray.params)
+    } as T;
+  }
+  if (isCardWellTray(tray)) {
+    return {
+      ...tray,
+      id: generateId(),
+      name,
+      params: cloneCardWellParamsWithFreshIds(tray.params)
+    } as T;
+  }
+  if (isMiniatureRackTray(tray)) {
+    return {
+      ...tray,
+      id: generateId(),
+      name,
+      params: cloneMiniatureRackParamsWithFreshIds(tray.params)
+    } as T;
+  }
+  return {
+    ...tray,
+    id: generateId(),
+    name,
+    params: {
+      ...tray.params,
+      ...(isCardDividerTray(tray)
+        ? { stacks: tray.params.stacks.map((stack) => ({ ...stack })) }
+        : {})
+    }
+  } as T;
+}
+
+function cloneLayeredBoxSectionWithFreshIds(
+  section: LayeredBoxSection,
+  name: string = duplicateName(section.name)
+): LayeredBoxSection {
+  return {
+    ...section,
+    id: generateId(),
+    name,
+    counterParams: section.counterParams
+      ? {
+          ...section.counterParams,
+          topLoadedStacks: section.counterParams.topLoadedStacks.map((stack) => [...stack] as typeof stack),
+          edgeLoadedStacks: section.counterParams.edgeLoadedStacks.map((stack) => [...stack] as typeof stack)
+        }
+      : undefined,
+    cardDrawParams: section.cardDrawParams
+      ? { ...section.cardDrawParams }
+      : undefined,
+    cardDividerParams: section.cardDividerParams
+      ? {
+          ...section.cardDividerParams,
+          stacks: section.cardDividerParams.stacks.map((stack) => ({ ...stack }))
+        }
+      : undefined,
+    cardWellParams: section.cardWellParams ? cloneCardWellParamsWithFreshIds(section.cardWellParams) : undefined,
+    cupParams: section.cupParams ? cloneCupParamsWithFreshIds(section.cupParams) : undefined
+  };
+}
+
+function cloneLayeredBoxLayerWithFreshIds(layer: LayeredBoxLayer): LayeredBoxLayer {
+  return {
+    ...layer,
+    id: generateId(),
+    sections: layer.sections.map((section) => cloneLayeredBoxSectionWithFreshIds(section, section.name))
+  };
+}
+
+function cloneBoxWithFreshIds(box: Box, name: string = duplicateName(box.name)): Box {
+  const trayIdMap = new Map<string, string>();
+  const trays = box.trays.map((tray, index) => {
+    const clonedTray = cloneTrayWithFreshIds(tray, index === 0 ? tray.name : tray.name);
+    trayIdMap.set(tray.id, clonedTray.id);
+    return clonedTray;
+  });
+
+  return {
+    ...box,
+    id: generateId(),
+    name,
+    trays,
+    manualLayout: box.manualLayout?.flatMap((placement) => {
+      const nextTrayId = trayIdMap.get(placement.trayId);
+      if (!nextTrayId) return [];
+      return [{ ...placement, trayId: nextTrayId }];
+    })
+  };
+}
+
+function cloneLayeredBoxWithFreshIds(layeredBox: LayeredBox, name: string = duplicateName(layeredBox.name)): LayeredBox {
+  return {
+    ...layeredBox,
+    id: generateId(),
+    name,
+    layers: layeredBox.layers.map((layer) => cloneLayeredBoxLayerWithFreshIds(layer))
+  };
+}
+
+function cloneBoardWithFreshId(board: Board, name: string = duplicateName(board.name)): Board {
+  return {
+    ...board,
+    id: generateId(),
+    name
+  };
+}
+
+function offsetPlacement<T extends { x: number; y: number }>(placement: T, amount: number = 10): T {
+  return {
+    ...placement,
+    x: placement.x + amount,
+    y: placement.y + amount
+  };
+}
+
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
   project.selectedBoardId = null;
@@ -1094,6 +1273,42 @@ export function moveBoardToLayer(boardId: string, targetLayerId: string | 'new')
   project.selectedLayeredBoxSectionId = null;
 
   autosave();
+}
+
+export function duplicateBoard(boardId: string): Board | null {
+  for (const layer of project.layers) {
+    const boardIndex = layer.boards.findIndex((board) => board.id === boardId);
+    if (boardIndex === -1) continue;
+
+    const sourceBoard = layer.boards[boardIndex];
+    const duplicatedBoard = cloneBoardWithFreshId(sourceBoard);
+    layer.boards.splice(boardIndex + 1, 0, duplicatedBoard);
+
+    const sourcePlacement = layer.manualLayout?.boards?.find((placement) => placement.boardId === boardId);
+    if (sourcePlacement) {
+      layer.manualLayout = {
+        boxes: layer.manualLayout?.boxes ?? [],
+        looseTrays: layer.manualLayout?.looseTrays ?? [],
+        boards: [
+          ...(layer.manualLayout?.boards ?? []),
+          { ...offsetPlacement(sourcePlacement), boardId: duplicatedBoard.id }
+        ]
+      };
+    }
+
+    project.selectedLayerId = layer.id;
+    project.selectedBoardId = duplicatedBoard.id;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedLayeredBoxId = null;
+    project.selectedLayeredBoxLayerId = null;
+    project.selectedLayeredBoxSectionId = null;
+
+    autosave();
+    return duplicatedBoard;
+  }
+
+  return null;
 }
 
 export function addLayeredBox(
@@ -1570,6 +1785,63 @@ export function deleteLayerFromLayeredBox(layeredBoxId: string, layeredBoxLayerI
   }
 }
 
+export function duplicateLayeredBox(layeredBoxId: string): LayeredBox | null {
+  for (const layer of project.layers) {
+    const layeredBoxIndex = layer.layeredBoxes.findIndex((box) => box.id === layeredBoxId);
+    if (layeredBoxIndex === -1) continue;
+
+    const sourceBox = layer.layeredBoxes[layeredBoxIndex];
+    const duplicatedBox = cloneLayeredBoxWithFreshIds(sourceBox);
+    layer.layeredBoxes.splice(layeredBoxIndex + 1, 0, duplicatedBox);
+
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = duplicatedBox.id;
+    project.selectedLayeredBoxLayerId = duplicatedBox.layers[0]?.id ?? null;
+    project.selectedLayeredBoxSectionId = duplicatedBox.layers[0]?.sections[0]?.id ?? null;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+
+    autosave();
+    return duplicatedBox;
+  }
+
+  return null;
+}
+
+export function duplicateLayeredBoxSection(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  sectionId: string
+): LayeredBoxSection | null {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes.find((box) => box.id === layeredBoxId);
+    if (!layeredBox) continue;
+
+    const internalLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!internalLayer) continue;
+
+    const sectionIndex = internalLayer.sections.findIndex((section) => section.id === sectionId);
+    if (sectionIndex === -1) continue;
+
+    const duplicatedSection = cloneLayeredBoxSectionWithFreshIds(internalLayer.sections[sectionIndex]);
+    internalLayer.sections.splice(sectionIndex + 1, 0, duplicatedSection);
+
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = layeredBox.id;
+    project.selectedLayeredBoxLayerId = internalLayer.id;
+    project.selectedLayeredBoxSectionId = duplicatedSection.id;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+
+    autosave();
+    return duplicatedSection;
+  }
+
+  return null;
+}
+
 // Box operations
 export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   // Find the target layer
@@ -1654,6 +1926,39 @@ export function updateBox(boxId: string, updates: Partial<Omit<Box, 'id' | 'tray
       return;
     }
   }
+}
+
+export function duplicateBox(boxId: string): Box | null {
+  for (const layer of project.layers) {
+    const boxIndex = layer.boxes.findIndex((box) => box.id === boxId);
+    if (boxIndex === -1) continue;
+
+    const sourceBox = layer.boxes[boxIndex];
+    const duplicatedBox = cloneBoxWithFreshIds(sourceBox);
+    layer.boxes.splice(boxIndex + 1, 0, duplicatedBox);
+
+    const sourcePlacement = layer.manualLayout?.boxes.find((placement) => placement.boxId === boxId);
+    if (sourcePlacement) {
+      layer.manualLayout = {
+        boxes: [...(layer.manualLayout?.boxes ?? []), { ...offsetPlacement(sourcePlacement), boxId: duplicatedBox.id }],
+        looseTrays: layer.manualLayout?.looseTrays ?? [],
+        boards: layer.manualLayout?.boards ?? []
+      };
+    }
+
+    project.selectedLayerId = layer.id;
+    project.selectedBoxId = duplicatedBox.id;
+    project.selectedTrayId = duplicatedBox.trays[0]?.id ?? null;
+    project.selectedLayeredBoxId = null;
+    project.selectedLayeredBoxLayerId = null;
+    project.selectedLayeredBoxSectionId = null;
+    project.selectedBoardId = null;
+
+    autosave();
+    return duplicatedBox;
+  }
+
+  return null;
 }
 
 export function expandBoxToAvailableSpace(
@@ -2057,6 +2362,67 @@ export function deleteTray(boxId: string, trayId: string): void {
       return;
     }
   }
+}
+
+export function duplicateTray(trayId: string): Tray | null {
+  const location = findTrayLocation(project, trayId);
+  if (!location) return null;
+
+  const layer = project.layers.find((entry) => entry.id === location.layerId);
+  if (!layer) return null;
+
+  if (location.boxId) {
+    const box = layer.boxes.find((entry) => entry.id === location.boxId);
+    if (!box) return null;
+
+    const trayIndex = box.trays.findIndex((tray) => tray.id === trayId);
+    if (trayIndex === -1) return null;
+
+    const duplicatedTray = cloneTrayWithFreshIds(box.trays[trayIndex]);
+    box.trays.splice(trayIndex + 1, 0, duplicatedTray);
+
+    const sourcePlacement = box.manualLayout?.find((placement) => placement.trayId === trayId);
+    if (sourcePlacement) {
+      box.manualLayout = [...(box.manualLayout ?? []), { ...offsetPlacement(sourcePlacement), trayId: duplicatedTray.id }];
+    }
+
+    project.selectedLayerId = layer.id;
+    project.selectedBoxId = box.id;
+    project.selectedTrayId = duplicatedTray.id;
+    project.selectedLayeredBoxId = null;
+    project.selectedLayeredBoxLayerId = null;
+    project.selectedLayeredBoxSectionId = null;
+    project.selectedBoardId = null;
+
+    autosave();
+    return duplicatedTray;
+  }
+
+  const trayIndex = layer.looseTrays.findIndex((tray) => tray.id === trayId);
+  if (trayIndex === -1) return null;
+
+  const duplicatedTray = cloneTrayWithFreshIds(layer.looseTrays[trayIndex]);
+  layer.looseTrays.splice(trayIndex + 1, 0, duplicatedTray);
+
+  const sourcePlacement = layer.manualLayout?.looseTrays.find((placement) => placement.trayId === trayId);
+  if (sourcePlacement) {
+    layer.manualLayout = {
+      boxes: layer.manualLayout?.boxes ?? [],
+      looseTrays: [...(layer.manualLayout?.looseTrays ?? []), { ...offsetPlacement(sourcePlacement), trayId: duplicatedTray.id }],
+      boards: layer.manualLayout?.boards ?? []
+    };
+  }
+
+  project.selectedLayerId = layer.id;
+  project.selectedBoxId = null;
+  project.selectedTrayId = duplicatedTray.id;
+  project.selectedLayeredBoxId = null;
+  project.selectedLayeredBoxLayerId = null;
+  project.selectedLayeredBoxSectionId = null;
+  project.selectedBoardId = null;
+
+  autosave();
+  return duplicatedTray;
 }
 
 export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): void {
@@ -2766,9 +3132,6 @@ export function importProject(data: Project): void {
   }
   autosave();
 }
-
-// Manual layout operations
-import type { ManualTrayPlacement } from '$lib/types/project';
 
 // Save manual tray layout for a box (box dimensions auto-calculate from tray positions)
 export function saveManualLayout(boxId: string, placements: ManualTrayPlacement[]): void {

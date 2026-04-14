@@ -62,6 +62,7 @@
     onSelectTray: (tray: Tray) => void;
     onAddTray: (boxId: string) => void;
     onDeleteTray: (boxId: string, trayId: string) => void;
+    onDuplicateTray?: (trayId: string) => void;
     onUpdateTray: (updates: Partial<Omit<Tray, 'id'>>) => void;
     onUpdateCounterParams?: (params: CounterTrayParams) => void;
     onUpdateCardParams?: (params: CardDrawTrayParams) => void;
@@ -78,6 +79,7 @@
     onSelectTray,
     onAddTray,
     onDeleteTray,
+    onDuplicateTray,
     onUpdateTray,
     onUpdateCounterParams,
     onUpdateCardParams,
@@ -406,6 +408,15 @@
 
         <Spacer size="1rem" />
 
+        {#if onDuplicateTray}
+          <div class="buttonRow">
+            <button class="secondaryButton" type="button" onclick={() => selectedTray && onDuplicateTray(selectedTray.id)}>
+              Duplicate tray
+            </button>
+          </div>
+          <Spacer size="1rem" />
+        {/if}
+
         <!-- Color -->
         <FormControl label="Color" name="trayColor">
           {#snippet start()}
@@ -565,6 +576,30 @@
 
   .panelFormSection {
     padding: 0 0.75rem;
+  }
+
+  .buttonRow {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .secondaryButton {
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    background: var(--contrastLow);
+    color: var(--fgPrimary);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .secondaryButton:hover {
+    background: var(--contrastMedium);
+    border-color: var(--fgMuted);
   }
 
   .emptyState {

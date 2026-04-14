@@ -13,12 +13,13 @@
     onSelectBox: (box: Box) => void;
     onAddBox: () => void;
     onDeleteBox: (boxId: string) => void;
+    onDuplicateBox?: (boxId: string) => void;
     onUpdateBox: (updates: Partial<Omit<Box, 'id' | 'trays'>>) => void;
     onAdaptToGap?: () => void;
     hideList?: boolean;
   }
 
-  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onUpdateBox, onAdaptToGap, hideList = false }: Props = $props();
+  let { selectedBox, onSelectBox, onAddBox, onDeleteBox, onDuplicateBox, onUpdateBox, onAdaptToGap, hideList = false }: Props = $props();
 
   // Get all boxes from all layers
   const allBoxes = $derived(getAllBoxes());
@@ -198,6 +199,15 @@
         </FormControl>
 
         <Spacer size="0.75rem" />
+
+        {#if onDuplicateBox}
+          <div class="buttonRow">
+            <button class="secondaryButton" type="button" onclick={() => selectedBox && onDuplicateBox(selectedBox.id)}>
+              Duplicate box
+            </button>
+          </div>
+          <Spacer size="0.75rem" />
+        {/if}
 
         <div class="formGrid">
           <FormControl label="Tolerance" name="tolerance">
