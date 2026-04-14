@@ -6,10 +6,10 @@ const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Edge-loaded stack orientation
 export type EdgeOrientation = 'lengthwise' | 'crosswise';
@@ -1577,7 +1577,7 @@ export function createCounterTray(
     const textHeightParam = 6;
     const margin = wallThickness * 2;
 
-    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeightParam, text: trayName.trim() });
 
     if (textSegments.length > 0) {
       const textShapes: ReturnType<typeof extrudeLinear>[] = [];

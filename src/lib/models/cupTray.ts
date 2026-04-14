@@ -1,13 +1,13 @@
 import type { CupId, CupLayout, CupLayoutNode } from '$lib/types/cupLayout';
 import { generateCupId, isCupLeaf, isCupSplit } from '$lib/types/cupLayout';
 import { getSafeEmbossDepth } from './emboss';
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
 const { cuboid, roundedCuboid } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, mirrorY, scale } = jscad.transforms;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
@@ -310,7 +310,7 @@ export function createCupTray(
     const textHeightParam = 6;
     const margin = wallThickness * 2;
 
-    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeightParam, text: trayName.trim() });
 
     if (textSegments.length > 0) {
       const textShapes: ReturnType<typeof extrudeLinear>[] = [];

@@ -5,7 +5,6 @@ const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, rotateY, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
@@ -14,6 +13,7 @@ const { extrudeLinear } = jscad.extrusions;
 import type { CardSize } from '$lib/types/project';
 import { getSafeEmbossDepth } from './emboss';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Re-export for backwards compatibility
 export type CustomCardSize = CardSize;
@@ -375,7 +375,7 @@ export function createCardDrawTray(
     const textHeightParam = 6;
     const margin = wallThickness * 2;
 
-    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, _trayName.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeightParam, text: _trayName.trim() });
 
     if (textSegments.length > 0) {
       const textShapes: ReturnType<typeof extrudeLinear>[] = [];

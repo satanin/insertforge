@@ -36,10 +36,10 @@ const { cuboid } = jscad.primitives;
 const { union, subtract } = jscad.booleans;
 const { translate, scale, mirrorY, rotateZ } = jscad.transforms;
 const { hull } = jscad.hulls;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
@@ -192,7 +192,7 @@ function createMiniatureRackSlotLabelGeometry(
   const availableHorizontal = slotWidth - horizontalMargin * 2;
   if (availableVertical < 3 || availableHorizontal < 2) return null;
 
-  const textSegments = vectorText({ height: baseTextHeight, align: 'center' }, trimmedLabel.toUpperCase());
+  const textSegments = vectorTextWithAccents({ height: baseTextHeight, text: trimmedLabel });
   if (textSegments.length === 0) return null;
 
   const textShapes: ReturnType<typeof extrudeLinear>[] = [];
@@ -419,7 +419,7 @@ export function createMiniatureRack(
     const strokeWidth = 1.2;
     const textHeightParam = 6;
     const margin = normalized.wallThickness * 2;
-    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeightParam, text: trayName.trim() });
 
     if (textSegments.length > 0) {
       const textShapes: ReturnType<typeof extrudeLinear>[] = [];

@@ -8,10 +8,10 @@ import { getSafeEmbossDepth } from './emboss';
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, mirrorY, scale } = jscad.transforms;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Card well stack definition - links a cell to a card size and count
 export interface CardWellStack {
@@ -547,7 +547,7 @@ export function createCardWellTray(
     const textHeightParam = 6;
     const margin = wallThickness * 2;
 
-    const textSegments = vectorText({ height: textHeightParam, align: 'center' }, trayName.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeightParam, text: trayName.trim() });
 
     if (textSegments.length > 0) {
       const textShapes: ReturnType<typeof extrudeLinear>[] = [];

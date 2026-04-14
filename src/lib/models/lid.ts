@@ -3,12 +3,12 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
 import { createHoneycombUnion, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 const { cuboid, cylinder } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { hull } = jscad.hulls;
 const { translate, rotateX, rotateY, rotateZ, scale, mirrorY } = jscad.transforms;
-const { vectorText } = jscad.text;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
@@ -903,7 +903,7 @@ export function createBoxWithLidGrooves(
 
     // Add tray name label to the left of the hole
     if (p.tray.name && p.tray.name.trim().length > 0) {
-      const textSegments = vectorText({ height: labelTextHeight, align: 'center' }, p.tray.name.trim().toUpperCase());
+      const textSegments = vectorTextWithAccents({ height: labelTextHeight, text: p.tray.name.trim() });
 
       if (textSegments.length > 0) {
         const textShapes: Geom3[] = [];
@@ -1593,7 +1593,7 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     const rotateText = extDepth > extWidth;
 
     // Get text outlines (uppercase renders better with vector font)
-    const textSegments = vectorText({ height: textHeight, align: 'center' }, box.name.trim().toUpperCase());
+    const textSegments = vectorTextWithAccents({ height: textHeight, text: box.name.trim() });
 
     if (textSegments.length > 0) {
       // Convert segments to path2, expand to give stroke width, and extrude
