@@ -55,6 +55,7 @@ export interface LayeredBoxLayer {
   name: string;
   fillSolidEmpty?: boolean;
   edgeReliefEnabled?: boolean;
+  manualLayout?: ManualLooseTrayPlacement[];
   sections: LayeredBoxSection[];
 }
 

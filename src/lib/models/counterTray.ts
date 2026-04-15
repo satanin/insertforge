@@ -32,6 +32,7 @@ export interface CounterTrayParams {
   counterThickness: number;
   clearance: number;
   wallThickness: number;
+  innerWallThickness?: number;
   floorThickness: number;
   rimHeight: number;
   cutoutRatio: number;
@@ -65,6 +66,7 @@ export const defaultParams: CounterTrayParams = {
   counterThickness: 1.3,
   clearance: 0.3,
   wallThickness: 2.0,
+  innerWallThickness: 2.0,
   floorThickness: 2.0,
   rimHeight: 2.0,
   cutoutRatio: 0.35,
@@ -141,6 +143,7 @@ export function getCounterPositions(
   const {
     clearance,
     wallThickness,
+    innerWallThickness: innerWallThicknessRaw,
     floorThickness,
     rimHeight,
     cutoutRatio,
@@ -148,6 +151,7 @@ export function getCounterPositions(
     topLoadedStacks,
     edgeLoadedStacks
   } = params;
+  const innerWallThickness = innerWallThicknessRaw ?? wallThickness;
 
   // Use topLoadedStacks (renamed from stacks)
   const stacks = topLoadedStacks;
@@ -421,11 +425,11 @@ export function getCounterPositions(
       (slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'front';
       // First slot uses wall cutout (no left space needed)
       (slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX;
-      frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      frontRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     } else {
       (slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'back';
       (slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX;
-      backRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      backRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     }
   }
 
@@ -462,8 +466,8 @@ export function getCounterPositions(
     for (const col of crosswiseColumnsPreview) {
       if (col.backSlot === null && col.frontSlot) {
         // Check if combined depth fits
-        const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
-        const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+        const combinedDepth = col.frontSlot.slotDepth + innerWallThickness + slot.slotDepth;
+        const availableDepth = effectiveFrontRowDepth + innerWallThickness + effectiveBackRowDepth;
 
         if (combinedDepth <= availableDepth || availableDepth === 0) {
           col.backSlot = slot;
@@ -496,7 +500,7 @@ export function getCounterPositions(
     if (col.backSlot) {
       (col.backSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
     }
-    crosswiseX += col.columnWidth + wallThickness;
+    crosswiseX += col.columnWidth + innerWallThickness;
   }
 
   // Top-loaded stacks start after all edge-loaded
@@ -522,7 +526,7 @@ export function getCounterPositions(
         originalIndex,
         label
       });
-      topLoadedFrontX += pw + wallThickness;
+      topLoadedFrontX += pw + innerWallThickness;
     } else {
       topLoadedPlacements.push({
         shapeRef,
@@ -534,7 +538,7 @@ export function getCounterPositions(
         originalIndex,
         label
       });
-      topLoadedBackX += pw + wallThickness;
+      topLoadedBackX += pw + innerWallThickness;
     }
   }
 
@@ -573,7 +577,7 @@ export function getCounterPositions(
 
   // Y positions for front and back rows
   const frontRowYStart = wallThickness;
-  const effectiveBackRowYStart = wallThickness + effectiveFrontRowDepth + wallThickness;
+  const effectiveBackRowYStart = wallThickness + effectiveFrontRowDepth + innerWallThickness;
 
   // Add lengthwise edge-loaded stacks (using pre-calculated positions)
   for (let i = 0; i < lengthwiseSlots.length; i++) {
@@ -612,7 +616,7 @@ export function getCounterPositions(
 
   // Calculate tray width for back position calculation
   const topLoadedTotalDepthPreview =
-    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? innerWallThickness + effectiveBackRowDepth : 0);
   const trayDepthPreview = wallThickness + topLoadedTotalDepthPreview + wallThickness;
 
   // Add crosswise edge-loaded stacks (using pre-calculated positions and row assignments)
@@ -721,6 +725,7 @@ export function createCounterTray(
   const {
     clearance,
     wallThickness,
+    innerWallThickness: innerWallThicknessRaw,
     floorThickness,
     rimHeight,
     cutoutRatio,
@@ -729,6 +734,7 @@ export function createCounterTray(
     topLoadedStacks,
     edgeLoadedStacks
   } = params;
+  const innerWallThickness = innerWallThicknessRaw ?? wallThickness;
 
   // Use topLoadedStacks (renamed from stacks)
   const stacks = topLoadedStacks;
@@ -990,11 +996,11 @@ export function createCounterTray(
       // First slot uses wall cutout (no left space needed); subsequent slots share half-cylinder
       (slot as EdgeLoadedSlot & { xPosition: number }).xPosition = frontRowX;
       // Reserve quarter-sphere space on right (will be replaced by half-cylinder if another slot follows)
-      frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      frontRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     } else {
       (slot as EdgeLoadedSlot & { rowAssignment: string; xPosition: number }).rowAssignment = 'back';
       (slot as EdgeLoadedSlot & { xPosition: number }).xPosition = backRowX;
-      backRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      backRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     }
   }
 
@@ -1035,8 +1041,8 @@ export function createCounterTray(
     for (const col of crosswiseColumns) {
       if (col.backSlot === null && col.frontSlot) {
         // Check if combined depth fits (front + wall + back ≤ available depth)
-        const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
-        const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+        const combinedDepth = col.frontSlot.slotDepth + innerWallThickness + slot.slotDepth;
+        const availableDepth = effectiveFrontRowDepth + innerWallThickness + effectiveBackRowDepth;
 
         if (combinedDepth <= availableDepth || availableDepth === 0) {
           col.backSlot = slot;
@@ -1070,7 +1076,7 @@ export function createCounterTray(
     if (col.backSlot) {
       (col.backSlot as EdgeLoadedSlot & { xPosition: number }).xPosition = crosswiseX;
     }
-    crosswiseX += col.columnWidth + wallThickness;
+    crosswiseX += col.columnWidth + innerWallThickness;
   }
 
   // Calculate crosswise max depth (for validation)
@@ -1102,7 +1108,7 @@ export function createCounterTray(
         originalIndex,
         label
       });
-      topLoadedFrontX += pw + wallThickness;
+      topLoadedFrontX += pw + innerWallThickness;
     } else {
       topLoadedPlacements.push({
         shapeRef,
@@ -1114,7 +1120,7 @@ export function createCounterTray(
         originalIndex,
         label
       });
-      topLoadedBackX += pw + wallThickness;
+      topLoadedBackX += pw + innerWallThickness;
     }
   }
 
@@ -1148,7 +1154,7 @@ export function createCounterTray(
 
   // Tray width (Y dimension) calculation - always 2 rows
   const topLoadedTotalDepth =
-    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? innerWallThickness + effectiveBackRowDepth : 0);
 
   // Validate crosswise stacks fit within the available Y space
   // Crosswise stacks must fit within the 2-row depth
@@ -1428,7 +1434,7 @@ export function createCounterTray(
   const fingerCuts = [];
 
   // Effective back row Y start (accounts for any expanded front row depth)
-  const effectiveBackRowYStart = wallThickness + effectiveFrontRowDepth + wallThickness;
+  const effectiveBackRowYStart = wallThickness + effectiveFrontRowDepth + innerWallThickness;
 
   // Edge-loaded pockets and cutholes
   // Group lengthwise slots by row for cutout optimization
@@ -1584,7 +1590,7 @@ export function createCounterTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }

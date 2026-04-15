@@ -64,6 +64,7 @@ export interface LayeredBoxSectionRenderPlacement {
   x: number;
   y: number;
   z: number;
+  rotation: 0 | 90 | 180 | 270;
   internalLayerId: string;
 }
 
@@ -195,16 +196,61 @@ export function getLayeredBoxRenderLayout(
   const sections: LayeredBoxSectionRenderPlacement[] = [];
 
   for (const layer of layeredBox.layers) {
-    const sectionDimensions = layer.sections.map((section) =>
-      getLayeredBoxSectionDimensions(section, cardSizes, counterShapes)
-    );
-
-    const layerWidth =
-      sectionDimensions.reduce((sum, dims) => sum + dims.width, 0) +
-      Math.max(sectionDimensions.length - 1, 0) * layeredBox.wallThickness;
-    const layerDepth = sectionDimensions.reduce((max, dims) => Math.max(max, dims.depth), 0);
-    const layerHeight = sectionDimensions.reduce((max, dims) => Math.max(max, dims.height), 0);
+    const sectionDimensionEntries = layer.sections.map((section) => ({
+      section,
+      dimensions: getLayeredBoxSectionDimensions(section, cardSizes, counterShapes)
+    }));
+    let layerWidth = 0;
+    let layerDepth = 0;
+    let layerHeight = 0;
     let currentX = 0;
+    const placedSectionIds = new Set<string>();
+
+    if (layer.manualLayout && layer.manualLayout.length > 0) {
+      for (const placement of layer.manualLayout) {
+        const sectionEntry = sectionDimensionEntries.find(({ section }) => section.id === placement.trayId);
+        if (!sectionEntry) continue;
+        const rotated = placement.rotation === 90 || placement.rotation === 270;
+        const dimensions = rotated
+          ? {
+              width: sectionEntry.dimensions.depth,
+              depth: sectionEntry.dimensions.width,
+              height: sectionEntry.dimensions.height
+            }
+          : sectionEntry.dimensions;
+
+        sections.push({
+          section: sectionEntry.section,
+          dimensions,
+          x: placement.x,
+          y: placement.y,
+          z: totalHeight,
+          rotation: placement.rotation,
+          internalLayerId: layer.id
+        });
+        placedSectionIds.add(sectionEntry.section.id);
+        layerWidth = Math.max(layerWidth, placement.x + dimensions.width);
+        layerDepth = Math.max(layerDepth, placement.y + dimensions.depth);
+        layerHeight = Math.max(layerHeight, dimensions.height);
+      }
+    }
+
+    for (const { section, dimensions } of sectionDimensionEntries) {
+      if (placedSectionIds.has(section.id)) continue;
+      sections.push({
+        section,
+        dimensions,
+        x: currentX,
+        y: 0,
+        z: totalHeight,
+        rotation: 0,
+        internalLayerId: layer.id
+      });
+      currentX += dimensions.width + layeredBox.wallThickness;
+      layerWidth = Math.max(layerWidth, currentX - layeredBox.wallThickness);
+      layerDepth = Math.max(layerDepth, dimensions.depth);
+      layerHeight = Math.max(layerHeight, dimensions.height);
+    }
 
     internalLayers.push({
       id: layer.id,
@@ -213,20 +259,6 @@ export function getLayeredBoxRenderLayout(
       height: layerHeight,
       z: totalHeight
     });
-
-    for (let index = 0; index < layer.sections.length; index += 1) {
-      const section = layer.sections[index];
-      const dimensions = sectionDimensions[index];
-      sections.push({
-        section,
-        dimensions,
-        x: currentX,
-        y: 0,
-        z: totalHeight,
-        internalLayerId: layer.id
-      });
-      currentX += dimensions.width + layeredBox.wallThickness;
-    }
 
     maxWidth = Math.max(maxWidth, layerWidth);
     maxDepth = Math.max(maxDepth, layerDepth);

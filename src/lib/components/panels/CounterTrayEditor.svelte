@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+  import { Input, FormControl, Spacer, Select, Link, IconButton, Icon, addToast } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CounterTray, CounterShapeCategory } from '$lib/types/project';
   import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
@@ -26,6 +26,14 @@
   // Get shape options from project-level counterShapes
   let availableShapes = $derived(getCounterShapes().filter((s) => (s.category ?? 'counter') === allowedShapeCategory));
   let shapeOptions = $derived(availableShapes.map((s) => ({ id: s.id, name: s.name })));
+  let smallestShapeId = $derived.by(
+    () =>
+      [...availableShapes].sort(
+        (a, b) =>
+          Math.max(a.width, a.length) * Math.min(a.width, a.length) -
+          Math.max(b.width, b.length) * Math.min(b.width, b.length)
+      )[0]?.id ?? DEFAULT_SHAPE_IDS.square
+  );
 
   const orientationOptions: EdgeOrientation[] = ['lengthwise', 'crosswise'];
 
@@ -34,6 +42,7 @@
     const paramsWithoutOverride = { ...tray.params, trayWidthOverride: 0 };
     return getTrayDimensions(paramsWithoutOverride, getCounterShapes()).width;
   });
+  let trayWidthFits = $derived(tray.params.trayWidthOverride <= 0 || minTrayWidth <= tray.params.trayWidthOverride + 0.01);
 
   // Compute dimensions, using actualHeight if provided (when tray expands to match box height)
   // If displayDimensions is provided (with rotation applied), use those for display
@@ -56,7 +65,29 @@
   }
 
   function updateParam<K extends keyof CounterTrayParams>(key: K, value: CounterTrayParams[K]) {
-    onUpdateParams({ ...tray.params, [key]: value });
+    submitParams({ ...tray.params, [key]: value });
+  }
+
+  function submitParams(nextParams: CounterTrayParams) {
+    if (nextParams.trayWidthOverride > 0) {
+      const currentMinWidth = getTrayDimensions({ ...tray.params, trayWidthOverride: 0 }, getCounterShapes()).width;
+      const minWidth = getTrayDimensions({ ...nextParams, trayWidthOverride: 0 }, getCounterShapes()).width;
+      const currentlyInvalid = currentMinWidth > tray.params.trayWidthOverride + 0.01 && tray.params.trayWidthOverride > 0;
+      const nextInvalid = minWidth > nextParams.trayWidthOverride + 0.01;
+      const improvesInvalidState = currentlyInvalid && nextInvalid && minWidth < currentMinWidth - 0.01;
+
+      if (nextInvalid && !improvesInvalidState) {
+        addToast({
+          data: {
+            title: 'Tray does not fit',
+            body: `This change would require at least ${minWidth.toFixed(1)}mm of tray width, but the tray is fixed to ${nextParams.trayWidthOverride.toFixed(1)}mm.`,
+            type: 'danger'
+          }
+        });
+        return;
+      }
+    }
+    onUpdateParams(nextParams);
   }
 
   // Drag handlers
@@ -90,12 +121,12 @@
       const newStacks = [...tray.params.topLoadedStacks];
       const [removed] = newStacks.splice(draggedIndex, 1);
       newStacks.splice(targetIndex, 0, removed);
-      onUpdateParams({ ...tray.params, topLoadedStacks: newStacks });
+      submitParams({ ...tray.params, topLoadedStacks: newStacks });
     } else {
       const newStacks = [...tray.params.edgeLoadedStacks];
       const [removed] = newStacks.splice(draggedIndex, 1);
       newStacks.splice(targetIndex, 0, removed);
-      onUpdateParams({ ...tray.params, edgeLoadedStacks: newStacks });
+      submitParams({ ...tray.params, edgeLoadedStacks: newStacks });
     }
 
     handleDragEnd();
@@ -112,20 +143,19 @@
     } else {
       newStacks[index] = [current[0], current[1], (value as string) || undefined];
     }
-    onUpdateParams({ ...tray.params, topLoadedStacks: newStacks });
+    submitParams({ ...tray.params, topLoadedStacks: newStacks });
   }
 
   function addTopLoadedStack() {
-    const shapeId = availableShapes[0]?.id ?? DEFAULT_SHAPE_IDS.square;
-    onUpdateParams({
+    submitParams({
       ...tray.params,
-      topLoadedStacks: [...tray.params.topLoadedStacks, [shapeId, 10, undefined]]
+      topLoadedStacks: [...tray.params.topLoadedStacks, [smallestShapeId, 10, undefined]]
     });
   }
 
   function removeTopLoadedStack(index: number) {
     const newStacks = tray.params.topLoadedStacks.filter((_, i) => i !== index);
-    onUpdateParams({ ...tray.params, topLoadedStacks: newStacks });
+    submitParams({ ...tray.params, topLoadedStacks: newStacks });
   }
 
   // Edge-loaded stack handlers
@@ -145,20 +175,19 @@
     } else {
       newStacks[index] = [current[0], current[1], current[2], (value as string) || undefined];
     }
-    onUpdateParams({ ...tray.params, edgeLoadedStacks: newStacks });
+    submitParams({ ...tray.params, edgeLoadedStacks: newStacks });
   }
 
   function addEdgeLoadedStack() {
-    const shapeId = availableShapes[0]?.id ?? DEFAULT_SHAPE_IDS.square;
-    onUpdateParams({
+    submitParams({
       ...tray.params,
-      edgeLoadedStacks: [...tray.params.edgeLoadedStacks, [shapeId, 10, 'lengthwise', undefined]]
+      edgeLoadedStacks: [...tray.params.edgeLoadedStacks, [smallestShapeId, 10, 'lengthwise', undefined]]
     });
   }
 
   function removeEdgeLoadedStack(index: number) {
     const newStacks = tray.params.edgeLoadedStacks.filter((_, i) => i !== index);
-    onUpdateParams({ ...tray.params, edgeLoadedStacks: newStacks });
+    submitParams({ ...tray.params, edgeLoadedStacks: newStacks });
   }
 </script>
 
@@ -341,6 +370,18 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Inner wall" name="innerWallThickness">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="0.1"
+            value={tray.params.innerWallThickness ?? tray.params.wallThickness}
+            onchange={(e) => updateParam('innerWallThickness', parseFloat(e.currentTarget.value))}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
       <FormControl label="Floor" name="floorThickness">
         {#snippet input({ inputProps })}
           <Input
@@ -399,6 +440,12 @@
   <section class="section">
     <h3 class="sectionTitle">Custom width</h3>
     <Spacer size="0.5rem" />
+    {#if !trayWidthFits}
+      <p class="warningText">
+        Current tray width is too small for this content. Increase `Tray width` or reduce `Inner wall`, `Cutout %`, or `Cutout max`.
+      </p>
+      <Spacer size="0.5rem" />
+    {/if}
     <div class="formGrid">
       <FormControl
         label="Tray width (min: {minTrayWidth.toFixed(1)})"
@@ -447,6 +494,13 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--fgMuted);
+  }
+
+  .warningText {
+    margin: 0;
+    color: #c9503c;
+    font-size: 0.875rem;
+    line-height: 1.4;
   }
 
   .sectionHeader .sectionTitle {

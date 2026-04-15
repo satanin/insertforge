@@ -97,8 +97,16 @@
     getManualLayerPlacements,
     rotateSelectedItem
   } from '$lib/stores/layerLayoutEditor.svelte';
-  import { saveLayerLayout, clearLayerLayout, selectTray, selectBox, selectLayer } from '$lib/stores/project.svelte';
-  import { findLayerOverlaps, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
+  import {
+    saveLayerLayout,
+    clearLayerLayout,
+    saveLayeredBoxLayerLayout,
+    clearLayeredBoxLayerLayout,
+    selectTray,
+    selectBox,
+    selectLayer
+  } from '$lib/stores/project.svelte';
+  import { findLayerOverlaps, isLayerItemWithinBounds, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
@@ -122,6 +130,7 @@
     x: number;
     y: number;
     z: number;
+    rotation: 0 | 90 | 180 | 270;
   }
 
   interface LayeredBoxGeometryData {
@@ -155,8 +164,15 @@
   const { expand } = jscad.expansions;
   const { extrudeLinear, project: projectFootprint } = jscad.extrusions;
   const { measureArea, measureBoundingBox } = jscad.measurements;
-  const { mirror, translate } = jscad.transforms;
+  const { mirror, rotateZ, translate } = jscad.transforms;
   const { cuboid, rectangle } = jscad.primitives;
+
+  function normalizeRotatedSectionGeometry(geometry: Geom3, rotation: 0 | 90 | 180 | 270): Geom3 {
+    if (!rotation) return geometry;
+    const rotated = rotateZ((rotation * Math.PI) / 180, geometry);
+    const [[minX, minY]] = measureBoundingBox(rotated);
+    return translate([-minX, -minY, 0], rotated);
+  }
 
   function createLayeredBoxSectionJscadGeometry(
     placement: import('$lib/models/layer').LayeredBoxSectionRenderPlacement,
@@ -165,7 +181,7 @@
     targetHeight: number
   ): Geom3 | null {
     if ((placement.section.type === 'counter' || placement.section.type === 'playerBoard') && placement.section.counterParams) {
-      return createCounterTray(
+      const geometry = createCounterTray(
         placement.section.counterParams,
         counterShapes,
         placement.section.name,
@@ -173,10 +189,11 @@
         0,
         false
       );
+      return normalizeRotatedSectionGeometry(geometry, placement.rotation);
     }
 
     if (placement.section.type === 'cardDraw' && placement.section.cardDrawParams) {
-      return createCardDrawTray(
+      const geometry = createCardDrawTray(
         placement.section.cardDrawParams,
         cardSizes,
         placement.section.name,
@@ -184,10 +201,11 @@
         0,
         false
       );
+      return normalizeRotatedSectionGeometry(geometry, placement.rotation);
     }
 
     if (placement.section.type === 'cardDivider' && placement.section.cardDividerParams) {
-      return createCardDividerTray(
+      const geometry = createCardDividerTray(
         placement.section.cardDividerParams,
         cardSizes,
         placement.section.name,
@@ -196,10 +214,11 @@
         false,
         true
       );
+      return normalizeRotatedSectionGeometry(geometry, placement.rotation);
     }
 
     if (placement.section.type === 'cardWell' && placement.section.cardWellParams) {
-      return createCardWellTray(
+      const geometry = createCardWellTray(
         placement.section.cardWellParams,
         cardSizes,
         placement.section.name,
@@ -207,10 +226,12 @@
         0,
         false
       );
+      return normalizeRotatedSectionGeometry(geometry, placement.rotation);
     }
 
     if (placement.section.type === 'cup' && placement.section.cupParams) {
-      return createCupTray(placement.section.cupParams, placement.section.name, targetHeight, 0, false);
+      const geometry = createCupTray(placement.section.cupParams, placement.section.name, targetHeight, 0, false);
+      return normalizeRotatedSectionGeometry(geometry, placement.rotation);
     }
 
     return null;
@@ -460,7 +481,8 @@
                   : [],
               x: placement.x,
               y: placement.y,
-              z: placement.z
+              z: placement.z,
+              rotation: placement.rotation
             });
           } catch (error) {
             console.warn('Failed to build layered box section geometry', {
@@ -1070,6 +1092,20 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+  let layerViewContainerWidth = $derived.by(() => {
+    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {
+      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProject().cardSizes ?? [], getProject().counterShapes ?? []);
+      return Math.max(dims.width - selectedLayeredBox.wallThickness * 2 - selectedLayeredBox.tolerance * 2, 1);
+    }
+    return gameContainerWidth;
+  });
+  let layerViewContainerDepth = $derived.by(() => {
+    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {
+      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProject().cardSizes ?? [], getProject().counterShapes ?? []);
+      return Math.max(dims.depth - selectedLayeredBox.wallThickness * 2 - selectedLayeredBox.tolerance * 2, 1);
+    }
+    return gameContainerDepth;
+  });
   let selectedTrayLetter = $derived.by(() => {
     // Use override during PDF capture
     if (captureTrayLetter) return captureTrayLetter;
@@ -1244,29 +1280,59 @@
           if (layeredBoxGeometry) {
             result.showLayerView = true;
             result.layerBoxPlacements = [];
-            result.layerLooseTrayPlacements = [];
-            result.layerBoardPlacements = [
-              {
-                board: {
-                  id: layeredBoxGeometry.proxyBoardId,
-                  name: layeredBoxGeometry.name,
-                  color: layeredBoxGeometry.color,
-                  width: layeredBoxGeometry.dimensions.width,
-                  depth: layeredBoxGeometry.dimensions.depth,
-                  height: layeredBoxGeometry.dimensions.height
-                },
-                dimensions: {
-                  width: layeredBoxGeometry.dimensions.width,
-                  depth: layeredBoxGeometry.dimensions.depth,
-                  height: layeredBoxGeometry.dimensions.height
-                },
-                x: Math.max((gameContainerWidth - layeredBoxGeometry.dimensions.width) / 2, 0),
-                y: Math.max((gameContainerDepth - layeredBoxGeometry.dimensions.depth) / 2, 0),
-                rotation: 0
-              }
-            ];
+            if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBoxLayer) {
+              result.layerLooseTrayPlacements = layeredBoxGeometry.sections
+                .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
+                .flatMap((section) => {
+                  const sourceSection = selectedLayeredBoxLayer.sections.find((entry) => entry.id === section.sectionId);
+                  const tray = sourceSection ? createTrayFromLayeredBoxSection(sourceSection) : null;
+                  if (!tray) return [];
+                  return [{
+                    tray,
+                    dimensions: section.dimensions,
+                    x: section.x,
+                    y: section.y,
+                    rotation: section.rotation
+                  }];
+                });
+              result.layerBoardPlacements = [];
+              result.allLooseTrays = layeredBoxGeometry.sections
+                .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
+                .map((section) => ({
+                  trayId: section.sectionId,
+                  layerId: selectedLayer?.id ?? '',
+                  name: section.name,
+                  color: section.color,
+                  geometry: section.geometry,
+                  dimensions: section.dimensions,
+                  counterStacks: section.counterStacks,
+                  trayLetter: 'S'
+                }));
+            } else {
+              result.layerLooseTrayPlacements = [];
+              result.layerBoardPlacements = [
+                {
+                  board: {
+                    id: layeredBoxGeometry.proxyBoardId,
+                    name: layeredBoxGeometry.name,
+                    color: layeredBoxGeometry.color,
+                    width: layeredBoxGeometry.dimensions.width,
+                    depth: layeredBoxGeometry.dimensions.depth,
+                    height: layeredBoxGeometry.dimensions.height
+                  },
+                  dimensions: {
+                    width: layeredBoxGeometry.dimensions.width,
+                    depth: layeredBoxGeometry.dimensions.depth,
+                    height: layeredBoxGeometry.dimensions.height
+                  },
+                  x: Math.max((gameContainerWidth - layeredBoxGeometry.dimensions.width) / 2, 0),
+                  y: Math.max((gameContainerDepth - layeredBoxGeometry.dimensions.depth) / 2, 0),
+                  rotation: 0
+                }
+              ];
+              result.allLooseTrays = allLooseTrayGeometries;
+            }
             result.allBoxes = allBoxGeometries;
-            result.allLooseTrays = allLooseTrayGeometries;
             result.layeredBoxes = allLayeredBoxGeometries;
           }
         } else if (layerArrangement) {
@@ -2632,16 +2698,49 @@
 
   // Layer Layout Editor handlers
   let isLayerLayoutEditMode = $derived.by(() => layerLayoutEditorState.isEditMode);
+  let canEditCurrentLayerView = $derived.by(() => {
+    if (selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') {
+      return (selectedLayeredBoxLayer?.sections.length ?? 0) > 0;
+    }
+    if (selectionType === 'layeredBox') {
+      return false;
+    }
+    return (
+      (layerArrangement?.boxes.length ?? 0) +
+        (layerArrangement?.looseTrays.length ?? 0) +
+        (layerArrangement?.boards.length ?? 0) >
+      0
+    );
+  });
 
   function handleEnterLayerLayoutEdit() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
-
     const project = getProject();
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
 
-    // Get current layer arrangement
+    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+      const layout = getLayeredBoxRenderLayout(selectedLayeredBox, cardSizes, counterShapes);
+      const sectionPlacements = layout.sections
+        .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
+        .flatMap((section) => {
+          const tray = createTrayFromLayeredBoxSection(section.section);
+          if (!tray) return [];
+          return [{
+            tray,
+            dimensions: section.dimensions,
+            x: section.x,
+            y: section.y,
+            rotation: section.rotation
+          }];
+        });
+
+      enterLayerEditMode([], sectionPlacements, [], layerViewContainerWidth, layerViewContainerDepth);
+      return;
+    }
+
+    const layer = getSelectedLayer();
+    if (!layer) return;
+
     const arrangement = arrangeLayerContents(layer, {
       gameContainerWidth,
       gameContainerDepth,
@@ -2653,9 +2752,6 @@
   }
 
   function handleSaveLayerLayout() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
-
     // Build items for overlap check
     const items: LayerItemForSnapping[] = [];
     for (const bp of layerLayoutEditorState.workingBoxPlacements) {
@@ -2712,8 +2808,38 @@
       return;
     }
 
+    const boundsWidth = selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection' ? layerViewContainerWidth : gameContainerWidth;
+    const boundsDepth = selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection' ? layerViewContainerDepth : gameContainerDepth;
+    const outOfBounds = items.some((item) => !isLayerItemWithinBounds(item, boundsWidth, boundsDepth));
+    if (outOfBounds) {
+      addToast({
+        data: {
+          title: 'Cannot save layout',
+          body: 'One or more items are outside the available bounds.',
+          type: 'danger'
+        }
+      });
+      return;
+    }
+
     const placements = getManualLayerPlacements();
-    saveLayerLayout(layer.id, placements.boxes, placements.looseTrays, placements.boards);
+    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+      const saved = saveLayeredBoxLayerLayout(selectedLayeredBox.id, selectedLayeredBoxLayer.id, placements.looseTrays);
+      if (!saved) {
+        addToast({
+          data: {
+            title: 'Cannot save layout',
+            body: 'This layout would make the layered box exceed its fixed size.',
+            type: 'danger'
+          }
+        });
+        return;
+      }
+    } else {
+      const layer = getSelectedLayer();
+      if (!layer) return;
+      saveLayerLayout(layer.id, placements.boxes, placements.looseTrays, placements.boards);
+    }
     exitLayerEditMode();
     regenerate(true);
   }
@@ -2724,10 +2850,13 @@
   }
 
   function handleResetAutoLayerLayout() {
-    const layer = getSelectedLayer();
-    if (!layer) return;
-
-    clearLayerLayout(layer.id);
+    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+      clearLayeredBoxLayerLayout(selectedLayeredBox.id, selectedLayeredBoxLayer.id);
+    } else {
+      const layer = getSelectedLayer();
+      if (!layer) return;
+      clearLayerLayout(layer.id);
+    }
     exitLayerEditMode();
     regenerate(true);
   }
@@ -2738,21 +2867,28 @@
 
   // Auto-cancel layer edit mode when navigating away
   let lastSelectedLayerId = $state<string | null>(null);
+  let lastSelectedLayeredBoxLayerId = $state<string | null>(null);
   $effect(() => {
     const currentLayerId = selectedLayer?.id ?? null;
+    const currentInternalLayerId = selectedLayeredBoxLayer?.id ?? null;
     const currentViewMode = viewMode;
 
     if (layerLayoutEditorState.isEditMode) {
       const layerChanged = lastSelectedLayerId !== null && currentLayerId !== lastSelectedLayerId;
+      const internalLayerChanged =
+        lastSelectedLayeredBoxLayerId !== null &&
+        currentInternalLayerId !== lastSelectedLayeredBoxLayerId &&
+        (selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection');
       const leftLayerView = currentViewMode !== 'layer';
 
-      if (layerChanged || leftLayerView) {
+      if (layerChanged || internalLayerChanged || leftLayerView) {
         cancelLayerChanges();
         exitLayerEditMode();
       }
     }
 
     lastSelectedLayerId = currentLayerId;
+    lastSelectedLayeredBoxLayerId = currentInternalLayerId;
   });
 
   // Cancel edit mode when selection changes (user navigates away)
@@ -2824,8 +2960,9 @@
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
-              {gameContainerWidth}
-              {gameContainerDepth}
+              lidTextInlayGeometry={visibleGeometries.lidTextInlay}
+              gameContainerWidth={layerViewContainerWidth}
+              gameContainerDepth={layerViewContainerDepth}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -2902,13 +3039,7 @@
                 onCancel={handleCancelLayerLayout}
                 onResetAuto={handleResetAutoLayerLayout}
                 onRotate={handleRotateLayerItem}
-                canEdit={
-                  selectionType !== 'layeredBoxLayer' &&
-                  (layerArrangement?.boxes.length ?? 0) +
-                    (layerArrangement?.looseTrays.length ?? 0) +
-                    (layerArrangement?.boards.length ?? 0) >
-                    0
-                }
+                canEdit={canEditCurrentLayerView}
               />
             {/if}
           </div>
@@ -3100,8 +3231,9 @@
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
               lidGeometry={visibleGeometries.lid}
-              {gameContainerWidth}
-              {gameContainerDepth}
+              lidTextInlayGeometry={visibleGeometries.lidTextInlay}
+              gameContainerWidth={layerViewContainerWidth}
+              gameContainerDepth={layerViewContainerDepth}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -3178,13 +3310,7 @@
                 onCancel={handleCancelLayerLayout}
                 onResetAuto={handleResetAutoLayerLayout}
                 onRotate={handleRotateLayerItem}
-                canEdit={
-                  selectionType !== 'layeredBoxLayer' &&
-                  (layerArrangement?.boxes.length ?? 0) +
-                    (layerArrangement?.looseTrays.length ?? 0) +
-                    (layerArrangement?.boards.length ?? 0) >
-                    0
-                }
+                canEdit={canEditCurrentLayerView}
               />
             {/if}
           </div>

@@ -212,8 +212,8 @@
     layer: LayeredBoxLayer,
     type: 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard'
   ) {
-    const section = addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
-    if (!section) {
+    const result = addSectionToLayeredBoxLayer(layeredBox.id, layer.id, type);
+    if (!result) {
       addToast({
         data: {
           title: 'Section does not fit',
@@ -222,6 +222,15 @@
         }
       });
       return;
+    }
+    if (!result.fits) {
+      addToast({
+        data: {
+          title: 'Section needs adjustment',
+          body: 'The new section was added but does not currently fit in the available space. Edit its parameters or delete it.',
+          type: 'danger'
+        }
+      });
     }
     onSelectionChange('layeredBoxSection');
     onExpandPanel();

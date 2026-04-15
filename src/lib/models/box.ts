@@ -82,8 +82,18 @@ export function getCounterTrayDimensions(
   params: CounterTrayParams,
   counterShapes: CounterShape[] = []
 ): TrayDimensions {
-  const { clearance, wallThickness, floorThickness, rimHeight, trayWidthOverride, topLoadedStacks, edgeLoadedStacks } =
+  const {
+    clearance,
+    wallThickness,
+    innerWallThickness: innerWallThicknessRaw,
+    floorThickness,
+    rimHeight,
+    trayWidthOverride,
+    topLoadedStacks,
+    edgeLoadedStacks
+  } =
     params;
+  const innerWallThickness = innerWallThicknessRaw ?? wallThickness;
 
   // Use topLoadedStacks (renamed from stacks)
   const stacks = topLoadedStacks || [];
@@ -327,10 +337,10 @@ export function getCounterTrayDimensions(
 
     if (frontRowX <= backRowX) {
       slot.rowAssignment = 'front';
-      frontRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      frontRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     } else {
       slot.rowAssignment = 'back';
-      backRowX += slot.slotWidth + cutoutRadius + wallThickness;
+      backRowX += slot.slotWidth + cutoutRadius + innerWallThickness;
     }
   }
 
@@ -365,8 +375,8 @@ export function getCounterTrayDimensions(
     for (const col of crosswiseColumns) {
       if (col.backSlot === null && col.frontSlot) {
         // Check if combined depth fits
-        const combinedDepth = col.frontSlot.slotDepth + wallThickness + slot.slotDepth;
-        const availableDepth = effectiveFrontRowDepth + wallThickness + effectiveBackRowDepth;
+        const combinedDepth = col.frontSlot.slotDepth + innerWallThickness + slot.slotDepth;
+        const availableDepth = effectiveFrontRowDepth + innerWallThickness + effectiveBackRowDepth;
 
         if (combinedDepth <= availableDepth || availableDepth === 0) {
           col.backSlot = slot;
@@ -391,7 +401,7 @@ export function getCounterTrayDimensions(
   // Calculate crosswise total width from columns
   let crosswiseX = Math.max(frontRowX, backRowX);
   for (const col of crosswiseColumns) {
-    crosswiseX += col.columnWidth + wallThickness;
+    crosswiseX += col.columnWidth + innerWallThickness;
   }
 
   // Use the maximum of top-loaded and edge-loaded heights
@@ -419,7 +429,7 @@ export function getCounterTrayDimensions(
         rowAssignment: 'front',
         xPosition: topLoadedFrontX
       });
-      topLoadedFrontX += pw + wallThickness;
+      topLoadedFrontX += pw + innerWallThickness;
     } else {
       topLoadedPlacements.push({
         shapeRef,
@@ -429,7 +439,7 @@ export function getCounterTrayDimensions(
         rowAssignment: 'back',
         xPosition: topLoadedBackX
       });
-      topLoadedBackX += pw + wallThickness;
+      topLoadedBackX += pw + innerWallThickness;
     }
   }
 
@@ -449,7 +459,7 @@ export function getCounterTrayDimensions(
 
   // Tray width (Y dimension) - always 2 rows
   const topLoadedTotalDepth =
-    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? wallThickness + effectiveBackRowDepth : 0);
+    effectiveFrontRowDepth + (effectiveBackRowDepth > 0 ? innerWallThickness + effectiveBackRowDepth : 0);
   const trayDepthAuto = topLoadedTotalDepth > 0 ? topLoadedTotalDepth : crosswiseMaxDepth;
   const trayDepth = wallThickness + trayDepthAuto + wallThickness;
 

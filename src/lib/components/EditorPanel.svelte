@@ -303,12 +303,20 @@
 
   function handleAddLayeredBoxSection(type: LayeredBoxSectionType) {
     if (selectedLayeredBox && selectedLayeredBoxLayer) {
-      const section = addSectionToLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, type);
-      if (!section) {
+      const result = addSectionToLayeredBoxLayer(selectedLayeredBox.id, selectedLayeredBoxLayer.id, type);
+      if (!result) {
         addToast({
           data: {
             title: 'Section does not fit',
             body: 'This layered box already has a fixed size, and the default section for this tray type does not fit inside it.',
+            type: 'danger'
+          }
+        });
+      } else if (!result.fits) {
+        addToast({
+          data: {
+            title: 'Section needs adjustment',
+            body: 'The new section was added but does not currently fit in the available space. Edit its parameters or delete it.',
             type: 'danger'
           }
         });
@@ -326,7 +334,21 @@
 
   function handleLayeredBoxSectionUpdate(updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>) {
     if (selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection) {
-      updateLayeredBoxSection(selectedLayeredBox.id, selectedLayeredBoxLayer.id, selectedLayeredBoxSection.id, updates);
+      const updated = updateLayeredBoxSection(
+        selectedLayeredBox.id,
+        selectedLayeredBoxLayer.id,
+        selectedLayeredBoxSection.id,
+        updates
+      );
+      if (!updated) {
+        addToast({
+          data: {
+            title: 'Section does not fit',
+            body: 'This change would make the layered box or the section content exceed the available fixed size, so it was not applied.',
+            type: 'danger'
+          }
+        });
+      }
     }
   }
 

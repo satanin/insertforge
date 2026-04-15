@@ -467,6 +467,40 @@ function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: strin
   };
 }
 
+function getSmallestCounterShapeId(category: 'counter' | 'playerBoard'): string | undefined {
+  return (
+    project.counterShapes
+      .filter((shape) => (shape.category ?? 'counter') === category)
+      .sort(
+        (a, b) =>
+          Math.max(a.width, a.length) * Math.min(a.width, a.length) -
+          Math.max(b.width, b.length) * Math.min(b.width, b.length)
+      )[0]?.id ??
+    project.counterShapes[0]?.id
+  );
+}
+
+function createMinimalEditableLayeredBoxSection(
+  type: LayeredBoxSectionType,
+  name: string,
+  availableWidth?: number
+): LayeredBoxSection {
+  const section = createDefaultLayeredBoxSection(type, name);
+
+  if ((type === 'counter' || type === 'playerBoard') && section.counterParams) {
+    const smallestShapeId = getSmallestCounterShapeId(type === 'playerBoard' ? 'playerBoard' : 'counter');
+    section.counterParams = {
+      ...section.counterParams,
+      topLoadedStacks: smallestShapeId ? [[smallestShapeId, 1]] : [],
+      edgeLoadedStacks: [],
+      trayWidthOverride:
+        availableWidth !== undefined ? floorToSingleDecimal(Math.max(availableWidth, 20)) : section.counterParams.trayWidthOverride
+    };
+  }
+
+  return section;
+}
+
 function createFitAwareLayeredBoxSection(
   layeredBox: LayeredBox,
   boxLayer: LayeredBoxLayer,
@@ -475,20 +509,28 @@ function createFitAwareLayeredBoxSection(
 ): LayeredBoxSection | null {
   const section = createDefaultLayeredBoxSection(type, name);
   const hasFixedSize = layeredBox.customWidth !== undefined && layeredBox.customDepth !== undefined;
-  const isEmptyLayer = boxLayer.sections.length === 0;
 
-  if (!hasFixedSize || !isEmptyLayer) {
+  if (!hasFixedSize) {
     return section;
   }
 
-  const availableWidth = Math.max(
+  const interiorWidth = Math.max(
     (layeredBox.customWidth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
     20
   );
-  const availableDepth = Math.max(
+  const interiorDepth = Math.max(
     (layeredBox.customDepth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
     20
   );
+  let availableWidth = interiorWidth;
+  let availableDepth = interiorDepth;
+
+  if (boxLayer.sections.length > 0) {
+    const bestRect = getBestLayeredBoxLayerGapRect(layeredBox, boxLayer.id);
+    if (!bestRect) return null;
+    availableWidth = Math.max(bestRect.right - bestRect.left, 20);
+    availableDepth = Math.max(bestRect.bottom - bestRect.top, 20);
+  }
 
   if (type === 'cup' && section.cupParams) {
     section.cupParams = {
@@ -501,9 +543,12 @@ function createFitAwareLayeredBoxSection(
   }
 
   if ((type === 'counter' || type === 'playerBoard') && section.counterParams) {
+    const smallestShapeId =
+      getSmallestCounterShapeId(type === 'playerBoard' ? 'playerBoard' : 'counter') ??
+      section.counterParams.topLoadedStacks[0]?.[0];
     section.counterParams = {
       ...section.counterParams,
-      topLoadedStacks: section.counterParams.topLoadedStacks.slice(0, 1).map(([shapeId]) => [shapeId, 1]),
+      topLoadedStacks: smallestShapeId ? [[smallestShapeId, 1]] : section.counterParams.topLoadedStacks.slice(0, 1).map(([shapeId]) => [shapeId, 1]),
       edgeLoadedStacks: [],
       trayWidthOverride: floorToSingleDecimal(availableWidth)
     };
@@ -517,12 +562,43 @@ function createFitAwareLayeredBoxSection(
   return section;
 }
 
+function getBestLayeredBoxLayerGapRect(layeredBox: LayeredBox, layeredBoxLayerId: string): LayoutRect | null {
+  const interiorWidth = Math.max(
+    (layeredBox.customWidth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+    20
+  );
+  const interiorDepth = Math.max(
+    (layeredBox.customDepth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
+    20
+  );
+  const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+  const obstacles = layout.sections
+    .filter((placement) => placement.internalLayerId === layeredBoxLayerId)
+    .map((placement) => ({
+      x: placement.x,
+      y: placement.y,
+      width: placement.dimensions.width,
+      depth: placement.dimensions.depth
+    }));
+  const freeRects = findAvailableGapRects(obstacles, interiorWidth, interiorDepth);
+
+  return (
+    freeRects
+      .map((rect) => ({
+        rect,
+        area: (rect.right - rect.left) * (rect.bottom - rect.top)
+      }))
+      .sort((a, b) => b.area - a.area)[0]?.rect ?? null
+  );
+}
+
 function createDefaultLayeredBoxLayer(name: string): LayeredBoxLayer {
   return {
     id: generateId(),
     name,
     fillSolidEmpty: true,
     edgeReliefEnabled: true,
+    manualLayout: undefined,
     sections: []
   };
 }
@@ -759,11 +835,99 @@ function cloneLayeredBoxSectionWithFreshIds(
 }
 
 function cloneLayeredBoxLayerWithFreshIds(layer: LayeredBoxLayer): LayeredBoxLayer {
+  const sectionIdMap = new Map<string, string>();
+  const sections = layer.sections.map((section) => {
+    const clonedSection = cloneLayeredBoxSectionWithFreshIds(section, section.name);
+    sectionIdMap.set(section.id, clonedSection.id);
+    return clonedSection;
+  });
+
   return {
     ...layer,
     id: generateId(),
-    sections: layer.sections.map((section) => cloneLayeredBoxSectionWithFreshIds(section, section.name))
+    sections,
+    manualLayout: layer.manualLayout?.flatMap((placement) => {
+      const nextTrayId = sectionIdMap.get(placement.trayId);
+      if (!nextTrayId) return [];
+      return [{ ...placement, trayId: nextTrayId }];
+    })
   };
+}
+
+function getLayeredBoxInteriorLimits(layeredBox: LayeredBox): { width?: number; depth?: number; height?: number } {
+  return {
+    width:
+      layeredBox.customWidth !== undefined
+        ? Math.max(layeredBox.customWidth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 0)
+        : undefined,
+    depth:
+      layeredBox.customDepth !== undefined
+        ? Math.max(layeredBox.customDepth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 0)
+        : undefined,
+    height:
+      layeredBox.customBoxHeight !== undefined
+        ? Math.max(layeredBox.customBoxHeight - layeredBox.floorThickness - layeredBox.tolerance, 0)
+        : undefined
+  };
+}
+
+function getLayeredBoxSectionContentOverflow(section: LayeredBoxSection): { fits: boolean; widthOverflow: number; depthOverflow: number } {
+  if ((section.type === 'counter' || section.type === 'playerBoard') && section.counterParams) {
+    const actualDimensions = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+    const minDimensions = getLayeredBoxSectionDimensions(
+      {
+        ...section,
+        counterParams: {
+          ...section.counterParams,
+          trayWidthOverride: 0
+        }
+      },
+      project.cardSizes,
+      project.counterShapes
+    );
+
+    const widthOverflow = Math.max(minDimensions.width - actualDimensions.width, 0);
+    const depthOverflow = Math.max(minDimensions.depth - actualDimensions.depth, 0);
+
+    return {
+      fits: widthOverflow <= 0.01 && depthOverflow <= 0.01,
+      widthOverflow,
+      depthOverflow
+    };
+  }
+
+  return {
+    fits: true,
+    widthOverflow: 0,
+    depthOverflow: 0
+  };
+}
+
+function getLayeredBoxLayoutOverflow(layeredBox: LayeredBox): {
+  fits: boolean;
+  widthOverflow: number;
+  depthOverflow: number;
+  heightOverflow: number;
+} {
+  const limits = getLayeredBoxInteriorLimits(layeredBox);
+  const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+  const widthOverflow =
+    limits.width !== undefined ? Math.max(layout.width - limits.width, 0) : 0;
+  const depthOverflow =
+    limits.depth !== undefined ? Math.max(layout.depth - limits.depth, 0) : 0;
+  const heightOverflow =
+    limits.height !== undefined ? Math.max(layout.height - limits.height, 0) : 0;
+
+  return {
+    fits: widthOverflow <= 0.01 && depthOverflow <= 0.01 && heightOverflow <= 0.01,
+    widthOverflow,
+    depthOverflow,
+    heightOverflow
+  };
+}
+
+function layeredBoxFitsResolvedLayout(layeredBox: LayeredBox): boolean {
+  return getLayeredBoxLayoutOverflow(layeredBox).fits;
 }
 
 function cloneBoxWithFreshIds(box: Box, name: string = duplicateName(box.name)): Box {
@@ -1670,7 +1834,7 @@ export function addSectionToLayeredBoxLayer(
   layeredBoxId: string,
   layeredBoxLayerId: string,
   type: LayeredBoxSectionType
-): LayeredBoxSection | null {
+): { section: LayeredBoxSection; fits: boolean } | null {
   for (const layer of project.layers) {
     const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
     if (!layeredBox) continue;
@@ -1690,11 +1854,54 @@ export function addSectionToLayeredBoxLayer(
           : type === 'cup'
             ? `Cup Tray ${sectionCountOfType}`
           : `Player Board ${sectionCountOfType}`;
-    const section = createFitAwareLayeredBoxSection(layeredBox, boxLayer, type, sectionName);
-    if (!section) {
-      return null;
-    }
+    const fittedSection = createFitAwareLayeredBoxSection(layeredBox, boxLayer, type, sectionName);
+    const section =
+      fittedSection ??
+      createMinimalEditableLayeredBoxSection(
+        type,
+        sectionName,
+        layeredBox.customWidth !== undefined
+          ? Math.max((layeredBox.customWidth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 20)
+          : undefined
+      );
+    const previousManualLayout = boxLayer.manualLayout ? [...boxLayer.manualLayout] : undefined;
+    const gapRect =
+      layeredBox.customWidth !== undefined && layeredBox.customDepth !== undefined
+        ? getBestLayeredBoxLayerGapRect(layeredBox, boxLayer.id)
+        : null;
+    let fits = fittedSection !== null;
     boxLayer.sections.push(section);
+    if (layeredBox.customWidth !== undefined && layeredBox.customDepth !== undefined && fittedSection) {
+      if (gapRect) {
+        const currentLayout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+        const existingPlacements = currentLayout.sections
+          .filter((placement) => placement.internalLayerId === boxLayer.id && placement.section.id !== section.id)
+          .map((placement) => ({
+            trayId: placement.section.id,
+            x: placement.x,
+            y: placement.y,
+            rotation: placement.rotation
+          }));
+        const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+        boxLayer.manualLayout = [
+          ...existingPlacements,
+          {
+            trayId: section.id,
+            x: gapRect.left,
+            y: gapRect.top,
+            rotation: 0
+          }
+        ];
+        if (sectionDims.width > gapRect.right - gapRect.left + 0.01 || sectionDims.depth > gapRect.bottom - gapRect.top + 0.01) {
+          boxLayer.manualLayout = previousManualLayout;
+          fits = false;
+        }
+      }
+    }
+    if (!layeredBoxFitsResolvedLayout(layeredBox)) {
+      boxLayer.manualLayout = previousManualLayout;
+      fits = false;
+    }
     project.selectedLayerId = layer.id;
     project.selectedLayeredBoxId = layeredBox.id;
     project.selectedLayeredBoxLayerId = boxLayer.id;
@@ -1703,7 +1910,7 @@ export function addSectionToLayeredBoxLayer(
     project.selectedTrayId = null;
     project.selectedBoardId = null;
     autosave();
-    return section;
+    return { section, fits };
   }
   return null;
 }
@@ -1731,7 +1938,7 @@ export function updateLayeredBoxSection(
   layeredBoxLayerId: string,
   sectionId: string,
   updates: Partial<Omit<LayeredBoxSection, 'id' | 'type'>>
-): void {
+): boolean {
   for (const layer of project.layers) {
     const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
     if (!layeredBox) continue;
@@ -1739,10 +1946,48 @@ export function updateLayeredBoxSection(
     if (!boxLayer) continue;
     const section = boxLayer.sections.find((entry) => entry.id === sectionId);
     if (!section) continue;
+    const previous = {
+      name: section.name,
+      color: section.color,
+      counterParams: section.counterParams,
+      cardDrawParams: section.cardDrawParams,
+      cardDividerParams: section.cardDividerParams,
+      cardWellParams: section.cardWellParams,
+      cupParams: section.cupParams
+    };
+    const previousOverflow = getLayeredBoxSectionContentOverflow(section);
+    const previousLayoutOverflow = getLayeredBoxLayoutOverflow(layeredBox);
     Object.assign(section, updates);
+    const nextOverflow = getLayeredBoxSectionContentOverflow(section);
+    const nextLayoutOverflow = getLayeredBoxLayoutOverflow(layeredBox);
+    const improvesInvalidContent =
+      !nextOverflow.fits &&
+      !previousOverflow.fits &&
+      nextOverflow.widthOverflow <= previousOverflow.widthOverflow + 0.01 &&
+      nextOverflow.depthOverflow <= previousOverflow.depthOverflow + 0.01 &&
+      (nextOverflow.widthOverflow < previousOverflow.widthOverflow - 0.01 ||
+        nextOverflow.depthOverflow < previousOverflow.depthOverflow - 0.01);
+    const improvesInvalidLayout =
+      !nextLayoutOverflow.fits &&
+      !previousLayoutOverflow.fits &&
+      nextLayoutOverflow.widthOverflow <= previousLayoutOverflow.widthOverflow + 0.01 &&
+      nextLayoutOverflow.depthOverflow <= previousLayoutOverflow.depthOverflow + 0.01 &&
+      nextLayoutOverflow.heightOverflow <= previousLayoutOverflow.heightOverflow + 0.01 &&
+      (nextLayoutOverflow.widthOverflow < previousLayoutOverflow.widthOverflow - 0.01 ||
+        nextLayoutOverflow.depthOverflow < previousLayoutOverflow.depthOverflow - 0.01 ||
+        nextLayoutOverflow.heightOverflow < previousLayoutOverflow.heightOverflow - 0.01);
+
+    if (
+      (!nextOverflow.fits && !improvesInvalidContent) ||
+      (!nextLayoutOverflow.fits && !improvesInvalidLayout)
+    ) {
+      Object.assign(section, previous);
+      return false;
+    }
     autosave();
-    return;
+    return true;
   }
+  return false;
 }
 
 export function deleteSectionFromLayeredBoxLayer(
@@ -1826,6 +2071,10 @@ export function duplicateLayeredBoxSection(
 
     const duplicatedSection = cloneLayeredBoxSectionWithFreshIds(internalLayer.sections[sectionIndex]);
     internalLayer.sections.splice(sectionIndex + 1, 0, duplicatedSection);
+    if (!layeredBoxFitsResolvedLayout(layeredBox)) {
+      internalLayer.sections.splice(sectionIndex + 1, 1);
+      return null;
+    }
 
     project.selectedLayerId = layer.id;
     project.selectedLayeredBoxId = layeredBox.id;
@@ -1840,6 +2089,43 @@ export function duplicateLayeredBoxSection(
   }
 
   return null;
+}
+
+export function saveLayeredBoxLayerLayout(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  placements: ManualLooseTrayPlacement[]
+): boolean {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((entry) => entry.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const internalLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!internalLayer) continue;
+
+    const previousLayout = internalLayer.manualLayout;
+    internalLayer.manualLayout = placements;
+    if (!layeredBoxFitsResolvedLayout(layeredBox)) {
+      internalLayer.manualLayout = previousLayout;
+      return false;
+    }
+
+    autosave();
+    return true;
+  }
+
+  return false;
+}
+
+export function clearLayeredBoxLayerLayout(layeredBoxId: string, layeredBoxLayerId: string): void {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((entry) => entry.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const internalLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!internalLayer) continue;
+    internalLayer.manualLayout = undefined;
+    autosave();
+    return;
+  }
 }
 
 // Box operations
