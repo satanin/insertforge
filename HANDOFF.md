@@ -144,6 +144,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - soporte de `Layered Box` en `Edit layout` de layer normal
 - render de `Layered Box` en `Edit layout` alineado con la vista normal para distinguir multiples cajas
 - posicion y rotacion de `Board` guardadas correctamente
+- navegacion entre `layers` reutiliza la geometria cacheada una vez generada y ya no relanza `Generating Geometry...` en cada cambio de layer si no ha cambiado la geometria real
 
 ### Emboss
 
@@ -221,3 +222,4 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - seguir puliendo consistencia visual y de UX entre `Box` y `Layered Box`
 - explorar una fuente/vector de texto de mayor calidad si se quiere mejorar de verdad la suavidad de curvas
 - trabajar el `README` publico con creditos y cambios introducidos en el fork
+- revisar por separado la generacion de geometria fuera de la layer activa; la navegacion por layers ya usa cache, pero el alcance de generacion/render por capa sigue siendo mejorable

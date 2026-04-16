@@ -1550,6 +1550,19 @@
 
     // If cache valid and not forced, try to use cached geometry
     if (cacheValid && !force) {
+      if (viewMode === 'layer') {
+        // Layer view can be reconstructed from cached global geometry plus the current arrangement.
+        // Avoid regenerating the whole project when only the selected layer/selection changed.
+        selectedTrayGeometry = null;
+        selectedTrayCounters = [];
+        allTrayGeometries = [];
+        boxGeometry = null;
+        lidGeometry = null;
+        error = '';
+        console.debug('[Geometry Cache] Hit for layer view');
+        return;
+      }
+
       // Handle loose trays
       if (selectedTray && generationTray && isLoose && allLooseTrayGeometries.length > 0) {
         const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === generationTray.id);
@@ -2595,6 +2608,7 @@
     // Track both hashes separately
     const selHash = selectionHash;
     const strHash = structureHash;
+    const activeViewMode = viewMode;
     if (browser && selHash && strHash) {
       // Check if we have valid selection using direct project reads
       // This avoids potential timing issues with derived values
@@ -2633,6 +2647,10 @@
           console.debug('[Geometry Trigger] Structure changed - forcing regeneration');
           regenerate(true);
         } else if (selectionChanged) {
+          if (activeViewMode === 'layer' && lastGeneratedHash && currentStateHash === lastGeneratedHash) {
+            console.debug('[Geometry Trigger] Layer selection changed - reusing cached geometry');
+            return;
+          }
           // Selection-only changes should use the cache
           console.debug('[Geometry Trigger] Selection changed - using cache');
           regenerate(false);
