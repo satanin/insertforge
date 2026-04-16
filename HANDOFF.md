@@ -63,7 +63,12 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - slider `Explode` alineado con el comportamiento de `Box`
 - creacion alineada con `Add box`, incluyendo menu de tipo inicial
 - si una `Layered Box` ya tiene `customWidth/customDepth`, la primera seccion nueva en una layer vacia intenta nacer ajustada al interior disponible para no forzar un resize inmediato
-- si un tipo de seccion no cabe con un default razonable dentro de una `Layered Box` ya fijada, no se crea y se muestra feedback al usuario
+- `Edit layout` disponible tambien dentro de layers internas de `Layered Box`
+- layout manual persistente por internal layer
+- validacion de bounds/solapes al guardar layouts internos
+- si una seccion nueva no cabe con sus defaults dentro de una `Layered Box` fija, se anade igualmente con feedback para poder editarla o borrarla
+- `Counter Tray` interna usa el `counter shape` mas pequeno por defecto cuando nace en una `Layered Box` fija
+- `Counter Tray` interna permite cambios que mejoran un estado invalido aunque todavia no quepa del todo
 
 ### Tipos soportados dentro de Layered Box
 
@@ -145,6 +150,14 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - clamp comun de profundidad de emboss para paredes finas
 - aplicado a multiples trays con emboss
 
+### Lid Text
+
+- nuevo `Text mode` en tapas de `Box` y `Layered Box`: `Emboss` / `Inlay`
+- `Inlay` genera cavidad mas pieza de texto separada
+- render del inserto visible en vista seleccionada, vista de proyecto y vistas de layer/layout
+- export `3MF` con tapa + texto inlay agrupados para multicolor
+- espaciado global de letras ajustado en `vectorTextWithAccents`
+
 ## Commits recientes relevantes
 
 - `7f93d2f` Add triangular rack side walls and spacing defaults
@@ -196,6 +209,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 - A veces Vite/HMR deja estados visuales raros. Antes de diagnosticar algo raro, conviene recargar fuerte o reiniciar `pnpm dev`.
 - `issues-next-iterations.md` es un fichero de trabajo del usuario y no debe meterse en commits salvo que el usuario lo pida.
+- `Card Separator` (`cardDivider`) puede dar aviso de `non-manifold edges` en Bambu Studio al importar el STL, pero la impresion real ha salido bien y por ahora se considera un issue no bloqueante.
 
 ## Pendientes razonables
 
@@ -205,4 +219,5 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - valorar labels / emboss para `Miniature Rack`
 - revisar si `Layered Box` debe dejar de usar proxies en `Edit layout`
 - seguir puliendo consistencia visual y de UX entre `Box` y `Layered Box`
+- explorar una fuente/vector de texto de mayor calidad si se quiere mejorar de verdad la suavidad de curvas
 - trabajar el `README` publico con creditos y cambios introducidos en el fork
