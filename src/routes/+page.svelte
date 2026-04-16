@@ -24,7 +24,7 @@
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
   import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
-  import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
+  import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
   import {
     arrangeLayerContents,
     getLayeredBoxExteriorDimensions,
@@ -136,6 +136,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: BufferGeometry;
     lidGeometry: BufferGeometry;
+    lidTextInlayGeometry: BufferGeometry | null;
     assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
@@ -863,6 +864,7 @@
           exterior.bodyHeight
         );
         const lidJscad = createLid(syntheticBox, cardSizes, counterShapes);
+        const lidTextInlayJscad = createLidTextInlay(syntheticBox, cardSizes, counterShapes);
         if (!shellJscad || !lidJscad) {
           continue;
         }
@@ -871,6 +873,7 @@
         geometries.push({
           shellGeometry: jscadToBufferGeometry(shellJscad),
           lidGeometry: jscadToBufferGeometry(lidJscad),
+          lidTextInlayGeometry: lidTextInlayJscad ? jscadToBufferGeometry(lidTextInlayJscad) : null,
           assemblyTrayGeometries,
           internalLayers,
           layeredBoxId: layeredBox.id,
@@ -901,6 +904,12 @@
   });
   let boxGeometry = $state<BufferGeometry | null>(null);
   let lidGeometry = $state<BufferGeometry | null>(null);
+  let lidTextInlayGeometry = $derived.by(() => {
+    if (!selectedBox) return null;
+    const project = getProject();
+    const jscadGeom = createLidTextInlay(selectedBox, project.cardSizes ?? [], project.counterShapes ?? []);
+    return jscadGeom ? jscadToBufferGeometry(jscadGeom) : null;
+  });
   let generating = $state(false);
   let generationProgress = $state<GenerationProgress | null>(null);
   let geometryWorker = getGeometryWorker();
@@ -1202,6 +1211,7 @@
       allLooseTrays: LooseTrayGeometryData[];
       box: BufferGeometry | null;
       lid: BufferGeometry | null;
+      lidTextInlay: BufferGeometry | null;
       exploded: boolean;
       showAllTrays: boolean;
       showAllBoxes: boolean;
@@ -1228,6 +1238,7 @@
       allLooseTrays: [],
       box: null,
       lid: null,
+      lidTextInlay: null,
       exploded: false,
       showAllTrays: false,
       showAllBoxes: false,
@@ -1251,6 +1262,7 @@
         result.allTrays = allTrayGeometries;
         result.box = inEditMode ? null : boxGeometry;
         result.lid = inEditMode ? null : lidGeometry;
+        result.lidTextInlay = inEditMode ? null : lidTextInlayGeometry;
         result.showAllTrays = true;
         break;
       case 'all-no-lid':
@@ -1265,6 +1277,7 @@
         result.allTrays = allTrayGeometries;
         result.box = inEditMode ? null : boxGeometry;
         result.lid = inEditMode ? null : lidGeometry;
+        result.lidTextInlay = inEditMode ? null : lidTextInlayGeometry;
         result.exploded = !inEditMode; // Don't explode in edit mode
         result.showAllTrays = true;
         break;

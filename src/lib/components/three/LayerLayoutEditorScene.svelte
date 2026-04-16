@@ -41,6 +41,7 @@
     boxName: string;
     boxGeometry: THREE.BufferGeometry | null;
     lidGeometry: THREE.BufferGeometry | null;
+    lidTextInlayGeometry?: THREE.BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
   }
@@ -73,6 +74,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: THREE.BufferGeometry;
     lidGeometry: THREE.BufferGeometry;
+    lidTextInlayGeometry: THREE.BufferGeometry | null;
     assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
@@ -303,6 +305,7 @@
       <BoxAssembly
         boxGeometry={boxData.boxGeometry}
         lidGeometry={boxData.lidGeometry}
+        lidTextInlayGeometry={boxData.lidTextInlayGeometry ?? null}
         trayGeometries={boxData.trayGeometries}
         boxDimensions={boxData.boxDimensions}
         wallThickness={boxWallThickness}
@@ -445,6 +448,7 @@
       <BoxAssembly
         boxGeometry={layeredBoxGeometry.shellGeometry}
         lidGeometry={layeredBoxGeometry.lidGeometry}
+        lidTextInlayGeometry={layeredBoxGeometry.lidTextInlayGeometry}
         trayGeometries={layeredBoxGeometry.assemblyTrayGeometries}
         boxDimensions={{
           width: layeredBoxGeometry.dimensions.width,

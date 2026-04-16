@@ -26,7 +26,7 @@ import {
   getLayeredBoxExteriorDimensions,
   getLayeredBoxRenderLayout
 } from '$lib/models/layer';
-import { createBoxWithLidGrooves, createLid } from '$lib/models/lid';
+import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import threemfSerializer from '@jscad/3mf-serializer';
@@ -376,6 +376,7 @@ interface BoxGeometryResult {
   boxName: string;
   boxGeometry: GeometryData | null;
   lidGeometry: GeometryData | null;
+  lidTextInlayGeometry?: GeometryData | null;
   trayGeometries: TrayGeometryResult[];
   boxDimensions: { width: number; depth: number; height: number };
 }
@@ -452,9 +453,33 @@ interface CachedBoxData {
   boxName: string;
   boxGeom: Geom3 | null;
   lidGeom: Geom3 | null;
+  lidTextInlayGeom: Geom3 | null;
+  lidTextInlayColor?: [number, number, number, number];
   trays: { jscadGeom: Geom3; name: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
+
+function hexToNormalizedRgba(hex: string): [number, number, number, number] {
+  const normalized = hex.replace('#', '');
+  const expanded =
+    normalized.length === 3
+      ? normalized
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalized;
+  const parsed = Number.parseInt(expanded, 16);
+  if (Number.isNaN(parsed) || expanded.length !== 6) {
+    return [1, 1, 1, 1];
+  }
+  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
+}
+
+function getContrastingRgba(hex: string): [number, number, number, number] {
+  const [r, g, b] = hexToNormalizedRgba(hex);
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.55 ? [0.1, 0.1, 0.1, 1] : [0.98, 0.98, 0.98, 1];
+}
 
 // Cache for all loose trays (for export all)
 interface CachedLooseTrayData {
@@ -926,6 +951,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Generate box and lid - pass target height for box to match layer height
       let boxJscad: Geom3 | null = null;
       let lidJscad: Geom3 | null = null;
+      let lidTextInlayJscad: Geom3 | null = null;
       time(`createBoxWithLidGrooves (${projectBox.name})`, () => {
         boxJscad = createBoxWithLidGrooves(projectBox, cardSizes, counterShapes, layerHeight);
       });
@@ -933,6 +959,9 @@ function handleGenerate(msg: GenerateMessage): void {
       // Lid dimensions are fixed (2x wall thickness) and don't depend on layer height
       time(`createLid (${projectBox.name})`, () => {
         lidJscad = createLid(projectBox, cardSizes, counterShapes);
+      });
+      time(`createLidTextInlay (${projectBox.name})`, () => {
+        lidTextInlayJscad = createLidTextInlay(projectBox, cardSizes, counterShapes);
       });
       const lidBufferGeom = lidJscad ? jscadToArrays(lidJscad) : null;
 
@@ -986,6 +1015,8 @@ function handleGenerate(msg: GenerateMessage): void {
         boxName: projectBox.name,
         boxGeom: boxJscad,
         lidGeom: lidJscad,
+        lidTextInlayGeom: lidTextInlayJscad,
+        lidTextInlayColor: lidTextInlayJscad ? getContrastingRgba('#2a2a2a') : undefined,
         trays: cachedTraysForBox
       });
 
@@ -995,6 +1026,7 @@ function handleGenerate(msg: GenerateMessage): void {
         boxName: projectBox.name,
         boxGeometry: boxBufferGeom,
         lidGeometry: lidBufferGeom,
+        lidTextInlayGeometry: lidTextInlayJscad ? jscadToArrays(lidTextInlayJscad) : null,
         trayGeometries: trayGeoms,
         boxDimensions: { width: projectBox.customWidth ?? 0, depth: projectBox.customDepth ?? 0, height: layerHeight }
       });
@@ -1016,11 +1048,15 @@ function handleGenerate(msg: GenerateMessage): void {
 
       let boxJscad: Geom3 | null = null;
       let lidJscad: Geom3 | null = null;
+      let lidTextInlayJscad: Geom3 | null = null;
       time(`createBoxWithLidGrooves (${layeredBox.name})`, () => {
         boxJscad = createBoxWithLidGrooves(syntheticBox, cardSizes, counterShapes, exterior.bodyHeight);
       });
       time(`createLid (${layeredBox.name})`, () => {
         lidJscad = createLid(syntheticBox, cardSizes, counterShapes);
+      });
+      time(`createLidTextInlay (${layeredBox.name})`, () => {
+        lidTextInlayJscad = createLidTextInlay(syntheticBox, cardSizes, counterShapes);
       });
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
 
@@ -1041,6 +1077,8 @@ function handleGenerate(msg: GenerateMessage): void {
         boxName: layeredBox.name,
         boxGeom: boxJscad,
         lidGeom: lidJscad,
+        lidTextInlayGeom: lidTextInlayJscad,
+        lidTextInlayColor: lidTextInlayJscad ? getContrastingRgba('#2a2a2a') : undefined,
         trays: cachedTraysForBox
       });
     }
@@ -1122,6 +1160,10 @@ function handleGenerate(msg: GenerateMessage): void {
       if (boxData.lidGeometry) {
         transferableSet.add(boxData.lidGeometry.positions.buffer as ArrayBuffer);
         transferableSet.add(boxData.lidGeometry.normals.buffer as ArrayBuffer);
+      }
+      if (boxData.lidTextInlayGeometry) {
+        transferableSet.add(boxData.lidTextInlayGeometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(boxData.lidTextInlayGeometry.normals.buffer as ArrayBuffer);
       }
       for (const tray of boxData.trayGeometries) {
         transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
@@ -1382,7 +1424,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     }
 
     // Collect all geometries with their names and bounds
-    const namedGeometries: { geom: Geom3; name: string }[] = [];
+    const namedGeometries: { geom: Geom3; name: string; groupKey?: string }[] = [];
     const usedNames = new Set<string>();
 
     // Helper to get unique name (reusing the same pattern as getUniqueFilename but without extension)
@@ -1414,7 +1456,22 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
       // Add lid
       if (boxData.lidGeom) {
         const cleanedGeom = cleanGeometryForExport(boxData.lidGeom);
-        namedGeometries.push({ geom: cleanedGeom, name: getUniqueName(`${boxPrefix}-lid`) });
+        namedGeometries.push({
+          geom: cleanedGeom,
+          name: getUniqueName(`${boxPrefix}-lid`),
+          groupKey: `${boxPrefix}-lid`
+        });
+      }
+
+      if (boxData.lidTextInlayGeom) {
+        const cleanedGeom = cleanGeometryForExport(boxData.lidTextInlayGeom);
+        (cleanedGeom as Geom3 & { color?: [number, number, number, number] }).color =
+          boxData.lidTextInlayColor ?? [0.98, 0.98, 0.98, 1];
+        namedGeometries.push({
+          geom: cleanedGeom,
+          name: getUniqueName(`${boxPrefix}-lid-text-inlay`),
+          groupKey: `${boxPrefix}-lid`
+        });
       }
 
       // Add trays in boxes
@@ -1458,32 +1515,51 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     let currentX = 0;
     let currentY = 0;
     let rowMaxDepth = 0;
-    const maxRowWidth = 300; // Start a new row after this width
-
+    const maxRowWidth = 300;
     const arrangedGeometries: Geom3[] = [];
+    const groupedGeometries = new Map<string, { geom: Geom3; name: string }[]>();
+    const ungroupedGeometries: { geom: Geom3; name: string }[] = [];
 
-    for (const { geom, name } of namedGeometries) {
-      const bounds = measureBoundingBox(geom);
-      const width = bounds[1][0] - bounds[0][0];
-      const depth = bounds[1][1] - bounds[0][1];
+    for (const { geom, name, groupKey } of namedGeometries) {
+      if (groupKey) {
+        const group = groupedGeometries.get(groupKey) ?? [];
+        group.push({ geom, name });
+        groupedGeometries.set(groupKey, group);
+      } else {
+        ungroupedGeometries.push({ geom, name });
+      }
+    }
 
-      // Check if we need to start a new row
+    const arrangedItems = [
+      ...Array.from(groupedGeometries.values()).map((items) => ({ items })),
+      ...ungroupedGeometries.map((item) => ({ items: [item] }))
+    ];
+
+    for (const { items } of arrangedItems) {
+      const boundsList = items.map(({ geom }) => measureBoundingBox(geom));
+      const groupMinX = Math.min(...boundsList.map((bounds) => bounds[0][0]));
+      const groupMinY = Math.min(...boundsList.map((bounds) => bounds[0][1]));
+      const groupMinZ = Math.min(...boundsList.map((bounds) => bounds[0][2]));
+      const groupMaxX = Math.max(...boundsList.map((bounds) => bounds[1][0]));
+      const groupMaxY = Math.max(...boundsList.map((bounds) => bounds[1][1]));
+      const width = groupMaxX - groupMinX;
+      const depth = groupMaxY - groupMinY;
+
       if (currentX > 0 && currentX + width > maxRowWidth) {
         currentX = 0;
         currentY += rowMaxDepth + spacing;
         rowMaxDepth = 0;
       }
 
-      // Translate geometry to its position (move min corner to currentX, currentY)
-      const offsetX = currentX - bounds[0][0];
-      const offsetY = currentY - bounds[0][1];
-      const translatedGeom = translate([offsetX, offsetY, -bounds[0][2]], geom);
+      const offsetX = currentX - groupMinX;
+      const offsetY = currentY - groupMinY;
 
-      // Set the name attribute for 3MF
-      (translatedGeom as Geom3 & { name?: string }).name = name;
-      arrangedGeometries.push(translatedGeom);
+      for (const { geom, name } of items) {
+        const translatedGeom = translate([offsetX, offsetY, -groupMinZ], geom);
+        (translatedGeom as Geom3 & { name?: string }).name = name;
+        arrangedGeometries.push(translatedGeom);
+      }
 
-      // Update position for next object
       currentX += width + spacing;
       rowMaxDepth = Math.max(rowMaxDepth, depth);
     }

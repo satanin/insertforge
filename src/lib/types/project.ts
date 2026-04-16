@@ -178,6 +178,7 @@ export interface LidParams {
   rampLengthOut: number; // Exit slope length in mm (default: 1.5, shorter = harder to remove)
   // Text embossing
   showName: boolean; // Emboss box name on lid top (default true)
+  textMode?: 'emboss' | 'inlay'; // Name treatment on lid top (default: emboss)
   // Honeycomb infill pattern (reduces filament, maintains structure)
   honeycombEnabled?: boolean; // Enable honeycomb pattern on lid top (default: false)
   honeycombHexSize?: number; // Hexagon circumradius in mm (default: 5)

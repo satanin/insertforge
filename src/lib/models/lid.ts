@@ -76,6 +76,7 @@ export const defaultLidParams: LidParams = {
   snapBumpWidth: 4.0,
   railEngagement: 0.5,
   showName: true,
+  textMode: 'emboss',
   // Ramp lock defaults (enabled by default for smoother operation)
   rampLockEnabled: true,
   rampHeight: 0.5,
@@ -84,6 +85,92 @@ export const defaultLidParams: LidParams = {
   // Honeycomb pattern defaults to off for backwards compatibility
   honeycombEnabled: false
 };
+
+function createLidNameTextGeometry(
+  box: Box,
+  extWidth: number,
+  extDepth: number,
+  strokeWidth: number,
+  textHeight: number,
+  textDepth: number
+): Geom3 | null {
+  const wall = box.wallThickness;
+  const margin = wall * 2;
+  const rotateText = extDepth > extWidth;
+  const textSegments = vectorTextWithAccents({ height: textHeight, text: box.name.trim() });
+
+  if (textSegments.length === 0) return null;
+
+  const textShapes: Geom3[] = [];
+  for (const segment of textSegments) {
+    if (segment.length < 2) continue;
+    const pathObj = path2.fromPoints({ closed: false }, segment);
+    const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+    const extruded = extrudeLinear({ height: textDepth }, expanded);
+    textShapes.push(extruded);
+  }
+
+  if (textShapes.length === 0) return null;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const segment of textSegments) {
+    for (const point of segment) {
+      minX = Math.min(minX, point[0]);
+      maxX = Math.max(maxX, point[0]);
+      minY = Math.min(minY, point[1]);
+      maxY = Math.max(maxY, point[1]);
+    }
+  }
+
+  const textWidth = maxX - minX + strokeWidth;
+  const textHeightY = maxY - minY + strokeWidth;
+  const availableLong = (rotateText ? extDepth : extWidth) - margin * 2;
+  const availableShort = (rotateText ? extWidth : extDepth) - margin * 2;
+  const textScale = Math.min(1, availableLong / textWidth, availableShort / textHeightY);
+  const centerX = extWidth / 2;
+  const centerY = extDepth / 2;
+  const textCenterX = (minX + maxX) / 2;
+  const textCenterY = (minY + maxY) / 2;
+
+  let combinedText: Geom3 = union(...textShapes);
+  combinedText = mirrorY(combinedText);
+
+  if (rotateText) {
+    combinedText = rotateZ(Math.PI / 2, combinedText);
+    return translate(
+      [centerX - textCenterY * textScale, centerY - textCenterX * textScale, 0],
+      scale([textScale, textScale, 1], combinedText)
+    );
+  }
+
+  return translate(
+    [centerX - textCenterX * textScale, centerY + textCenterY * textScale, 0],
+    scale([textScale, textScale, 1], combinedText)
+  );
+}
+
+export function createLidTextInlay(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
+): Geom3 | null {
+  const showName = box.lidParams?.showName ?? true;
+  const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
+  const textMode = box.lidParams?.textMode ?? 'emboss';
+  if (!showName || honeycombEnabled || textMode !== 'inlay' || !box.name?.trim()) return null;
+
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const extWidth = box.customWidth ?? minimums.minWidth;
+  const extDepth = box.customDepth ?? minimums.minDepth;
+  const recessDepth = 0.6;
+  const recessClearance = 0.2;
+  const insertStrokeWidth = Math.max(1.4 - recessClearance, 0.8);
+  const insertHeight = Math.max(recessDepth - 0.05, 0.2);
+  return createLidNameTextGeometry(box, extWidth, extDepth, insertStrokeWidth, 8, insertHeight);
+}
 
 /**
  * Box with recess cut from OUTSIDE of walls at top.
@@ -910,7 +997,7 @@ export function createBoxWithLidGrooves(
         for (const segment of textSegments) {
           if (segment.length >= 2) {
             const pathObj = path2.fromPoints({ closed: false }, segment);
-            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 32 }, pathObj);
+            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
             const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
             textShapes.push(extruded);
           }
@@ -1581,86 +1668,12 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     }
   }
 
-  // 4. Emboss box name on lid top if enabled (disabled when honeycomb is enabled)
+  // 4. Apply lid name treatment if enabled (disabled when honeycomb is enabled)
   const showName = box.lidParams?.showName ?? true;
   if (showName && !honeycombEnabled && box.name && box.name.trim().length > 0) {
-    const textDepth = 0.6; // How deep the text is recessed
-    const strokeWidth = 1.4; // Width of the text strokes (thicker = bolder)
-    const textHeight = 8; // Font height in mm
-    const margin = wall * 2; // Margin from edges
-
-    // Determine if text should be rotated to read along the longest dimension
-    const rotateText = extDepth > extWidth;
-
-    // Get text outlines (uppercase renders better with vector font)
-    const textSegments = vectorTextWithAccents({ height: textHeight, text: box.name.trim() });
-
-    if (textSegments.length > 0) {
-      // Convert segments to path2, expand to give stroke width, and extrude
-      const textShapes: Geom3[] = [];
-      for (const segment of textSegments) {
-        if (segment.length >= 2) {
-          const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
-          const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
-          textShapes.push(extruded);
-        }
-      }
-
-      if (textShapes.length > 0) {
-        // Calculate text bounds to center it
-        let minX = Infinity,
-          maxX = -Infinity;
-        let minY = Infinity,
-          maxY = -Infinity;
-        for (const segment of textSegments) {
-          for (const point of segment) {
-            minX = Math.min(minX, point[0]);
-            maxX = Math.max(maxX, point[0]);
-            minY = Math.min(minY, point[1]);
-            maxY = Math.max(maxY, point[1]);
-          }
-        }
-        const textWidth = maxX - minX + strokeWidth;
-        const textHeightY = maxY - minY + strokeWidth;
-
-        // Available space depends on orientation
-        const availableLong = (rotateText ? extDepth : extWidth) - margin * 2;
-        const availableShort = (rotateText ? extWidth : extDepth) - margin * 2;
-
-        // Scale to fit: text width goes along long dimension, text height along short
-        const scaleLong = Math.min(1, availableLong / textWidth);
-        const scaleShort = Math.min(1, availableShort / textHeightY);
-        const textScale = Math.min(scaleLong, scaleShort);
-
-        // Center position on lid top
-        const centerX = extWidth / 2;
-        const centerY = extDepth / 2;
-        const textCenterX = (minX + maxX) / 2;
-        const textCenterY = (minY + maxY) / 2;
-
-        // Combine all text shapes and position them
-        // Match the same orientation as the poke hole tray labels inside the box
-        let combinedText: Geom3 = union(...textShapes);
-        combinedText = mirrorY(combinedText); // Flip letters right-side up
-
-        // If lid is longer in Y, rotate text 90° to read along Y axis
-        if (rotateText) {
-          combinedText = rotateZ(Math.PI / 2, combinedText);
-          // After mirrorY + rotateZ: center at (textCenterY, textCenterX)
-          const positionedText = translate(
-            [centerX - textCenterY * textScale, centerY - textCenterX * textScale, -0.1],
-            scale([textScale, textScale, 1], combinedText)
-          );
-          lid = subtract(lid, positionedText);
-        } else {
-          const positionedText = translate(
-            [centerX - textCenterX * textScale, centerY + textCenterY * textScale, -0.1],
-            scale([textScale, textScale, 1], combinedText)
-          );
-          lid = subtract(lid, positionedText);
-        }
-      }
+    const cavityText = createLidNameTextGeometry(box, extWidth, extDepth, 1.4, 8, 0.7);
+    if (cavityText) {
+      lid = subtract(lid, translate([0, 0, -0.1], cavityText));
     }
   }
 

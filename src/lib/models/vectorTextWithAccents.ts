@@ -88,10 +88,12 @@ function createAccentSegments(
 
 export function vectorTextWithAccents({
   height,
-  text
+  text,
+  letterSpacing = 0.22
 }: {
   height: number;
   text: string;
+  letterSpacing?: number;
 }): VectorTextSegments {
   const source = text.toUpperCase();
   const allSegments: VectorTextSegments = [];
@@ -129,7 +131,7 @@ export function vectorTextWithAccents({
       );
     }
 
-    cursorX += glyphWidth + height * 0.12;
+    cursorX += glyphWidth + height * letterSpacing;
   }
 
   return allSegments;

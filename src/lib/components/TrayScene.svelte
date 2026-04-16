@@ -50,6 +50,7 @@
     boxName: string;
     boxGeometry: BufferGeometry | null;
     lidGeometry: BufferGeometry | null;
+    lidTextInlayGeometry?: BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
   }
@@ -82,6 +83,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: BufferGeometry;
     lidGeometry: BufferGeometry;
+    lidTextInlayGeometry: BufferGeometry | null;
     assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
@@ -131,6 +133,7 @@
     allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
+    lidTextInlayGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
@@ -198,6 +201,7 @@
     allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
+    lidTextInlayGeometry = null,
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
@@ -1590,6 +1594,18 @@
   >
     <T.MeshStandardMaterial color="#444444" roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
   </T.Mesh>
+  {#if lidTextInlayGeometry}
+    <T.Mesh
+      geometry={lidTextInlayGeometry}
+      rotation.x={exploded ? Math.PI / 2 : -Math.PI / 2}
+      rotation.z={lidRotZ}
+      position.x={lidPosX}
+      position.y={exploded ? explodedOffset.lidY + lidHeight + 0.02 : explodedOffset.lidY + 0.02}
+      position.z={lidPosZ}
+    >
+      <T.MeshStandardMaterial color="#f2f2f2" roughness={0.5} metalness={0.05} side={THREE.DoubleSide} />
+    </T.Mesh>
+  {/if}
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->

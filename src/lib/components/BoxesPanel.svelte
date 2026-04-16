@@ -74,6 +74,10 @@
 
   // Minimum total height (box + lid) for display
   const minTotalHeight = $derived(minimums.minHeight + lidHeight);
+  const lidTextModeOptions = [
+    { value: 'emboss', label: 'Emboss' },
+    { value: 'inlay', label: 'Inlay' }
+  ];
 
   // Display value for height input: convert box height to total height
   const displayTotalHeight = $derived(
@@ -385,13 +389,31 @@
                   showName: (e.target as HTMLInputElement).checked
                 }
               })}
-            label="Emboss name on lid top"
+            label="Show name on lid top"
           />
         </span>
+        {#if !selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
+          <Spacer size="0.5rem" />
+          <FormControl label="Text mode" name="lidTextMode">
+            {#snippet input()}
+              <Select
+                selected={[selectedBox.lidParams?.textMode ?? 'emboss']}
+                options={lidTextModeOptions}
+                onSelectedChange={(selected) =>
+                  onUpdateBox({
+                    lidParams: {
+                      ...selectedBox.lidParams,
+                      textMode: (selected[0] as 'emboss' | 'inlay') ?? 'emboss'
+                    }
+                  })}
+              />
+            {/snippet}
+          </FormControl>
+        {/if}
         {#if selectedBox.lidParams?.honeycombEnabled}
           <Spacer size="0.5rem" />
           <Text color="var(--fgMuted)" size="0.875rem">
-            Text embossing is disabled when honeycomb pattern is enabled
+            Lid text is disabled when honeycomb pattern is enabled
           </Text>
         {/if}
       </div>

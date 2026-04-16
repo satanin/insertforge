@@ -81,6 +81,11 @@
     getLayeredBoxRenderLayout,
     getLayeredBoxSectionDimensions
   } from '$lib/models/layer';
+
+  const lidTextModeOptions = [
+    { value: 'emboss', label: 'Emboss' },
+    { value: 'inlay', label: 'Inlay' }
+  ];
   import { getLidHeight } from '$lib/models/box';
 
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
@@ -920,13 +925,31 @@
                         showName: (e.target as HTMLInputElement).checked
                       }
                     })}
-                  label="Emboss name on lid top"
+                  label="Show name on lid top"
                 />
               </span>
+              {#if !selectedLayeredBox.lidParams?.honeycombEnabled && (selectedLayeredBox.lidParams?.showName ?? true)}
+                <Spacer size="0.5rem" />
+                <FormControl label="Text mode" name="layeredBoxLidTextMode">
+                  {#snippet input()}
+                    <Select
+                      selected={[selectedLayeredBox.lidParams?.textMode ?? 'emboss']}
+                      options={lidTextModeOptions}
+                      onSelectedChange={(selected) =>
+                        handleLayeredBoxUpdate({
+                          lidParams: {
+                            ...selectedLayeredBox.lidParams,
+                            textMode: (selected[0] as 'emboss' | 'inlay') ?? 'emboss'
+                          }
+                        })}
+                    />
+                  {/snippet}
+                </FormControl>
+              {/if}
               {#if selectedLayeredBox.lidParams?.honeycombEnabled}
                 <Spacer size="0.5rem" />
                 <Text size="0.875rem" color="fgMuted">
-                  Text embossing is disabled when honeycomb pattern is enabled
+                  Lid text is disabled when honeycomb pattern is enabled
                 </Text>
               {/if}
             </div>

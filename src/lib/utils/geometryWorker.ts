@@ -29,6 +29,7 @@ interface BoxGeometryResult {
   boxName: string;
   boxGeometry: GeometryData | null;
   lidGeometry: GeometryData | null;
+  lidTextInlayGeometry?: GeometryData | null;
   trayGeometries: TrayGeometryResult[];
   boxDimensions: { width: number; depth: number; height: number };
 }
@@ -115,6 +116,7 @@ export interface BoxGeometryData {
   boxName: string;
   boxGeometry: THREE.BufferGeometry | null;
   lidGeometry: THREE.BufferGeometry | null;
+  lidTextInlayGeometry?: THREE.BufferGeometry | null;
   trayGeometries: TrayGeometryData[];
   boxDimensions: { width: number; depth: number; height: number };
 }
@@ -271,6 +273,7 @@ export class GeometryWorkerManager {
             ...b,
             boxGeometry: b.boxGeometry ? arrayToBufferGeometry(b.boxGeometry) : null,
             lidGeometry: b.lidGeometry ? arrayToBufferGeometry(b.lidGeometry) : null,
+            lidTextInlayGeometry: b.lidTextInlayGeometry ? arrayToBufferGeometry(b.lidTextInlayGeometry) : null,
             trayGeometries: b.trayGeometries.map((t) => ({
               ...t,
               geometry: arrayToBufferGeometry(t.geometry)

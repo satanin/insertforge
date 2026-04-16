@@ -31,6 +31,7 @@
     boxName: string;
     boxGeometry: THREE.BufferGeometry | null;
     lidGeometry: THREE.BufferGeometry | null;
+    lidTextInlayGeometry?: THREE.BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
   }
@@ -63,6 +64,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: THREE.BufferGeometry;
     lidGeometry: THREE.BufferGeometry;
+    lidTextInlayGeometry: THREE.BufferGeometry | null;
     assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
@@ -654,6 +656,7 @@
       <BoxAssembly
         boxGeometry={boxData.boxGeometry}
         lidGeometry={boxData.lidGeometry}
+        lidTextInlayGeometry={boxData.lidTextInlayGeometry ?? null}
         trayGeometries={boxData.trayGeometries}
         boxDimensions={boxData.boxDimensions}
         boxId={boxPlacement.box.id}
@@ -827,6 +830,7 @@
         <BoxAssembly
           boxGeometry={layeredBoxGeometry.shellGeometry}
           lidGeometry={layeredBoxGeometry.lidGeometry}
+          lidTextInlayGeometry={layeredBoxGeometry.lidTextInlayGeometry}
           trayGeometries={layeredBoxGeometry.assemblyTrayGeometries}
           boxDimensions={{
             width: layeredBoxGeometry.dimensions.width,
@@ -905,6 +909,26 @@
               polygonOffsetUnits={1}
             />
           </T.Mesh>
+          {#if layeredBoxGeometry.lidTextInlayGeometry}
+            <T.Mesh
+              geometry={layeredBoxGeometry.lidTextInlayGeometry}
+              rotation.x={Math.PI / 2}
+              rotation.z={lidRotZ}
+              position.x={explodedLidX}
+              position.y={explodedLidY + 0.02}
+              position.z={explodedLidZ}
+            >
+              <T.MeshStandardMaterial
+                color="#f2f2f2"
+                roughness={0.45}
+                metalness={0.05}
+                side={THREE.DoubleSide}
+                polygonOffset
+                polygonOffsetFactor={1}
+                polygonOffsetUnits={1}
+              />
+            </T.Mesh>
+          {/if}
         {/if}
       {/if}
 

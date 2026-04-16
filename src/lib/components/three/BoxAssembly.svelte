@@ -36,6 +36,7 @@
   interface Props {
     boxGeometry: THREE.BufferGeometry | null;
     lidGeometry: THREE.BufferGeometry | null;
+    lidTextInlayGeometry?: THREE.BufferGeometry | null;
     trayGeometries: TrayGeometryData[];
     boxDimensions: { width: number; depth: number; height: number };
     boxId?: string;
@@ -58,6 +59,7 @@
   let {
     boxGeometry,
     lidGeometry,
+    lidTextInlayGeometry = null,
     trayGeometries,
     boxDimensions,
     boxId = '',
@@ -184,6 +186,18 @@
   >
     <T.MeshStandardMaterial color="#444444" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
   </T.Mesh>
+  {#if lidTextInlayGeometry}
+    <T.Mesh
+      geometry={lidTextInlayGeometry}
+      rotation.x={Math.PI / 2}
+      rotation.z={lidRotZ}
+      position.x={lidCenterX}
+      position.y={boxHeight + 0.02}
+      position.z={lidCenterZ}
+    >
+      <T.MeshStandardMaterial color="#f2f2f2" roughness={0.45} metalness={0.05} side={THREE.DoubleSide} />
+    </T.Mesh>
+  {/if}
 {/if}
 
 <!-- Trays inside the box -->

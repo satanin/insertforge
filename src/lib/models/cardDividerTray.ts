@@ -334,7 +334,7 @@ function createStackLabelGeometry(
   for (const segment of textSegments) {
     if (segment.length >= 2) {
       const pathObj = path2.fromPoints({ closed: false }, segment);
-      const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 64 }, pathObj);
+      const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
       const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
       textShapes.push(extruded);
     }

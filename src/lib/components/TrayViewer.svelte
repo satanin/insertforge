@@ -63,6 +63,7 @@
   interface LayeredBoxGeometryData {
     shellGeometry: BufferGeometry;
     lidGeometry: BufferGeometry;
+    lidTextInlayGeometry: BufferGeometry | null;
     assemblyTrayGeometries: TrayGeometryData[];
     internalLayers: Array<{
       id: string;
@@ -122,6 +123,7 @@
     allLooseTrays?: LooseTrayGeometryData[];
     boxGeometry?: BufferGeometry | null;
     lidGeometry?: BufferGeometry | null;
+    lidTextInlayGeometry?: BufferGeometry | null;
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
@@ -185,6 +187,7 @@
     allLooseTrays = [],
     boxGeometry = null,
     lidGeometry = null,
+    lidTextInlayGeometry = null,
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
@@ -282,8 +285,9 @@
       {allTrays}
       {allBoxes}
       {allLooseTrays}
-      {boxGeometry}
-      {lidGeometry}
+        {boxGeometry}
+        {lidGeometry}
+        {lidTextInlayGeometry}
       {gameContainerWidth}
       {gameContainerDepth}
       {exploded}
