@@ -1498,8 +1498,9 @@
     let generationTray = selectedTray;
     let generationBox = selectedBox;
     const selectedEmptyBox = !!selectedBox && selectedBox.trays.length === 0;
+    const needsPrimarySelection = viewMode === 'tray' || viewMode === 'all' || viewMode === 'exploded';
 
-    if (!generationTray && !selectedEmptyBox) {
+    if (!generationTray && !selectedEmptyBox && needsPrimarySelection) {
       for (const layer of project.layers) {
         if (layer.looseTrays.length > 0) {
           generationTray = layer.looseTrays[0];
@@ -1517,7 +1518,7 @@
       }
     }
 
-    if (!generationTray && !selectedEmptyBox) {
+    if (!generationTray && !selectedEmptyBox && needsPrimarySelection) {
       selectedTrayGeometry = null;
       selectedTrayCounters = [];
       allTrayGeometries = [];
@@ -1536,7 +1537,7 @@
     const isLoose = !!(trayLocation && trayLocation.boxId === null);
 
     // For boxed trays, we need a box
-    if (!isLoose && !generationBox && !selectedEmptyBox) {
+    if (!isLoose && !generationBox && !selectedEmptyBox && needsPrimarySelection) {
       error = 'No box selected';
       return;
     }
@@ -2505,6 +2506,35 @@
           name: t.name,
           params: t.params,
           showEmboss: t.showEmboss
+        })),
+        layeredBoxes: (layer.layeredBoxes ?? []).map((box) => ({
+          id: box.id,
+          name: box.name,
+          tolerance: box.tolerance,
+          wallThickness: box.wallThickness,
+          floorThickness: box.floorThickness,
+          customWidth: box.customWidth,
+          customDepth: box.customDepth,
+          customBoxHeight: box.customBoxHeight,
+          lidParams: box.lidParams,
+          layers: box.layers.map((internalLayer) => ({
+            id: internalLayer.id,
+            name: internalLayer.name,
+            fillSolidEmpty: internalLayer.fillSolidEmpty,
+            edgeReliefEnabled: internalLayer.edgeReliefEnabled,
+            sections: internalLayer.sections.map((section) => ({
+              id: section.id,
+              type: section.type,
+              name: section.name,
+              color: section.color,
+              counterParams: section.counterParams,
+              cardDrawParams: section.cardDrawParams,
+              cardDividerParams: section.cardDividerParams,
+              cardWellParams: section.cardWellParams,
+              cupParams: section.cupParams
+            })),
+            manualLayout: internalLayer.manualLayout ?? null
+          }))
         }))
       }))
     });
@@ -2547,7 +2577,11 @@
         boardIds: l.boards.map((b) => b.id),
         layeredBoxes: l.layeredBoxes.map((b) => ({
           layeredBoxId: b.id,
-          layerIds: b.layers.map((entry) => entry.id)
+          layers: b.layers.map((entry) => ({
+            layerId: entry.id,
+            sectionIds: entry.sections.map((section) => section.id),
+            manualLayoutTrayIds: entry.manualLayout?.map((placement) => placement.trayId) ?? []
+          }))
         }))
       }))
     });
@@ -3216,6 +3250,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
         />
       </div>
@@ -3525,6 +3560,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
         />
       </Pane>

@@ -834,6 +834,71 @@ function cloneLayeredBoxSectionWithFreshIds(
   };
 }
 
+function createTrayFromLayeredBoxSection(section: LayeredBoxSection, options?: { preserveId?: boolean }): Tray | null {
+  const preserveId = options?.preserveId ?? true;
+  const trayId = preserveId ? section.id : generateId();
+  const color = section.color ?? '#c9503c';
+
+  if ((section.type === 'counter' || section.type === 'playerBoard') && section.counterParams) {
+    return {
+      id: trayId,
+      type: 'counter',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.counterParams
+    };
+  }
+
+  if (section.type === 'cardDraw' && section.cardDrawParams) {
+    return {
+      id: trayId,
+      type: 'cardDraw',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardDrawParams
+    };
+  }
+
+  if (section.type === 'cardDivider' && section.cardDividerParams) {
+    return {
+      id: trayId,
+      type: 'cardDivider',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardDividerParams,
+      showEmboss: true,
+      showStackLabels: true
+    };
+  }
+
+  if (section.type === 'cardWell' && section.cardWellParams) {
+    return {
+      id: trayId,
+      type: 'cardWell',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cardWellParams
+    };
+  }
+
+  if (section.type === 'cup' && section.cupParams) {
+    return {
+      id: trayId,
+      type: 'cup',
+      name: section.name,
+      color,
+      rotationOverride: 'auto',
+      params: section.cupParams
+    };
+  }
+
+  return null;
+}
+
 function cloneLayeredBoxLayerWithFreshIds(layer: LayeredBoxLayer): LayeredBoxLayer {
   const sectionIdMap = new Map<string, string>();
   const sections = layer.sections.map((section) => {
@@ -1987,6 +2052,85 @@ export function updateLayeredBoxSection(
     autosave();
     return true;
   }
+  return false;
+}
+
+export function moveLayeredBoxSectionToLayer(
+  layeredBoxId: string,
+  sourceLayerId: string,
+  sectionId: string,
+  targetLayerId: string
+): boolean {
+  if (sourceLayerId === targetLayerId) return true;
+
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const sourceLayer = layeredBox.layers.find((entry) => entry.id === sourceLayerId);
+    const targetLayer = layeredBox.layers.find((entry) => entry.id === targetLayerId);
+    if (!sourceLayer || !targetLayer) continue;
+
+    const sectionIndex = sourceLayer.sections.findIndex((entry) => entry.id === sectionId);
+    if (sectionIndex === -1) return false;
+
+    const [section] = sourceLayer.sections.splice(sectionIndex, 1);
+    const previousSourceLayout = sourceLayer.manualLayout;
+    sourceLayer.manualLayout = sourceLayer.manualLayout?.filter((placement) => placement.trayId !== sectionId);
+    targetLayer.sections.push(section);
+
+    if (!layeredBoxFitsResolvedLayout(layeredBox)) {
+      targetLayer.sections.pop();
+      sourceLayer.sections.splice(sectionIndex, 0, section);
+      sourceLayer.manualLayout = previousSourceLayout;
+      return false;
+    }
+
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = layeredBox.id;
+    project.selectedLayeredBoxLayerId = targetLayer.id;
+    project.selectedLayeredBoxSectionId = section.id;
+    project.selectedBoxId = null;
+    project.selectedTrayId = null;
+    project.selectedBoardId = null;
+    autosave();
+    return true;
+  }
+
+  return false;
+}
+
+export function convertLayeredBoxSectionToLooseTray(
+  layeredBoxId: string,
+  layeredBoxLayerId: string,
+  sectionId: string
+): boolean {
+  for (const layer of project.layers) {
+    const layeredBox = layer.layeredBoxes?.find((b) => b.id === layeredBoxId);
+    if (!layeredBox) continue;
+    const internalLayer = layeredBox.layers.find((entry) => entry.id === layeredBoxLayerId);
+    if (!internalLayer) continue;
+    const sectionIndex = internalLayer.sections.findIndex((entry) => entry.id === sectionId);
+    if (sectionIndex === -1) return false;
+
+    const section = internalLayer.sections[sectionIndex];
+    const tray = createTrayFromLayeredBoxSection(section, { preserveId: false });
+    if (!tray) return false;
+
+    internalLayer.sections.splice(sectionIndex, 1);
+    internalLayer.manualLayout = internalLayer.manualLayout?.filter((placement) => placement.trayId !== sectionId);
+    layer.looseTrays.push(tray);
+
+    project.selectedLayerId = layer.id;
+    project.selectedLayeredBoxId = null;
+    project.selectedLayeredBoxLayerId = null;
+    project.selectedLayeredBoxSectionId = null;
+    project.selectedBoxId = null;
+    project.selectedTrayId = tray.id;
+    project.selectedBoardId = null;
+    autosave();
+    return true;
+  }
+
   return false;
 }
 

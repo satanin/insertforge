@@ -30,6 +30,8 @@
     duplicateTray,
     updateBoard,
     moveBoardToLayer,
+    moveLayeredBoxSectionToLayer,
+    convertLayeredBoxSectionToLooseTray,
     updateBox,
     updateLayeredBox,
     updateLayeredBoxLayer,
@@ -96,6 +98,7 @@
     gameContainerWidth?: number;
     gameContainerDepth?: number;
     onForceRegenerate?: () => void;
+    onSelectionChange?: (type: SelectionType) => void;
   }
 
   let {
@@ -103,7 +106,8 @@
     isLayoutEditMode = false,
     gameContainerWidth = 256,
     gameContainerDepth = 256,
-    onForceRegenerate
+    onForceRegenerate,
+    onSelectionChange
   }: Props = $props();
 
   // Layout editor dimensions
@@ -149,6 +153,14 @@
       }
     }
     return '';
+  });
+
+  const layeredBoxInternalLayerOptions = $derived.by(() => {
+    if (!selectedLayeredBox) return [];
+    return selectedLayeredBox.layers.map((layer) => ({
+      value: layer.id,
+      label: layer.name
+    }));
   });
 
   function getLayeredBoxSectionTypeLabel(type: LayeredBoxSectionType): string {
@@ -355,6 +367,48 @@
         });
       }
     }
+  }
+
+  function handleLayeredBoxSectionLayerChange(layerId: string) {
+    if (!selectedLayeredBox || !selectedLayeredBoxLayer || !selectedLayeredBoxSection || layerId === selectedLayeredBoxLayer.id) return;
+    const moved = moveLayeredBoxSectionToLayer(
+      selectedLayeredBox.id,
+      selectedLayeredBoxLayer.id,
+      selectedLayeredBoxSection.id,
+      layerId
+    );
+    if (!moved) {
+      addToast({
+        data: {
+          title: 'Section does not fit',
+          body: 'Moving this section to that internal layer would exceed the available fixed size.',
+          type: 'danger'
+        }
+      });
+      return;
+    }
+
+  }
+
+  function handleConvertSelectedLayeredBoxSectionToLooseTray() {
+    if (!selectedLayeredBox || !selectedLayeredBoxLayer || !selectedLayeredBoxSection) return;
+    const converted = convertLayeredBoxSectionToLooseTray(
+      selectedLayeredBox.id,
+      selectedLayeredBoxLayer.id,
+      selectedLayeredBoxSection.id
+    );
+    if (!converted) {
+      addToast({
+        data: {
+          title: 'Cannot convert section',
+          body: 'This section type cannot be converted to a loose tray yet.',
+          type: 'danger'
+        }
+      });
+      return;
+    }
+
+    onSelectionChange?.('tray');
   }
 
   function handleLayeredBoxSectionCounterParamsChange(newParams: CounterTrayParams) {
@@ -1071,6 +1125,29 @@
               {/snippet}
             </FormControl>
             <Spacer size="1rem" />
+            <FormControl label="Box Layer" name="layeredBoxSectionLayer">
+              {#snippet input({ inputProps })}
+                <Select
+                  {...inputProps}
+                  selected={[selectedLayeredBoxLayer.id]}
+                  options={layeredBoxInternalLayerOptions}
+                  onSelectedChange={(selected) => {
+                    if (selected[0]) {
+                      handleLayeredBoxSectionLayerChange(selected[0]);
+                    }
+                  }}
+                />
+              {/snippet}
+            </FormControl>
+            <Spacer size="1rem" />
+            {#if selectedLayeredBoxSection.type !== 'playerBoard'}
+              <div class="buttonRow">
+                <button class="secondaryButton" onclick={handleConvertSelectedLayeredBoxSectionToLooseTray}>
+                  Convert to loose tray
+                </button>
+              </div>
+              <Spacer size="1rem" />
+            {/if}
             <div class="buttonRow">
               <button class="secondaryButton" onclick={handleDuplicateSelectedLayeredBoxSection}>Duplicate section</button>
               <button class="secondaryButton" onclick={handleDeleteSelectedLayeredBoxSection}>Delete section</button>
