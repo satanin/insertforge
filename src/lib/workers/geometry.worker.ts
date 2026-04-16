@@ -26,6 +26,10 @@ import {
   getLayeredBoxExteriorDimensions,
   getLayeredBoxRenderLayout
 } from '$lib/models/layer';
+import {
+  createLayeredBoxInternalLayerAssemblyGeometry,
+  createLayeredBoxSectionJscadGeometry
+} from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
@@ -456,6 +460,7 @@ interface CachedBoxData {
   lidTextInlayGeom: Geom3 | null;
   lidTextInlayColor?: [number, number, number, number];
   trays: { jscadGeom: Geom3; name: string }[];
+  extraGeometries?: { jscadGeom: Geom3; name: string; groupKey?: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
 
@@ -1059,18 +1064,46 @@ function handleGenerate(msg: GenerateMessage): void {
         lidTextInlayJscad = createLidTextInlay(syntheticBox, cardSizes, counterShapes);
       });
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
+      const extraGeometries: { jscadGeom: Geom3; name: string; groupKey?: string }[] = [];
+      const sectionGeometryMap = new Map<string, Geom3>();
+      const sectionReliefGeometryMap = new Map<string, Geom3>();
+      const fillSolidLayerIds = new Set(
+        layeredBox.layers.filter((layer) => layer.fillSolidEmpty ?? true).map((layer) => layer.id)
+      );
 
       for (const placement of layout.sections) {
         const tray = createTrayFromLayeredBoxSection(placement.section);
         if (!tray) continue;
-        const jscadGeom = createTrayGeometry(
-          tray,
-          cardSizes,
-          counterShapes,
-          placement.dimensions.height,
-          0
-        );
-        cachedTraysForBox.push({ jscadGeom, name: placement.section.name });
+        const jscadGeom =
+          createLayeredBoxSectionJscadGeometry(placement, cardSizes, counterShapes, placement.dimensions.height) ??
+          createTrayGeometry(tray, cardSizes, counterShapes, placement.dimensions.height, 0);
+        sectionGeometryMap.set(placement.section.id, jscadGeom);
+        sectionReliefGeometryMap.set(placement.section.id, jscadGeom);
+
+        if (!fillSolidLayerIds.has(placement.internalLayerId)) {
+          cachedTraysForBox.push({ jscadGeom, name: placement.section.name });
+        }
+      }
+
+      for (const internalLayer of layout.internalLayers) {
+        if (!fillSolidLayerIds.has(internalLayer.id)) continue;
+        const layerSections = layout.sections.filter((section) => section.internalLayerId === internalLayer.id);
+        if (layerSections.length === 0) continue;
+        const sourceLayer = layeredBox.layers.find((layer) => layer.id === internalLayer.id);
+        const assemblyGeometry = createLayeredBoxInternalLayerAssemblyGeometry({
+          internalLayer,
+          layerSections,
+          sourceLayer,
+          sectionGeometryMap,
+          sectionReliefGeometryMap
+        });
+        if (!assemblyGeometry) continue;
+        const layerName = sanitizeFilename(sourceLayer?.name ?? internalLayer.id);
+        extraGeometries.push({
+          jscadGeom: assemblyGeometry,
+          name: `${layeredBox.name} ${sourceLayer?.name ?? internalLayer.id}`,
+          groupKey: `${sanitizeFilename(layeredBox.name)}-${layerName}-assembly`
+        });
       }
 
       cachedAllBoxes.push({
@@ -1079,7 +1112,8 @@ function handleGenerate(msg: GenerateMessage): void {
         lidGeom: lidJscad,
         lidTextInlayGeom: lidTextInlayJscad,
         lidTextInlayColor: lidTextInlayJscad ? getContrastingRgba('#2a2a2a') : undefined,
-        trays: cachedTraysForBox
+        trays: cachedTraysForBox,
+        extraGeometries
       });
     }
 
@@ -1372,6 +1406,17 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         files.push({ filename, data: buffer });
         transferables.push(buffer);
       }
+
+      for (const geometry of boxData.extraGeometries ?? []) {
+        const cleanedGeom = cleanGeometryForExport(geometry.jscadGeom);
+        const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
+        const blob = new Blob(stlData, { type: 'application/octet-stream' });
+        const buffer = await blob.arrayBuffer();
+        const geometryName = sanitizeFilename(geometry.name);
+        const filename = getUniqueFilename(`${boxPrefix}-${geometryName}.stl`, usedFilenames);
+        files.push({ filename, data: buffer });
+        transferables.push(buffer);
+      }
     }
 
     // Export loose trays
@@ -1481,6 +1526,16 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
         namedGeometries.push({
           geom: cleanedGeom,
           name: getUniqueName(`${boxPrefix}-${trayName}`)
+        });
+      }
+
+      for (const geometry of boxData.extraGeometries ?? []) {
+        const cleanedGeom = cleanGeometryForExport(geometry.jscadGeom);
+        const geometryName = sanitizeFilename(geometry.name);
+        namedGeometries.push({
+          geom: cleanedGeom,
+          name: getUniqueName(`${boxPrefix}-${geometryName}`),
+          groupKey: geometry.groupKey
         });
       }
     }
