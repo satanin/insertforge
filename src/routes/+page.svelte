@@ -922,8 +922,13 @@
             result.showLayerView = true;
             result.layerBoxPlacements = [];
             if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBoxLayer) {
-              result.layerLooseTrayPlacements = layeredBoxGeometry.sections
+              const visibleSections = layeredBoxGeometry.sections
                 .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
+                .filter((section) =>
+                  selectionType === 'layeredBoxSection' ? section.sectionId === selectedLayeredBoxSection?.id : true
+                );
+
+              result.layerLooseTrayPlacements = visibleSections
                 .flatMap((section) => {
                   const sourceSection = selectedLayeredBoxLayer.sections.find((entry) => entry.id === section.sectionId);
                   const tray = sourceSection ? createTrayFromLayeredBoxSection(sourceSection) : null;
@@ -937,8 +942,7 @@
                   }];
                 });
               result.layerBoardPlacements = [];
-              result.allLooseTrays = layeredBoxGeometry.sections
-                .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
+              result.allLooseTrays = visibleSections
                 .map((section) => ({
                   trayId: section.sectionId,
                   layerId: selectedLayer?.id ?? '',
@@ -2392,8 +2396,11 @@
   // Layer Layout Editor handlers
   let isLayerLayoutEditMode = $derived.by(() => layerLayoutEditorState.isEditMode);
   let canEditCurrentLayerView = $derived.by(() => {
-    if (selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') {
+    if (selectionType === 'layeredBoxLayer') {
       return (selectedLayeredBoxLayer?.sections.length ?? 0) > 0;
+    }
+    if (selectionType === 'layeredBoxSection') {
+      return false;
     }
     if (selectionType === 'layeredBox') {
       return false;
@@ -2411,7 +2418,7 @@
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
 
-    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+    if (selectionType === 'layeredBoxLayer' && selectedLayeredBox && selectedLayeredBoxLayer) {
       const layout = getLayeredBoxRenderLayout(selectedLayeredBox, cardSizes, counterShapes);
       const sectionPlacements = layout.sections
         .filter((section) => section.internalLayerId === selectedLayeredBoxLayer.id)
@@ -2501,8 +2508,8 @@
       return;
     }
 
-    const boundsWidth = selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection' ? layerViewContainerWidth : gameContainerWidth;
-    const boundsDepth = selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection' ? layerViewContainerDepth : gameContainerDepth;
+    const boundsWidth = selectionType === 'layeredBoxLayer' ? layerViewContainerWidth : gameContainerWidth;
+    const boundsDepth = selectionType === 'layeredBoxLayer' ? layerViewContainerDepth : gameContainerDepth;
     const outOfBounds = items.some((item) => !isLayerItemWithinBounds(item, boundsWidth, boundsDepth));
     if (outOfBounds) {
       addToast({
@@ -2516,7 +2523,7 @@
     }
 
     const placements = getManualLayerPlacements();
-    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+    if (selectionType === 'layeredBoxLayer' && selectedLayeredBox && selectedLayeredBoxLayer) {
       const saved = saveLayeredBoxLayerLayout(selectedLayeredBox.id, selectedLayeredBoxLayer.id, placements.looseTrays);
       if (!saved) {
         addToast({
@@ -2543,7 +2550,7 @@
   }
 
   function handleResetAutoLayerLayout() {
-    if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox && selectedLayeredBoxLayer) {
+    if (selectionType === 'layeredBoxLayer' && selectedLayeredBox && selectedLayeredBoxLayer) {
       clearLayeredBoxLayerLayout(selectedLayeredBox.id, selectedLayeredBoxLayer.id);
     } else {
       const layer = getSelectedLayer();
@@ -2561,10 +2568,14 @@
   // Auto-cancel layer edit mode when navigating away
   let lastSelectedLayerId = $state<string | null>(null);
   let lastSelectedLayeredBoxLayerId = $state<string | null>(null);
+  let lastLayerSelectionType = $state<SelectionType>('dimensions');
   $effect(() => {
     const currentLayerId = selectedLayer?.id ?? null;
     const currentInternalLayerId = selectedLayeredBoxLayer?.id ?? null;
     const currentViewMode = viewMode;
+    const currentSelectionType = selectionType;
+    const leftInternalLayerSelection =
+      lastLayerSelectionType === 'layeredBoxLayer' && currentSelectionType === 'layeredBoxSection';
 
     if (layerLayoutEditorState.isEditMode) {
       const layerChanged = lastSelectedLayerId !== null && currentLayerId !== lastSelectedLayerId;
@@ -2574,7 +2585,7 @@
         (selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection');
       const leftLayerView = currentViewMode !== 'layer';
 
-      if (layerChanged || internalLayerChanged || leftLayerView) {
+      if (layerChanged || internalLayerChanged || leftLayerView || leftInternalLayerSelection) {
         cancelLayerChanges();
         exitLayerEditMode();
       }
@@ -2582,6 +2593,7 @@
 
     lastSelectedLayerId = currentLayerId;
     lastSelectedLayeredBoxLayerId = currentInternalLayerId;
+    lastLayerSelectionType = currentSelectionType;
   });
 
   // Cancel edit mode when selection changes (user navigates away)
