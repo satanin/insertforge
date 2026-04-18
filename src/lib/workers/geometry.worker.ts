@@ -34,6 +34,7 @@ import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/mod
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import { sanitizeExportName } from '$lib/utils/exportNames';
+import { analyzeGeom3Topology, repairGeom3PlanarHoles } from '$lib/utils/geom3Topology';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -53,7 +54,34 @@ const generalize = (jscad.modifiers as any).generalize as (
  * Note: triangulate is omitted here since the STL serializer handles it.
  */
 function cleanGeometryForExport(geom: Geom3): Geom3 {
-  return generalize({ snap: true, simplify: true }, geom);
+  const cleaned = generalize({ snap: true, simplify: true }, geom);
+  const topology = analyzeGeom3Topology(cleaned);
+
+  if (topology.nakedEdges === 0 && topology.nonManifoldEdges === 0) {
+    return cleaned;
+  }
+
+  const repaired = repairGeom3PlanarHoles(cleaned);
+  const repairedTopology = analyzeGeom3Topology(repaired);
+
+  if (
+    repairedTopology.nonManifoldEdges === 0 &&
+    repairedTopology.nakedEdges < topology.nakedEdges
+  ) {
+    if (repairedTopology.nakedEdges > 0) {
+      console.warn('Geometry export cleanup reduced but did not fully remove naked edges', {
+        before: topology,
+        after: repairedTopology
+      });
+    }
+    return repaired;
+  }
+
+  if (topology.nakedEdges > 0 || topology.nonManifoldEdges > 0) {
+    console.warn('Geometry export cleanup found unresolved topology issues', topology);
+  }
+
+  return cleaned;
 }
 
 /**
