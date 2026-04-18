@@ -33,6 +33,7 @@ import {
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
+import { sanitizeExportName } from '$lib/utils/exportNames';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -492,18 +493,6 @@ interface CachedLooseTrayData {
   trayGeom: Geom3;
 }
 let cachedAllLooseTrays: CachedLooseTrayData[] = [];
-
-/**
- * Sanitize a string for use in filenames (replace slashes, spaces, etc.)
- */
-function sanitizeFilename(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[/\\]+/g, '-') // Replace slashes with dashes
-    .replace(/\s+/g, '-') // Replace spaces with dashes
-    .replace(/-+/g, '-') // Collapse multiple dashes
-    .replace(/^-|-$/g, ''); // Trim leading/trailing dashes
-}
 
 /**
  * Create tray geometry based on tray type
@@ -1098,11 +1087,11 @@ function handleGenerate(msg: GenerateMessage): void {
           sectionReliefGeometryMap
         });
         if (!assemblyGeometry) continue;
-        const layerName = sanitizeFilename(sourceLayer?.name ?? internalLayer.id);
+        const layerName = sanitizeExportName(sourceLayer?.name ?? internalLayer.id);
         extraGeometries.push({
           jscadGeom: assemblyGeometry,
           name: `${layeredBox.name} ${sourceLayer?.name ?? internalLayer.id}`,
-          groupKey: `${sanitizeFilename(layeredBox.name)}-${layerName}-assembly`
+          groupKey: `${sanitizeExportName(layeredBox.name, 'layered-box')}-${layerName}-assembly`
         });
       }
 
@@ -1265,16 +1254,16 @@ function handleExportStl(msg: ExportStlMessage): void {
         break;
       case 'box':
         geom = cachedBox;
-        filename = `${sanitizeFilename(cachedBoxName)}-box.stl`;
+        filename = `${sanitizeExportName(cachedBoxName, 'box')}-box.stl`;
         break;
       case 'lid':
         geom = cachedLid;
-        filename = `${sanitizeFilename(cachedBoxName)}-lid.stl`;
+        filename = `${sanitizeExportName(cachedBoxName, 'box')}-lid.stl`;
         break;
       case 'all-tray':
         if (trayIndex !== undefined && cachedAllTrays[trayIndex]) {
           geom = cachedAllTrays[trayIndex].jscadGeom;
-          filename = `${sanitizeFilename(cachedBoxName)}-${sanitizeFilename(cachedAllTrays[trayIndex].name)}.stl`;
+          filename = `${sanitizeExportName(cachedBoxName, 'box')}-${sanitizeExportName(cachedAllTrays[trayIndex].name)}.stl`;
         }
         break;
     }
@@ -1371,7 +1360,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
     // Export boxes and their contents
     for (const boxData of cachedAllBoxes) {
-      const boxPrefix = sanitizeFilename(boxData.boxName);
+      const boxPrefix = sanitizeExportName(boxData.boxName, 'box');
 
       // Export box
       if (boxData.boxGeom) {
@@ -1401,7 +1390,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
         const blob = new Blob(stlData, { type: 'application/octet-stream' });
         const buffer = await blob.arrayBuffer();
-        const trayName = sanitizeFilename(tray.name);
+        const trayName = sanitizeExportName(tray.name);
         const filename = getUniqueFilename(`${boxPrefix}-${trayName}.stl`, usedFilenames);
         files.push({ filename, data: buffer });
         transferables.push(buffer);
@@ -1412,7 +1401,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
         const blob = new Blob(stlData, { type: 'application/octet-stream' });
         const buffer = await blob.arrayBuffer();
-        const geometryName = sanitizeFilename(geometry.name);
+        const geometryName = sanitizeExportName(geometry.name);
         const filename = getUniqueFilename(`${boxPrefix}-${geometryName}.stl`, usedFilenames);
         files.push({ filename, data: buffer });
         transferables.push(buffer);
@@ -1425,7 +1414,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
       const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
       const blob = new Blob(stlData, { type: 'application/octet-stream' });
       const buffer = await blob.arrayBuffer();
-      const trayName = sanitizeFilename(looseTray.trayName);
+      const trayName = sanitizeExportName(looseTray.trayName);
       const filename = getUniqueFilename(`${trayName}.stl`, usedFilenames);
       files.push({ filename, data: buffer });
       transferables.push(buffer);
@@ -1490,7 +1479,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
     // Add boxes and their contents
     for (const boxData of cachedAllBoxes) {
-      const boxPrefix = sanitizeFilename(boxData.boxName);
+      const boxPrefix = sanitizeExportName(boxData.boxName, 'box');
 
       // Add box
       if (boxData.boxGeom) {
@@ -1522,7 +1511,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
       // Add trays in boxes
       for (const tray of boxData.trays) {
         const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
-        const trayName = sanitizeFilename(tray.name);
+        const trayName = sanitizeExportName(tray.name);
         namedGeometries.push({
           geom: cleanedGeom,
           name: getUniqueName(`${boxPrefix}-${trayName}`)
@@ -1531,7 +1520,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
       for (const geometry of boxData.extraGeometries ?? []) {
         const cleanedGeom = cleanGeometryForExport(geometry.jscadGeom);
-        const geometryName = sanitizeFilename(geometry.name);
+        const geometryName = sanitizeExportName(geometry.name);
         namedGeometries.push({
           geom: cleanedGeom,
           name: getUniqueName(`${boxPrefix}-${geometryName}`),
@@ -1543,7 +1532,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     // Add loose trays
     for (const looseTray of cachedAllLooseTrays) {
       const cleanedGeom = cleanGeometryForExport(looseTray.trayGeom);
-      const trayName = sanitizeFilename(looseTray.trayName);
+      const trayName = sanitizeExportName(looseTray.trayName);
       namedGeometries.push({
         geom: cleanedGeom,
         name: getUniqueName(trayName)
@@ -1635,7 +1624,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     const buffer = await blob.arrayBuffer();
 
     // Use first box name for filename
-    const projectName = cachedAllBoxes[0]?.boxName?.toLowerCase().replace(/\s+/g, '-') || 'counterslayer';
+    const projectName = sanitizeExportName(cachedAllBoxes[0]?.boxName ?? 'counterslayer', 'counterslayer');
 
     self.postMessage(
       {

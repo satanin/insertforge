@@ -23,6 +23,10 @@ pnpm dev
 pnpm run check
 ```
 
+- Regla nueva para iteraciones:
+  - cada fix o nueva funcionalidad debe intentar anadir o actualizar tests en la misma iteracion para cubrir la regresion o el flujo nuevo
+  - empezar por tests pequenos y de alto valor antes que por cobertura amplia
+
 ## Nota de ramas
 
 - Rama estable actual: `codex/insertforge`
@@ -211,6 +215,24 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - A veces Vite/HMR deja estados visuales raros. Antes de diagnosticar algo raro, conviene recargar fuerte o reiniciar `pnpm dev`.
 - `issues-next-iterations.md` es un fichero de trabajo del usuario y no debe meterse en commits salvo que el usuario lo pida.
 - `Card Separator` (`cardDivider`) puede dar aviso de `non-manifold edges` en Bambu Studio al importar el STL, pero la impresion real ha salido bien y por ahora se considera un issue no bloqueante.
+
+## Testing
+
+- Estado actual:
+  - existe una base minima de `Playwright`, pero la cobertura real de regresiones es todavia muy baja
+  - faltan tests unitarios/integracion para `models` y `stores`
+- Criterio operativo:
+  - cada bug arreglado deberia dejar al menos un test nuevo o ajustado que falle sin el fix
+  - cada feature nueva deberia dejar al menos un test del comportamiento principal y, si aplica, un test del edge case mas fragil
+- Prioridades iniciales:
+  - `src/lib/models/layer.ts`
+  - `src/lib/stores/project.svelte.ts`
+  - flujos criticos de `Layered Box` en `Playwright`
+- Primeros casos a cubrir:
+  - seleccion correcta entre `layeredBox`, `layeredBoxLayer` y `layeredBoxSection`
+  - visibilidad correcta de `Edit layout`
+  - guardado/reset de layout manual por internal layer
+  - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
 
