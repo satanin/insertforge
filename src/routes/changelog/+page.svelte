@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Link, Text, Spacer, Title } from '@tableslayer/ui';
+  import { APP_NAME, APP_VERSION } from '$lib/appInfo';
   import { marked } from 'marked';
   import type { PageData } from './$types';
   import { onMount, onDestroy } from 'svelte';
@@ -26,8 +27,8 @@
 </script>
 
 <svelte:head>
-  <title>InsertForge changelog</title>
-  <meta name="description" content="Monthly updates and new features for InsertForge." />
+  <title>{APP_NAME} changelog</title>
+  <meta name="description" content={`Monthly updates and new features for ${APP_NAME}. Current version: v${APP_VERSION}.`} />
 </svelte:head>
 
 <div class="changelogPage">
@@ -36,13 +37,11 @@
       <Title as="h1" size="md">Product updates</Title>
       <Spacer size="0.5rem" />
       <Text color="var(--fgMuted)">
-        Notable updates and improvements to InsertForge. A complete <Link
-          href="https://github.com/Siege-Perilous/counterslayer/pulls?q=is%3Apr+is%3Amerged"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          history
-        </Link> is available on GitHub.
+        {APP_NAME} changelog and release notes. Current browser version: <strong>v{APP_VERSION}</strong>.
+      </Text>
+      <Spacer size="0.5rem" />
+      <Text color="var(--fgMuted)">
+        Releases from <strong>v1.0.0</strong> onward belong to InsertForge. Earlier monthly entries are kept only as upstream Counter Slayer context before the fork.
       </Text>
       <Spacer size="2rem" />
 

@@ -4,6 +4,7 @@
   import { resolve } from '$app/paths';
   import { Link, IconButton, Icon, Popover, Toast } from '@tableslayer/ui';
   import { IconSun, IconMoon, IconMenu2 } from '@tabler/icons-svelte';
+  import { APP_LINKS, APP_NAME, APP_VERSION } from '$lib/appInfo';
   import { ModeWatcher, toggleMode, mode } from 'mode-watcher';
   import { setContext } from 'svelte';
 
@@ -27,23 +28,21 @@
 <div class="appContainer" class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
   <!-- Header -->
   <div class="appHeader">
-    <div style="display: flex; align-items: center; gap: 0.25rem;">
-      <Link href={resolve('/')} color="fg">InsertForge</Link>
-      <span>based on</span>
-      <Link href="https://davesnider.com" target="_blank" rel="noopener noreferrer" color="fg">Counter Slayer by Dave Snider</Link>
+    <div class="headerBrand">
+      <div class="headerBrand__line">
+        <Link href={resolve('/')} color="fg">{APP_NAME}</Link>
+        <span class="headerVersion">
+          <Link href={APP_LINKS.changelog} color="muted">v{APP_VERSION}</Link>
+        </span>
+        <span>based on</span>
+        <Link href={APP_LINKS.counterSlayerApp} target="_blank" rel="noopener noreferrer" color="fg">Counter Slayer</Link>
+        <span>by</span>
+        <Link href={APP_LINKS.daveSnider} target="_blank" rel="noopener noreferrer" color="fg">Dave Snider</Link>
+      </div>
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
       <div class="headerLinks">
-        <Link href="/changelog" color="fg">Changelog</Link>
-        <Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg">Tutorial</Link>
-        <Link
-          href="https://github.com/Siege-Perilous/counterslayer"
-          target="_blank"
-          rel="noopener noreferrer"
-          color="fg"
-        >
-          GitHub
-        </Link>
+        <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
       </div>
       <div class="headerMenu">
         <Popover positioning={{ placement: 'bottom-end' }}>
@@ -54,18 +53,7 @@
           {/snippet}
           {#snippet content()}
             <div class="headerMenuContent">
-              <Link href="/changelog" color="fg">Changelog</Link>
-              <Link href="https://youtu.be/82d_-vjFpKw" target="_blank" rel="noopener noreferrer" color="fg">
-                Tutorial
-              </Link>
-              <Link
-                href="https://github.com/Siege-Perilous/counterslayer"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="fg"
-              >
-                GitHub
-              </Link>
+              <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
             </div>
           {/snippet}
         </Popover>
@@ -110,6 +98,26 @@
     min-height: 0;
   }
 
+  .headerBrand {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .headerBrand__line {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .headerVersion {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
   .headerLinks {
     display: flex;
     align-items: center;
@@ -129,8 +137,22 @@
 
   /* Mobile responsive styles */
   @media (max-width: 768px) {
+    .headerBrand {
+      align-items: flex-start;
+    }
+
+    .headerBrand__line {
+      flex-wrap: wrap;
+      line-height: 1.3;
+      white-space: normal;
+    }
+
     .headerLinks {
       display: none;
+    }
+
+    .appHeader {
+      gap: 0.75rem;
     }
 
     .headerMenu {
