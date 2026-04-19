@@ -956,6 +956,29 @@ export function getLidHeight(box: Box): number {
   return box.wallThickness * 2;
 }
 
+export function getVisibleLidHeight(box: Box): number {
+  return box.lidParams?.thickness ?? 2;
+}
+
+export function getRequiredTrayHeightForLayer(box: Box, targetLayerHeight: number): number {
+  const visibleLidHeight = getVisibleLidHeight(box);
+  const requiredTrayHeight = targetLayerHeight - visibleLidHeight - box.floorThickness;
+  return Math.max(requiredTrayHeight, 0);
+}
+
+export function getBoxVisibleAssembledHeight(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = []
+): number {
+  const minimums = calculateMinimumBoxDimensions(box, cardSizes, counterShapes);
+  const bodyHeight = box.customBoxHeight ?? minimums.minHeight;
+  const visibleLidHeight = getVisibleLidHeight(box);
+  const requiredTrayHeight = getRequiredTrayHeightForLayer(box, bodyHeight + visibleLidHeight);
+  const effectiveBodyHeight = requiredTrayHeight + box.floorThickness;
+  return effectiveBodyHeight + visibleLidHeight;
+}
+
 // Get total assembled height (box + lid)
 export function getTotalAssembledHeight(box: Box): number | null {
   const dims = getBoxDimensions(box);

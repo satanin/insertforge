@@ -68,7 +68,7 @@ export const defaultParams: CounterTrayParams = {
   wallThickness: 2.0,
   innerWallThickness: 2.0,
   floorThickness: 2.0,
-  rimHeight: 2.0,
+  rimHeight: 1.0,
   cutoutRatio: 0.35,
   cutoutMax: 12,
   trayWidthOverride: 0,
@@ -569,7 +569,6 @@ export function getCounterPositions(
 
   const baseTrayHeight = floorThickness + maxStackHeight + rimHeight;
   const trayHeight = targetHeight && targetHeight > baseTrayHeight ? targetHeight : baseTrayHeight;
-
   const counterStacks: CounterStack[] = [];
 
   // Top-loaded stacks start at front of tray
@@ -1533,7 +1532,6 @@ export function createCounterTray(
   for (const placement of topLoadedPlacements) {
     const counterShape = getShape(placement.shapeRef);
     const pocketDepth = placement.count * counterShape.thickness;
-    // Use original rimHeight (not effectiveRimHeight) so pocket depth stays constant
     const pocketFloorZ = trayHeight - rimHeight - pocketDepth;
 
     // Create pocket shape for this placement

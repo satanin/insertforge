@@ -8,6 +8,7 @@ import {
   clearLayeredBoxLayerLayout,
   getProject,
   importProject,
+  moveTray,
   resetProject,
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
@@ -142,5 +143,96 @@ describe('project store layered box selection', () => {
     const manualLayout = getProject().layers[0].layeredBoxes[0].layers[0].manualLayout;
 
     expect(manualLayout).toBeUndefined();
+  });
+});
+
+describe('box placeholder dimensions', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('clears empty-box placeholder dimensions when moving the first tray into it', () => {
+    importProject({
+      version: 2,
+      layers: [
+        {
+          id: 'layer-1',
+          name: 'Layer 1',
+          boxes: [
+            {
+              id: 'box-empty',
+              name: 'Empty Box',
+              trays: [],
+              tolerance: 0.5,
+              wallThickness: 3,
+              floorThickness: 2,
+              fillSolidEmpty: true,
+              lidParams: { ...defaultLidParams },
+              customWidth: 50,
+              customDepth: 30,
+              customBoxHeight: 20
+            },
+            {
+              id: 'box-source',
+              name: 'Source Box',
+              trays: [
+                {
+                  id: 'tray-1',
+                  type: 'counter',
+                  name: 'Tray 1',
+                  color: '#c9503c',
+                  rotationOverride: 'auto',
+                  params: {
+                    ...defaultParams,
+                    topLoadedStacks: [[DEFAULT_SHAPE_IDS.square, 5, 'Tray 1']],
+                    edgeLoadedStacks: []
+                  }
+                }
+              ],
+              tolerance: 0.5,
+              wallThickness: 3,
+              floorThickness: 2,
+              fillSolidEmpty: true,
+              lidParams: { ...defaultLidParams }
+            }
+          ],
+          layeredBoxes: [],
+          looseTrays: [],
+          boards: []
+        }
+      ],
+      counterShapes: [
+        {
+          id: DEFAULT_SHAPE_IDS.square,
+          name: 'Square',
+          category: 'counter',
+          baseShape: 'square',
+          width: 16,
+          length: 16,
+          thickness: 1.3
+        }
+      ],
+      cardSizes: [],
+      selectedLayerId: 'layer-1',
+      selectedBoxId: 'box-source',
+      selectedLayeredBoxId: null,
+      selectedLayeredBoxLayerId: null,
+      selectedLayeredBoxSectionId: null,
+      selectedTrayId: 'tray-1',
+      selectedBoardId: null,
+      globalSettings: {
+        gameContainerWidth: 256,
+        gameContainerDepth: 256
+      }
+    });
+
+    moveTray('tray-1', 'box-empty');
+
+    const targetBox = getProject().layers[0].boxes.find((box) => box.id === 'box-empty');
+
+    expect(targetBox?.trays).toHaveLength(1);
+    expect(targetBox?.customWidth).toBeUndefined();
+    expect(targetBox?.customDepth).toBeUndefined();
+    expect(targetBox?.customBoxHeight).toBeUndefined();
   });
 });

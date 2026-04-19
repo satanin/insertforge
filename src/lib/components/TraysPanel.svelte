@@ -37,7 +37,7 @@
   import type { MiniatureRackParams } from '$lib/models/miniatureRack';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
-  import { getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
+  import { getRequiredTrayHeightForLayer, getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
   import { calculateLayerHeight } from '$lib/models/layer';
   import {
     getProject,
@@ -176,11 +176,7 @@
     // If box is in a layer, calculate layer-adjusted height
     if (selectedBoxLayer) {
       const layerHeight = calculateLayerHeight(selectedBoxLayer, { cardSizes, counterShapes });
-      // Only lid thickness (flat top) sticks above box, not full lid height
-      const lidThickness = selectedBox.lidParams?.thickness ?? 2;
-      const floorThickness = selectedBox.floorThickness;
-      // Required tray height to fill box interior when box is adjusted to layer height
-      const requiredTrayHeight = layerHeight - lidThickness - floorThickness;
+      const requiredTrayHeight = getRequiredTrayHeightForLayer(selectedBox, layerHeight);
       return Math.max(naturalMaxHeight, requiredTrayHeight);
     }
 

@@ -96,6 +96,14 @@ export function vectorTextWithAccents({
   letterSpacing?: number;
 }): VectorTextSegments {
   const source = text.toUpperCase();
+
+  // Preserve original JSCAD text generation for plain ASCII strings.
+  // This keeps the same geometry as upstream Counter Slayer unless we
+  // actually need custom accent handling.
+  if (![...source].some((char) => char in ACCENTED_CHAR_MAP)) {
+    return vectorText({ height, align: 'left' }, source);
+  }
+
   const allSegments: VectorTextSegments = [];
   let cursorX = 0;
 

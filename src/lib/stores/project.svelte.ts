@@ -442,6 +442,15 @@ function createDefaultBox(name: string): Box {
   };
 }
 
+function shouldResetPlaceholderBoxDimensions(box: Box): boolean {
+  return (
+    box.trays.length === 0 &&
+    box.customWidth === DEFAULT_EMPTY_BOX_WIDTH &&
+    box.customDepth === DEFAULT_EMPTY_BOX_DEPTH &&
+    box.customBoxHeight === DEFAULT_EMPTY_BOX_BODY_HEIGHT
+  );
+}
+
 function createDefaultLayeredBoxSection(type: LayeredBoxSectionType, name: string): LayeredBoxSection {
   const color = getNextTrayColor(project.layers);
   const counterTray = createDefaultCounterTray(name, color, project.counterShapes);
@@ -2745,10 +2754,16 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
       project.selectedTrayId = tray.id;
       project.selectedBoardId = null;
 
-      // Clear manual layout and custom dimensions so auto layout takes over
+      // Clear manual layout and convert placeholder empty-box dimensions to auto.
       box.manualLayout = undefined;
-      box.customWidth = undefined;
-      box.customDepth = undefined;
+      if (shouldResetPlaceholderBoxDimensions(box)) {
+        box.customWidth = undefined;
+        box.customDepth = undefined;
+        box.customBoxHeight = undefined;
+      } else {
+        box.customWidth = undefined;
+        box.customDepth = undefined;
+      }
 
       autosave();
       return tray;
@@ -3267,6 +3282,12 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   }
 
   // Add to target box
+  if (shouldResetPlaceholderBoxDimensions(targetBox)) {
+    targetBox.customWidth = undefined;
+    targetBox.customDepth = undefined;
+    targetBox.customBoxHeight = undefined;
+  }
+  targetBox.manualLayout = undefined;
   targetBox.trays.push(sourceTray);
 
   // Update selection to follow the moved tray
@@ -3396,6 +3417,12 @@ export function moveLooseTrayToBox(trayId: string, targetBoxId: string): void {
   sourceLayer.looseTrays.splice(sourceIndex, 1);
 
   // Add to target box
+  if (shouldResetPlaceholderBoxDimensions(targetBox)) {
+    targetBox.customWidth = undefined;
+    targetBox.customDepth = undefined;
+    targetBox.customBoxHeight = undefined;
+  }
+  targetBox.manualLayout = undefined;
   targetBox.trays.push(sourceTray);
 
   // Update selection

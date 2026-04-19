@@ -238,6 +238,15 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 - seguir afinando tolerancias reales de impresion de `Miniature Rack`
 - seguir puliendo geometria del rail/labio de `Miniature Rack`
+- mejoras de gestion de proyecto:
+  - anadir `Project name`
+  - usar `Project name` como base de nombre al exportar, en vez del item seleccionado en la vista
+  - separar acciones de reset:
+    - `Reset to empty project`
+    - `Reset to default sample project`
+- mejorar opciones de export:
+  - exponer en UI export individual de `STL` para pieza seleccionada / `Box` / `Lid`
+  - valorar soporte de export individual de `3MF`, no solo export global del proyecto
 - decidir si `Miniature Rack` debe vivir tambien dentro de `Box` o `Layered Box`
 - valorar labels / emboss para `Miniature Rack`
 - revisar si `Layered Box` debe dejar de usar proxies en `Edit layout`

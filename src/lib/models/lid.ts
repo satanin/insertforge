@@ -967,7 +967,7 @@ export function createBoxWithLidGrooves(
   }
 
   // 5. Add poke holes at the center of each tray position for easy removal
-  // Also add tray name labels to the left of each hole
+  // Also add tray name labels to the left of each hole.
   const POKE_HOLE_DIAMETER = 20;
   const labelTextDepth = 0.6;
   const labelStrokeWidth = 1.0;

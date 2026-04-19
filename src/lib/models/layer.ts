@@ -17,7 +17,7 @@ import type {
   Tray
 } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
-import { getBoxExteriorDimensions, getTrayDimensionsForTray } from './box';
+import { getBoxExteriorDimensions, getBoxVisibleAssembledHeight, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {
   width: number;
@@ -312,8 +312,7 @@ export function calculateLayerHeight(
 
   // Get all box exterior heights
   const boxHeights = layer.boxes.map((box) => {
-    const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
-    return dims.height;
+    return getBoxVisibleAssembledHeight(box, cardSizes, counterShapes);
   });
   const layeredBoxHeights = layer.layeredBoxes.map((layeredBox) => {
     const dims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
@@ -337,7 +336,11 @@ export function calculateLayerHeight(
  * This is used for layer-level arrangement
  */
 export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes: CounterShape[]): BoxDimensions {
-  return getBoxExteriorDimensions(box, cardSizes, counterShapes);
+  const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
+  return {
+    ...dims,
+    height: getBoxVisibleAssembledHeight(box, cardSizes, counterShapes)
+  };
 }
 
 /**

@@ -7,6 +7,8 @@ import {
   arrangeTrays,
   calculateTraySpacers,
   getBoxExteriorDimensions,
+  getBoxVisibleAssembledHeight,
+  getRequiredTrayHeightForLayer,
   getTrayDimensionsForTray,
   validateCustomDimensions,
   type TrayPlacement
@@ -34,55 +36,13 @@ import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/mod
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import { sanitizeExportName } from '$lib/utils/exportNames';
-import { analyzeGeom3Topology, repairGeom3PlanarHoles } from '$lib/utils/geom3Topology';
+import { cleanGeometryForExport } from '$lib/utils/exportGeometryCleanup';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import stlSerializer from '@jscad/stl-serializer';
 
 const { geom3 } = jscad.geometries;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const generalize = (jscad.modifiers as any).generalize as (
-  options: { snap?: boolean; simplify?: boolean; triangulate?: boolean },
-  geom: Geom3
-) => Geom3;
-
-/**
- * Clean geometry before STL export to reduce non-manifold edges.
- * Applies snap and simplify (merge coplanar polygons).
- * Note: triangulate is omitted here since the STL serializer handles it.
- */
-function cleanGeometryForExport(geom: Geom3): Geom3 {
-  const cleaned = generalize({ snap: true, simplify: true }, geom);
-  const topology = analyzeGeom3Topology(cleaned);
-
-  if (topology.nakedEdges === 0 && topology.nonManifoldEdges === 0) {
-    return cleaned;
-  }
-
-  const repaired = repairGeom3PlanarHoles(cleaned);
-  const repairedTopology = analyzeGeom3Topology(repaired);
-
-  if (
-    repairedTopology.nonManifoldEdges === 0 &&
-    repairedTopology.nakedEdges < topology.nakedEdges
-  ) {
-    if (repairedTopology.nakedEdges > 0) {
-      console.warn('Geometry export cleanup reduced but did not fully remove naked edges', {
-        before: topology,
-        after: repairedTopology
-      });
-    }
-    return repaired;
-  }
-
-  if (topology.nakedEdges > 0 || topology.nonManifoldEdges > 0) {
-    console.warn('Geometry export cleanup found unresolved topology issues', topology);
-  }
-
-  return cleaned;
-}
 
 /**
  * Generate a tray letter based on cumulative index across all layers.
@@ -311,8 +271,7 @@ function getCumulativeTrayIndexForTray(layers: Layer[], trayId: string): number 
 function calculateUnifiedLayerHeight(layer: Layer, cardSizes: CardSize[], counterShapes: CounterShape[]): number {
   // Get all box exterior heights
   const boxHeights = layer.boxes.map((box) => {
-    const dims = getBoxExteriorDimensions(box, cardSizes, counterShapes);
-    return dims.height;
+    return getBoxVisibleAssembledHeight(box, cardSizes, counterShapes);
   });
   const layeredBoxHeights = layer.layeredBoxes.map((layeredBox) => {
     const dims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes);
@@ -327,26 +286,6 @@ function calculateUnifiedLayerHeight(layer: Layer, cardSizes: CardSize[], counte
 
   // Layer height = max of all items
   return Math.max(...boxHeights, ...layeredBoxHeights, ...looseTrayHeights, 0);
-}
-
-/**
- * Calculate the required interior tray height for a box to match a target layer height.
- * The lid slides into the box - only the flat top (lid thickness) sticks above.
- * Box body = layer height - lid thickness (visible part)
- * Box interior = box body - floor thickness
- * Required tray height = box interior
- */
-function getRequiredTrayHeightForBox(box: Box, targetLayerHeight: number): number {
-  // Only the lid thickness (flat top) sticks above the box, not the full lid height
-  const lidThickness = box.lidParams?.thickness ?? 2;
-  const floorThickness = box.floorThickness;
-
-  // Box body = layer height - lid visible height
-  // Tray height = box interior = box body - floor
-  const requiredTrayHeight = targetLayerHeight - lidThickness - floorThickness;
-
-  // Return at least 0 (shouldn't happen in practice)
-  return Math.max(requiredTrayHeight, 0);
 }
 
 // Message types
@@ -816,7 +755,7 @@ function handleGenerate(msg: GenerateMessage): void {
       const selectedLayerHeight = selectedBoxLayer ? (layerHeights.get(selectedBoxLayer.id) ?? 0) : 0;
 
       // Calculate the required tray height to match the layer height
-      const requiredTrayHeight = getRequiredTrayHeightForBox(box, selectedLayerHeight);
+      const requiredTrayHeight = getRequiredTrayHeightForLayer(box, selectedLayerHeight);
 
       // Generate all trays with their placements for selected box
       const placements =
@@ -968,7 +907,7 @@ function handleGenerate(msg: GenerateMessage): void {
 
       // Calculate the required tray height to match the layer height
       // This ensures all boxes in a layer have the same exterior height
-      const requiredTrayHeight = getRequiredTrayHeightForBox(projectBox, layerHeight);
+      const requiredTrayHeight = getRequiredTrayHeightForLayer(projectBox, layerHeight);
 
       // Generate box and lid - pass target height for box to match layer height
       let boxJscad: Geom3 | null = null;
@@ -1408,6 +1347,16 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
         const blob = new Blob(stlData, { type: 'application/octet-stream' });
         const buffer = await blob.arrayBuffer();
         const filename = getUniqueFilename(`${boxPrefix}-lid.stl`, usedFilenames);
+        files.push({ filename, data: buffer });
+        transferables.push(buffer);
+      }
+
+      if (boxData.lidTextInlayGeom) {
+        const cleanedGeom = cleanGeometryForExport(boxData.lidTextInlayGeom);
+        const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
+        const blob = new Blob(stlData, { type: 'application/octet-stream' });
+        const buffer = await blob.arrayBuffer();
+        const filename = getUniqueFilename(`${boxPrefix}-lid-text-inlay.stl`, usedFilenames);
         files.push({ filename, data: buffer });
         transferables.push(buffer);
       }
