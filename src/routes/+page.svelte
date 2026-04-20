@@ -746,7 +746,7 @@
   let gameContainerHeight = $derived(globalSettings.gameContainerHeight ?? autoGameContainerHeight);
 
   function getProjectExportName(): string {
-    return sanitizeExportName(getProject().name ?? '', 'counterslayer');
+    return sanitizeExportName(getProject().name ?? '', 'insertforge');
   }
   let layerViewContainerWidth = $derived.by(() => {
     if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {

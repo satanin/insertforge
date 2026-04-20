@@ -78,7 +78,7 @@ function parseArgs() {
       case '--help':
       case '-h':
         console.log(`
-Capture view from the Counter Slayer app.
+Capture view from the InsertForge app.
 
 Usage:
   npx tsx scripts/capture-view.ts [options]

@@ -420,7 +420,7 @@ let cachedBox: Geom3 | null = null;
 let cachedLid: Geom3 | null = null;
 let cachedAllTrays: { jscadGeom: Geom3; name: string }[] = [];
 let cachedBoxName = '';
-let cachedProjectName = 'counterslayer';
+let cachedProjectName = 'insertforge';
 
 // Cache for all boxes (for export all)
 interface CachedBoxData {
@@ -707,7 +707,7 @@ function handleGenerate(msg: GenerateMessage): void {
   };
 
   try {
-    cachedProjectName = sanitizeExportName(project.name ?? '', 'counterslayer');
+    cachedProjectName = sanitizeExportName(project.name ?? '', 'insertforge');
     const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
     const tray = selectedTrayId ? findTrayById(project.layers, selectedTrayId) : undefined;
     const isEmptySelectedBox = !!box && box.trays.length === 0 && !tray;

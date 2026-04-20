@@ -99,7 +99,7 @@ npx tsx scripts/capture-view.ts --angle iso
 
 ## License
 
-Counter Slayer / InsertForge is available under the functional source [license](./LICENSE.md) that becomes Apache 2.0 after two years.
+InsertForge is derived from Counter Slayer and remains available under the functional source [license](./LICENSE.md) that becomes Apache 2.0 after two years.
 
 You can host and modify it for personal use under that license, but not monetize the app itself during the restricted period.
 
