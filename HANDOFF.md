@@ -2,7 +2,7 @@
 
 ## Proyecto
 
-- Workspace: `/Users/raul/projects/counterslayer`
+- Workspace: `/Users/raul/projects/insertforge`
 - Rama actual: `codex/insertforge`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
@@ -190,25 +190,25 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 ## Ficheros importantes
 
 - App principal:
-  - `/Users/raul/projects/counterslayer/src/routes/+page.svelte`
+  - `/Users/raul/projects/insertforge/src/routes/+page.svelte`
 - Store principal:
-  - `/Users/raul/projects/counterslayer/src/lib/stores/project.svelte.ts`
+  - `/Users/raul/projects/insertforge/src/lib/stores/project.svelte.ts`
 - Modelo de layer:
-  - `/Users/raul/projects/counterslayer/src/lib/models/layer.ts`
+  - `/Users/raul/projects/insertforge/src/lib/models/layer.ts`
 - Panel de edicion general:
-  - `/Users/raul/projects/counterslayer/src/lib/components/EditorPanel.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/EditorPanel.svelte`
 - Panel de box:
-  - `/Users/raul/projects/counterslayer/src/lib/components/BoxesPanel.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/BoxesPanel.svelte`
 - Render principal 3D:
-  - `/Users/raul/projects/counterslayer/src/lib/components/TrayScene.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/TrayScene.svelte`
 - Modelo de miniature rack:
-  - `/Users/raul/projects/counterslayer/src/lib/models/miniatureRack.ts`
+  - `/Users/raul/projects/insertforge/src/lib/models/miniatureRack.ts`
 - Editor de miniature rack:
-  - `/Users/raul/projects/counterslayer/src/lib/components/panels/MiniatureRackTrayEditor.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/panels/MiniatureRackTrayEditor.svelte`
 - Render de contenido de layer:
-  - `/Users/raul/projects/counterslayer/src/lib/components/three/LayerContent.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/three/LayerContent.svelte`
 - Editor visual de layout de layer:
-  - `/Users/raul/projects/counterslayer/src/lib/components/three/LayerLayoutEditorScene.svelte`
+  - `/Users/raul/projects/insertforge/src/lib/components/three/LayerLayoutEditorScene.svelte`
 
 ## Cosas a vigilar
 

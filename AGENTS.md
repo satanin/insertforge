@@ -5,7 +5,7 @@
 - Nombre visible: `InsertForge`
 - Origen: fork de `Counter Slayer`
 - Proposito: aplicacion Svelte + JSCAD para disenar piezas imprimibles relacionadas con juegos de mesa
-- Workspace: `/Users/raul/projects/counterslayer`
+- Workspace: `/Users/raul/projects/insertforge`
 
 ## Core workflow rules
 
