@@ -52,6 +52,10 @@ export interface TraySpacerInfo {
   floorSpacerHeight: number; // Additional solid material under tray floor
 }
 
+function getEdgeLoadedCounterSpan(count: number, thickness: number, clearance: number): number {
+  return count * thickness + clearance * 2;
+}
+
 // Get dimensions for any tray type (dispatches based on tray type)
 export function getTrayDimensionsForTray(
   tray: Tray,
@@ -292,7 +296,7 @@ export function getCounterTrayDimensions(
 
   if (edgeLoadedStacks && edgeLoadedStacks.length > 0) {
     for (const stack of edgeLoadedStacks) {
-      const counterSpan = stack[1] * getShape(stack[0]).thickness + (stack[1] - 1) * clearance;
+      const counterSpan = getEdgeLoadedCounterSpan(stack[1], getShape(stack[0]).thickness, clearance);
       const orientation = stack[2] || 'lengthwise';
 
       if (orientation === 'lengthwise') {

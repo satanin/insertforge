@@ -92,6 +92,10 @@ export const defaultParams: CounterTrayParams = {
   gameContainerDepth: 256
 };
 
+function getEdgeLoadedCounterSpan(count: number, thickness: number, clearance: number): number {
+  return count * thickness + clearance * 2;
+}
+
 // Counter preview data for visualization
 export interface CounterStack {
   shape: 'square' | 'hex' | 'circle' | 'triangle' | 'custom';
@@ -338,7 +342,7 @@ export function getCounterPositions(
     for (let i = 0; i < edgeLoadedStacks.length; i++) {
       const [shapeId, count, orientationPref, label] = edgeLoadedStacks[i];
       const shape = getShape(shapeId);
-      const counterSpan = count * shape.thickness + (count - 1) * clearance;
+      const counterSpan = getEdgeLoadedCounterSpan(count, shape.thickness, clearance);
 
       // Default to lengthwise if not specified
       const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
@@ -891,7 +895,7 @@ export function createCounterTray(
     for (let i = 0; i < edgeLoadedStacks.length; i++) {
       const [shapeId, count, orientationPref, label] = edgeLoadedStacks[i];
       const shape = getShape(shapeId);
-      const counterSpan = count * shape.thickness + (count - 1) * clearance;
+      const counterSpan = getEdgeLoadedCounterSpan(count, shape.thickness, clearance);
 
       // Default to lengthwise if not specified
       const orientation: 'lengthwise' | 'crosswise' = orientationPref || 'lengthwise';
