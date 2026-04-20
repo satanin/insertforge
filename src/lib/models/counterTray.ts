@@ -1435,6 +1435,25 @@ export function createCounterTray(
 
   const pocketCuts = [];
   const fingerCuts = [];
+  const embossMargin = wallThickness * 2;
+  const embossCutoutPadding = 1;
+  const embossSafeArea = {
+    minX: embossMargin,
+    maxX: trayWidth - embossMargin,
+    minY: embossMargin,
+    maxY: trayDepth - embossMargin
+  };
+
+  const reserveBottomEdgeCutout = (edge: 'left' | 'front' | 'back', radius: number) => {
+    const inset = radius + embossCutoutPadding;
+    if (edge === 'left') {
+      embossSafeArea.minX = Math.max(embossSafeArea.minX, inset);
+    } else if (edge === 'front') {
+      embossSafeArea.minY = Math.max(embossSafeArea.minY, inset);
+    } else {
+      embossSafeArea.maxY = Math.min(embossSafeArea.maxY, trayDepth - inset);
+    }
+  };
 
   // Effective back row Y start (accounts for any expanded front row depth)
   const effectiveBackRowYStart = wallThickness + effectiveFrontRowDepth + innerWallThickness;
@@ -1476,6 +1495,7 @@ export function createCounterTray(
         if (isAgainstLeftWall) {
           // Vertical half-cylinder at left tray edge (like top-loaded stacks)
           fingerCuts.push(translate([0, yStart + rowDepth / 2, 0], createFingerCutout(cutoutRadius)));
+          reserveBottomEdgeCutout('left', cutoutRadius);
         } else {
           // Quarter-sphere at left edge of slot (centered with slot)
           fingerCuts.push(
@@ -1526,9 +1546,11 @@ export function createCounterTray(
     if (rowAssignment === 'back') {
       // Back slot: cutout at back edge
       fingerCuts.push(translate([slotXStart + slot.slotWidth / 2, trayDepth, 0], createFingerCutout(cutoutRadius)));
+      reserveBottomEdgeCutout('back', cutoutRadius);
     } else {
       // Front slot: cutout at front edge
       fingerCuts.push(translate([slotXStart + slot.slotWidth / 2, 0, 0], createFingerCutout(cutoutRadius)));
+      reserveBottomEdgeCutout('front', cutoutRadius);
     }
   }
 
@@ -1568,9 +1590,11 @@ export function createCounterTray(
     if (isFrontRow) {
       // Front row: cutout at tray front
       fingerCuts.push(translate([xCenter, 0, 0], createFingerCutout(cutoutRadius)));
+      reserveBottomEdgeCutout('front', cutoutRadius);
     } else {
       // Back row: cutout at tray back
       fingerCuts.push(translate([xCenter, trayDepth, 0], createFingerCutout(cutoutRadius)));
+      reserveBottomEdgeCutout('back', cutoutRadius);
     }
   }
 
@@ -1583,7 +1607,6 @@ export function createCounterTray(
     if (!embossEnabled) return result;
     const strokeWidth = 1.2;
     const textHeightParam = 6;
-    const margin = wallThickness * 2;
 
     const textSegments = vectorTextWithAccents({ height: textHeightParam, text: trayName.trim() });
 
@@ -1615,14 +1638,14 @@ export function createCounterTray(
         const textHeightY = maxY - minY + strokeWidth;
 
         // Fit text along tray width (X axis)
-        const availableWidth = trayWidth - margin * 2;
-        const availableDepth = trayDepth - margin * 2;
+        const availableWidth = Math.max(1, embossSafeArea.maxX - embossSafeArea.minX);
+        const availableDepth = Math.max(1, embossSafeArea.maxY - embossSafeArea.minY);
         const scaleX = Math.min(1, availableWidth / textWidthCalc);
         const scaleY = Math.min(1, availableDepth / textHeightY);
         const textScale = Math.min(scaleX, scaleY);
 
-        const centerX = trayWidth / 2;
-        const centerY = trayDepth / 2;
+        const centerX = (embossSafeArea.minX + embossSafeArea.maxX) / 2;
+        const centerY = (embossSafeArea.minY + embossSafeArea.maxY) / 2;
         const textCenterX = (minX + maxX) / 2;
         const textCenterY = (minY + maxY) / 2;
 
