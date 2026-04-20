@@ -261,6 +261,7 @@ export interface GlobalSettings {
 
 export interface Project {
   version?: number; // For migration (2 = layers format)
+  name: string;
   layers: Layer[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
@@ -276,6 +277,7 @@ export interface Project {
 
 // Legacy project format (pre-layers)
 export interface LegacyProject {
+  name?: string;
   boxes: Box[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];

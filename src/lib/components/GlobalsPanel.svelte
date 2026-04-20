@@ -32,11 +32,13 @@
   } from '$lib/stores/project.svelte';
 
   interface Props {
+    projectName: string;
     globalSettings: { gameContainerWidth: number; gameContainerDepth: number };
+    onProjectNameChange: (name: string) => void;
     onGlobalSettingsChange: (updates: { gameContainerWidth?: number; gameContainerDepth?: number }) => void;
   }
 
-  let { globalSettings, onGlobalSettingsChange }: Props = $props();
+  let { projectName, globalSettings, onProjectNameChange, onGlobalSettingsChange }: Props = $props();
 
   // Track which counter is expanded (null = none)
   let expandedCounterIndex: number | null = $state(null);
@@ -268,6 +270,26 @@
 </script>
 
 <div class="globalsPanel">
+  <section class="section">
+    <h3 class="sectionTitle">Project</h3>
+    <Spacer size="0.5rem" />
+    <FormControl label="Name" name="projectName">
+      {#snippet input({ inputProps })}
+        <Input
+          {...inputProps}
+          type="text"
+          value={projectName}
+          onchange={(e) => onProjectNameChange(e.currentTarget.value)}
+          placeholder="InsertForge Project"
+        />
+      {/snippet}
+    </FormControl>
+    <Spacer size="0.5rem" />
+    <Text size="0.875rem" color="var(--fgMuted)">Used as the default filename for project exports.</Text>
+  </section>
+
+  <Hr />
+
   <section class="section">
     <h3 class="sectionTitle">Game Container</h3>
     <div class="gameContainerInputs">

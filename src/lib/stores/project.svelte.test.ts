@@ -7,12 +7,14 @@ import type { LayeredBox, LayeredBoxSection, Project } from '$lib/types/project'
 import {
   clearLayeredBoxLayerLayout,
   getProject,
+  getProjectName,
   importProject,
   moveTray,
   resetProject,
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
-  selectLayeredBoxSection
+  selectLayeredBoxSection,
+  updateProjectName
 } from './project.svelte';
 
 function createCounterSection(id: string, name: string): LayeredBoxSection {
@@ -59,6 +61,7 @@ function createLayeredBoxFixture(): LayeredBox {
 function createProjectFixture(): Project {
   return {
     version: 2,
+    name: 'Test Project',
     layers: [
       {
         id: 'layer-1',
@@ -146,6 +149,19 @@ describe('project store layered box selection', () => {
   });
 });
 
+describe('project store project name', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('updates the project-level export name', () => {
+    updateProjectName('Factions Insert');
+
+    expect(getProjectName()).toBe('Factions Insert');
+    expect(getProject().name).toBe('Factions Insert');
+  });
+});
+
 describe('box placeholder dimensions', () => {
   beforeEach(() => {
     resetProject();
@@ -154,6 +170,7 @@ describe('box placeholder dimensions', () => {
   it('clears empty-box placeholder dimensions when moving the first tray into it', () => {
     importProject({
       version: 2,
+      name: 'Test Project',
       layers: [
         {
           id: 'layer-1',

@@ -301,6 +301,7 @@ export class GeometryWorkerManager {
       // Deep clone to strip Svelte 5 Proxy wrappers (can't be cloned for postMessage)
       const plainProject = JSON.parse(
         JSON.stringify({
+          name: project.name,
           layers: project.layers,
           cardSizes: project.cardSizes,
           counterShapes: project.counterShapes

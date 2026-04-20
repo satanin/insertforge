@@ -49,6 +49,7 @@
   import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '$lib/utils/pdfGenerator';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
   import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
+  import { sanitizeExportName } from '$lib/utils/exportNames';
   import {
     initProject,
     getSelectedBoard,
@@ -729,6 +730,10 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+
+  function getProjectExportName(): string {
+    return sanitizeExportName(getProject().name ?? '', 'counterslayer');
+  }
   let layerViewContainerWidth = $derived.by(() => {
     if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {
       const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProject().cardSizes ?? [], getProject().counterShapes ?? []);
@@ -1474,11 +1479,8 @@
 
       const zipBlob = await zipWriter.close();
 
-      // Download zip - use first box name, first loose tray name, or default
-      const projectName =
-        allBoxes[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
-        allLooseTrays[0]?.name?.toLowerCase().replace(/\s+/g, '-') ||
-        'counterslayer';
+      // Download zip using the project-level export name.
+      const projectName = getProjectExportName();
       const url = URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -1884,7 +1886,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'counter-tray-project.json';
+    a.download = `${getProjectExportName()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

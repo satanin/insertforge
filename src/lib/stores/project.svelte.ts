@@ -114,6 +114,7 @@ export type {
 
 // Default counter thickness (used when migrating old shapes without thickness)
 export const DEFAULT_COUNTER_THICKNESS = 1.3;
+export const DEFAULT_PROJECT_NAME = 'InsertForge Project';
 
 // Default counter shapes (global)
 export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
@@ -1052,6 +1053,7 @@ function offsetPlacement<T extends { x: number; y: number }>(placement: T, amoun
 
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
+  project.name = project.name?.trim() || DEFAULT_PROJECT_NAME;
   project.selectedBoardId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;
@@ -1097,6 +1099,10 @@ export function saveProjectNow(): void {
 // Getters
 export function getProject(): Project {
   return project;
+}
+
+export function getProjectName(): string {
+  return project.name?.trim() || DEFAULT_PROJECT_NAME;
 }
 
 export function getLayers(): Layer[] {
@@ -3096,6 +3102,11 @@ export function updateGlobalSettings(updates: { gameContainerWidth?: number; gam
       }
     }
   }
+  autosave();
+}
+
+export function updateProjectName(name: string): void {
+  project.name = name;
   autosave();
 }
 

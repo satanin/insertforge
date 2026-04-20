@@ -293,6 +293,7 @@ interface GenerateMessage {
   type: 'generate';
   id: number;
   project: {
+    name?: string;
     layers: Layer[];
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
@@ -419,6 +420,7 @@ let cachedBox: Geom3 | null = null;
 let cachedLid: Geom3 | null = null;
 let cachedAllTrays: { jscadGeom: Geom3; name: string }[] = [];
 let cachedBoxName = '';
+let cachedProjectName = 'counterslayer';
 
 // Cache for all boxes (for export all)
 interface CachedBoxData {
@@ -705,6 +707,7 @@ function handleGenerate(msg: GenerateMessage): void {
   };
 
   try {
+    cachedProjectName = sanitizeExportName(project.name ?? '', 'counterslayer');
     const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
     const tray = selectedTrayId ? findTrayById(project.layers, selectedTrayId) : undefined;
     const isEmptySelectedBox = !!box && box.trays.length === 0 && !tray;
@@ -1600,15 +1603,12 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     });
     const buffer = await blob.arrayBuffer();
 
-    // Use first box name for filename
-    const projectName = sanitizeExportName(cachedAllBoxes[0]?.boxName ?? 'counterslayer', 'counterslayer');
-
     self.postMessage(
       {
         type: 'export-3mf-result',
         id,
         data: buffer,
-        filename: `${projectName}.3mf`
+        filename: `${cachedProjectName}.3mf`
       } as Export3mfResult,
       { transfer: [buffer] }
     );

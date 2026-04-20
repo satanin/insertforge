@@ -53,6 +53,8 @@
     isCupTray,
     isMiniatureRackTray,
     getGlobalSettings,
+    getProjectName,
+    updateProjectName,
     updateGlobalSettings,
     moveLayeredBoxToLayer,
     expandLayeredBoxToAvailableSpace,
@@ -444,7 +446,12 @@
   }
 
   // Get global settings from project store
+  let projectName = $derived(getProjectName());
   let globalSettings = $derived(getGlobalSettings());
+
+  function handleProjectNameChange(name: string) {
+    updateProjectName(name);
+  }
 
   function handleGlobalSettingsChange(updates: { gameContainerWidth?: number; gameContainerDepth?: number }) {
     updateGlobalSettings(updates);
@@ -612,7 +619,12 @@
           </div>
         </div>
       {:else if selectionType === 'dimensions'}
-        <GlobalsPanel {globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} />
+        <GlobalsPanel
+          {projectName}
+          {globalSettings}
+          onProjectNameChange={handleProjectNameChange}
+          onGlobalSettingsChange={handleGlobalSettingsChange}
+        />
       {:else if selectionType === 'layer'}
         {#if selectedLayer}
           {@const cardSizes = project.cardSizes ?? []}

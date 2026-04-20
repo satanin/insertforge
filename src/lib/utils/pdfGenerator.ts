@@ -9,6 +9,7 @@ import {
 } from '$lib/models/counterTray';
 import type { Box, CounterShape, Layer, Project } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCounterTray } from '$lib/types/project';
+import { sanitizeExportName } from '$lib/utils/exportNames';
 import { jsPDF } from 'jspdf';
 
 /**
@@ -335,7 +336,7 @@ export function extractPdfData(project: Project): PdfData {
   }
 
   return {
-    projectName: 'Counter Tray Project',
+    projectName: project.name?.trim() || 'InsertForge Project',
     boxes
   };
 }
@@ -497,7 +498,7 @@ export async function generatePdfWithScreenshots(data: PdfData, screenshots: Tra
   }
 
   // Generate filename from project name
-  const filename = `${data.projectName.toLowerCase().replace(/\s+/g, '-')}-reference.pdf`;
+  const filename = `${sanitizeExportName(data.projectName, 'insertforge-project')}-reference.pdf`;
   doc.save(filename);
 }
 
@@ -645,7 +646,7 @@ export async function generatePdf(data: PdfData): Promise<void> {
   }
 
   // Generate filename from project name
-  const filename = `${data.projectName.toLowerCase().replace(/\s+/g, '-')}-reference.pdf`;
+  const filename = `${sanitizeExportName(data.projectName, 'insertforge-project')}-reference.pdf`;
   doc.save(filename);
 }
 

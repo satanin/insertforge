@@ -11,6 +11,7 @@ import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
   DEFAULT_COUNTER_THICKNESS,
+  DEFAULT_PROJECT_NAME,
   TRAY_COLORS
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
@@ -471,6 +472,8 @@ function _getAllTraysFromProject(project: Project | LegacyProject): Tray[] {
 
 // Migrate a full project to ensure all fields have valid values
 export function migrateProjectData(project: Project | LegacyProject): Project {
+  const projectName = project.name?.trim() || DEFAULT_PROJECT_NAME;
+
   // Check if project already has new format (counterShapes/cardSizes at project level)
   const hasCounterShapesAndCardSizes =
     Array.isArray((project as { counterShapes?: unknown }).counterShapes) &&
@@ -571,6 +574,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
     return {
       version: 2,
+      name: projectName,
       layers: [layer],
       counterShapes,
       cardSizes,
@@ -617,6 +621,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
   return {
     ...project,
     version: 2,
+    name: projectName,
     layers: migratedLayers,
     counterShapes,
     cardSizes,
