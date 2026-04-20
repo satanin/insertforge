@@ -402,6 +402,7 @@
   "selectedTrayId": "nrme206",
   "globalSettings": {
     "gameContainerWidth": 150,
-    "gameContainerDepth": 200
+    "gameContainerDepth": 200,
+    "gameContainerHeight": null
   }
 }

@@ -11,6 +11,7 @@ import {
   DEFAULT_CARD_SIZES,
   DEFAULT_COUNTER_SHAPES,
   DEFAULT_COUNTER_THICKNESS,
+  DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_PROJECT_NAME,
   TRAY_COLORS
 } from '$lib/stores/project.svelte';
@@ -546,9 +547,17 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     if (legacyPrintBedSize !== undefined) {
       globalSettings = {
         gameContainerWidth: legacyPrintBedSize,
-        gameContainerDepth: legacyPrintBedSize
+        gameContainerDepth: legacyPrintBedSize,
+        gameContainerHeight: null
+      };
+    } else {
+      globalSettings = {
+        ...globalSettings,
+        gameContainerHeight: globalSettings.gameContainerHeight ?? null
       };
     }
+  } else {
+    globalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
   }
 
   // Handle legacy vs new format

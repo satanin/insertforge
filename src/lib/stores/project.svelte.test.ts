@@ -6,6 +6,7 @@ import type { LayeredBox, LayeredBoxSection, Project } from '$lib/types/project'
 
 import {
   clearLayeredBoxLayerLayout,
+  getGlobalSettings,
   getProject,
   getProjectName,
   importProject,
@@ -14,6 +15,7 @@ import {
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
   selectLayeredBoxSection,
+  updateGlobalSettings,
   updateProjectName
 } from './project.svelte';
 
@@ -93,7 +95,8 @@ function createProjectFixture(): Project {
     selectedBoardId: null,
     globalSettings: {
       gameContainerWidth: 256,
-      gameContainerDepth: 256
+      gameContainerDepth: 256,
+      gameContainerHeight: null
     }
   };
 }
@@ -159,6 +162,24 @@ describe('project store project name', () => {
 
     expect(getProjectName()).toBe('Factions Insert');
     expect(getProject().name).toBe('Factions Insert');
+  });
+});
+
+describe('project store global settings', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('updates the game container height', () => {
+    updateGlobalSettings({ gameContainerHeight: 95 });
+
+    expect(getGlobalSettings().gameContainerHeight).toBe(95);
+  });
+
+  it('supports automatic game container height', () => {
+    updateGlobalSettings({ gameContainerHeight: null });
+
+    expect(getGlobalSettings().gameContainerHeight).toBeNull();
   });
 });
 
@@ -239,7 +260,8 @@ describe('box placeholder dimensions', () => {
       selectedBoardId: null,
       globalSettings: {
         gameContainerWidth: 256,
-        gameContainerDepth: 256
+        gameContainerDepth: 256,
+        gameContainerHeight: null
       }
     });
 

@@ -127,6 +127,8 @@
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    gameContainerHeight?: number;
+    gameContainerHeightIsAuto?: boolean;
     exploded?: boolean;
     showAllTrays?: boolean;
     showAllBoxes?: boolean;
@@ -191,6 +193,8 @@
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
+    gameContainerHeight: propContainerHeight,
+    gameContainerHeightIsAuto = true,
     exploded = false,
     showAllTrays = false,
     showAllBoxes = false,
@@ -256,6 +260,7 @@
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
   let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
   let gameContainerDepth = $derived(propContainerDepth ?? legacyPrintBedSize ?? 256);
+  let gameContainerHeight = $derived(propContainerHeight ?? 0);
 
   // Clicked tray info for display overlay
   let clickedTrayInfo = $state<TrayClickInfo | null>(null);
@@ -290,6 +295,8 @@
         {lidTextInlayGeometry}
       {gameContainerWidth}
       {gameContainerDepth}
+      {gameContainerHeight}
+      {gameContainerHeightIsAuto}
       {exploded}
       {showAllTrays}
       {showAllBoxes}

@@ -137,6 +137,8 @@
     printBedSize?: number; // Legacy (deprecated) - use gameContainerWidth/gameContainerDepth
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    gameContainerHeight?: number;
+    gameContainerHeightIsAuto?: boolean;
     exploded?: boolean;
     showAllTrays?: boolean;
     showAllBoxes?: boolean;
@@ -205,6 +207,8 @@
     printBedSize: legacyPrintBedSize,
     gameContainerWidth: propContainerWidth,
     gameContainerDepth: propContainerDepth,
+    gameContainerHeight: propContainerHeight,
+    gameContainerHeightIsAuto = true,
     exploded = false,
     showAllTrays = false,
     showAllBoxes = false,
@@ -365,8 +369,29 @@
   // Compute actual container dimensions (prefer new props, fallback to legacy printBedSize)
   let gameContainerWidth = $derived(propContainerWidth ?? legacyPrintBedSize ?? 256);
   let gameContainerDepth = $derived(propContainerDepth ?? legacyPrintBedSize ?? 256);
+  let gameContainerHeight = $derived(propContainerHeight ?? 0);
   // For backwards compatibility with places that use printBedSize
   let printBedSize = $derived(Math.max(gameContainerWidth, gameContainerDepth));
+
+  function mapActualStackHeightToVisualY(
+    targetHeight: number,
+    arrangements: Array<{ arrangement: { layerHeight: number } }>,
+    layerYOffsets: number[]
+  ): number {
+    if (targetHeight <= 0 || arrangements.length === 0) return 0;
+
+    let actualBase = 0;
+    for (let i = 0; i < arrangements.length; i++) {
+      const layerHeight = arrangements[i].arrangement.layerHeight;
+      if (targetHeight <= actualBase + layerHeight) {
+        return layerYOffsets[i] + (targetHeight - actualBase);
+      }
+      actualBase += layerHeight;
+    }
+
+    const lastIndex = arrangements.length - 1;
+    return layerYOffsets[lastIndex] + arrangements[lastIndex].arrangement.layerHeight + (targetHeight - actualBase);
+  }
 
   // Get Threlte context for capture
   const { renderer, scene, camera } = useThrelte();
@@ -1293,6 +1318,89 @@
       />
     </T.Group>
   {/each}
+
+  {#if showPreviewSizes && !gameContainerHeightIsAuto && gameContainerHeight > 0}
+    {@const usedHeight = allLayerArrangements.reduce((total, entry) => total + entry.arrangement.layerHeight, 0)}
+    {@const remainingHeight = gameContainerHeight - usedHeight}
+    {@const containerVisualTop = mapActualStackHeightToVisualY(gameContainerHeight, allLayerArrangements, layerYOffsets)}
+    {@const usedVisualTop = mapActualStackHeightToVisualY(usedHeight, allLayerArrangements, layerYOffsets)}
+    {@const indicatorX = gameContainerWidth / 2 + 28 + horizontalPhase * Math.max(allLayerArrangements.length - 1, 0) * 20}
+    {@const indicatorZ = printBedSize / 2 + gameContainerDepth / 2}
+    {@const statusColor = remainingHeight < 0 ? '#ff6b5a' : remainingHeight < 2 ? '#f2b84b' : '#79b983'}
+    {@const containerLineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(indicatorX, 0, indicatorZ),
+      new THREE.Vector3(indicatorX, containerVisualTop, indicatorZ)
+    ])}
+    {@const usedLineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(indicatorX + 4, 0, indicatorZ),
+      new THREE.Vector3(indicatorX + 4, usedVisualTop, indicatorZ)
+    ])}
+
+    <T.Line geometry={containerLineGeometry}>
+      <T.LineBasicMaterial color={statusColor} linewidth={2} />
+    </T.Line>
+    <T.Line geometry={usedLineGeometry}>
+      <T.LineBasicMaterial color="#aaaaaa" linewidth={2} />
+    </T.Line>
+
+    <T.Line
+      geometry={new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(indicatorX - 3, 0, indicatorZ),
+        new THREE.Vector3(indicatorX + 7, 0, indicatorZ)
+      ])}
+    >
+      <T.LineBasicMaterial color={statusColor} />
+    </T.Line>
+    <T.Line
+      geometry={new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(indicatorX - 3, containerVisualTop, indicatorZ),
+        new THREE.Vector3(indicatorX + 7, containerVisualTop, indicatorZ)
+      ])}
+    >
+      <T.LineBasicMaterial color={statusColor} />
+    </T.Line>
+
+    <Text
+      text="Game box"
+      font={monoFont}
+      fontSize={5}
+      position={[indicatorX + 10, containerVisualTop / 2 + 5, indicatorZ]}
+      quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+      color="#ffffff"
+      anchorX="left"
+      anchorY="middle"
+    />
+    <Text
+      text={`${gameContainerHeight.toFixed(1)}mm`}
+      font={monoFont}
+      fontSize={4}
+      position={[indicatorX + 10, containerVisualTop / 2 - 1, indicatorZ]}
+      quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+      color={statusColor}
+      anchorX="left"
+      anchorY="middle"
+    />
+    <Text
+      text={`Used ${usedHeight.toFixed(1)}mm`}
+      font={monoFont}
+      fontSize={3.5}
+      position={[indicatorX + 10, Math.max(usedVisualTop - 4, 2), indicatorZ]}
+      quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+      color="#aaaaaa"
+      anchorX="left"
+      anchorY="middle"
+    />
+    <Text
+      text={remainingHeight >= 0 ? `${remainingHeight.toFixed(1)}mm free` : `${Math.abs(remainingHeight).toFixed(1)}mm over`}
+      font={monoFont}
+      fontSize={4}
+      position={[indicatorX + 10, Math.max(containerVisualTop + 6, usedVisualTop + 6), indicatorZ]}
+      quaternion={captureMode ? topDownQuaternion : labelQuaternion}
+      color={statusColor}
+      anchorX="left"
+      anchorY="middle"
+    />
+  {/if}
 {/if}
 
 <!-- Layer view: Boxes and loose trays arranged on game container -->

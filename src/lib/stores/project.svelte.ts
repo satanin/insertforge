@@ -3027,16 +3027,18 @@ export function deleteCardSize(id: string): void {
 // Default global settings
 export const DEFAULT_GLOBAL_SETTINGS = {
   gameContainerWidth: 256,
-  gameContainerDepth: 256
+  gameContainerDepth: 256,
+  gameContainerHeight: null as number | null
 };
 
 // Global settings operations
-export function getGlobalSettings(): { gameContainerWidth: number; gameContainerDepth: number } {
+export function getGlobalSettings(): { gameContainerWidth: number; gameContainerDepth: number; gameContainerHeight: number | null } {
   // If project has explicit global settings, use those
   if (project.globalSettings) {
     return {
       gameContainerWidth: project.globalSettings.gameContainerWidth,
-      gameContainerDepth: project.globalSettings.gameContainerDepth
+      gameContainerDepth: project.globalSettings.gameContainerDepth,
+      gameContainerHeight: project.globalSettings.gameContainerHeight ?? null
     };
   }
   // Otherwise, try to get from existing counter tray
@@ -3046,7 +3048,8 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
         if (isCounterTray(tray)) {
           return {
             gameContainerWidth: tray.params.gameContainerWidth,
-            gameContainerDepth: tray.params.gameContainerDepth
+            gameContainerDepth: tray.params.gameContainerDepth,
+            gameContainerHeight: null
           };
         }
       }
@@ -3055,7 +3058,8 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
       if (isCounterTray(tray)) {
         return {
           gameContainerWidth: tray.params.gameContainerWidth,
-          gameContainerDepth: tray.params.gameContainerDepth
+          gameContainerDepth: tray.params.gameContainerDepth,
+          gameContainerHeight: null
         };
       }
     }
@@ -3064,7 +3068,11 @@ export function getGlobalSettings(): { gameContainerWidth: number; gameContainer
   return DEFAULT_GLOBAL_SETTINGS;
 }
 
-export function updateGlobalSettings(updates: { gameContainerWidth?: number; gameContainerDepth?: number }): void {
+export function updateGlobalSettings(updates: {
+  gameContainerWidth?: number;
+  gameContainerDepth?: number;
+  gameContainerHeight?: number | null;
+}): void {
   // Initialize global settings if not present
   if (!project.globalSettings) {
     project.globalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
@@ -3075,6 +3083,9 @@ export function updateGlobalSettings(updates: { gameContainerWidth?: number; gam
   }
   if (updates.gameContainerDepth !== undefined) {
     project.globalSettings.gameContainerDepth = updates.gameContainerDepth;
+  }
+  if (updates.gameContainerHeight !== undefined) {
+    project.globalSettings.gameContainerHeight = updates.gameContainerHeight;
   }
 
   // Propagate to all counter trays (these are "global" params)

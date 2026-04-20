@@ -33,12 +33,23 @@
 
   interface Props {
     projectName: string;
-    globalSettings: { gameContainerWidth: number; gameContainerDepth: number };
+    globalSettings: { gameContainerWidth: number; gameContainerDepth: number; gameContainerHeight: number | null };
+    effectiveGameContainerHeight: number;
     onProjectNameChange: (name: string) => void;
-    onGlobalSettingsChange: (updates: { gameContainerWidth?: number; gameContainerDepth?: number }) => void;
+    onGlobalSettingsChange: (updates: {
+      gameContainerWidth?: number;
+      gameContainerDepth?: number;
+      gameContainerHeight?: number | null;
+    }) => void;
   }
 
-  let { projectName, globalSettings, onProjectNameChange, onGlobalSettingsChange }: Props = $props();
+  let {
+    projectName,
+    globalSettings,
+    effectiveGameContainerHeight,
+    onProjectNameChange,
+    onGlobalSettingsChange
+  }: Props = $props();
 
   // Track which counter is expanded (null = none)
   let expandedCounterIndex: number | null = $state(null);
@@ -319,11 +330,28 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Height" name="gameContainerHeight">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="1"
+            min="1"
+            value={globalSettings.gameContainerHeight ?? ''}
+            placeholder={`Auto (${effectiveGameContainerHeight.toFixed(0)}mm)`}
+            onchange={(e) => {
+              const value = e.currentTarget.value.trim();
+              onGlobalSettingsChange({ gameContainerHeight: value ? parseInt(value) : null });
+            }}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
     </div>
     <Spacer size="0.5rem" />
     <Text size="0.875rem" color="var(--fgMuted)">
       Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
-      calculations.
+      calculations. Leave height empty to use the current stacked layer height automatically.
     </Text>
   </section>
 

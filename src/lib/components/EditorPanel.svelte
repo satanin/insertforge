@@ -99,6 +99,7 @@
     isLayoutEditMode?: boolean;
     gameContainerWidth?: number;
     gameContainerDepth?: number;
+    gameContainerHeight?: number;
     onForceRegenerate?: () => void;
     onSelectionChange?: (type: SelectionType) => void;
   }
@@ -108,6 +109,7 @@
     isLayoutEditMode = false,
     gameContainerWidth = 256,
     gameContainerDepth = 256,
+    gameContainerHeight = 70,
     onForceRegenerate,
     onSelectionChange
   }: Props = $props();
@@ -453,7 +455,11 @@
     updateProjectName(name);
   }
 
-  function handleGlobalSettingsChange(updates: { gameContainerWidth?: number; gameContainerDepth?: number }) {
+  function handleGlobalSettingsChange(updates: {
+    gameContainerWidth?: number;
+    gameContainerDepth?: number;
+    gameContainerHeight?: number | null;
+  }) {
     updateGlobalSettings(updates);
   }
 
@@ -604,7 +610,7 @@
           <div class="layoutDimensionsInfo">
             <div class="dimensionRow">
               <span class="dimensionLabel">Game container</span>
-              <span class="dimensionValue">{gameContainerWidth} × {gameContainerDepth}mm</span>
+              <span class="dimensionValue">{gameContainerWidth} × {gameContainerDepth} × {gameContainerHeight}mm</span>
             </div>
             {#if selectedBox}
               <div class="dimensionRow">
@@ -622,6 +628,7 @@
         <GlobalsPanel
           {projectName}
           {globalSettings}
+          effectiveGameContainerHeight={gameContainerHeight}
           onProjectNameChange={handleProjectNameChange}
           onGlobalSettingsChange={handleGlobalSettingsChange}
         />

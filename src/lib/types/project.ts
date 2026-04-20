@@ -257,6 +257,7 @@ export interface Box {
 export interface GlobalSettings {
   gameContainerWidth: number;
   gameContainerDepth: number;
+  gameContainerHeight: number | null;
 }
 
 export interface Project {

@@ -27,6 +27,7 @@
   import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
   import {
     arrangeLayerContents,
+    calculateLayerHeight,
     getLayeredBoxExteriorDimensions,
     getLayeredBoxRenderLayout,
     type BoardPlacement,
@@ -730,6 +731,19 @@
   let globalSettings = $derived(getGlobalSettings());
   let gameContainerWidth = $derived(globalSettings.gameContainerWidth);
   let gameContainerDepth = $derived(globalSettings.gameContainerDepth);
+  let autoGameContainerHeight = $derived.by(() => {
+    const project = getProject();
+    return project.layers.reduce(
+      (total, layer) =>
+        total +
+        calculateLayerHeight(layer, {
+          cardSizes: project.cardSizes || [],
+          counterShapes: project.counterShapes || []
+        }),
+      0
+    );
+  });
+  let gameContainerHeight = $derived(globalSettings.gameContainerHeight ?? autoGameContainerHeight);
 
   function getProjectExportName(): string {
     return sanitizeExportName(getProject().name ?? '', 'counterslayer');
@@ -2670,6 +2684,8 @@
               lidTextInlayGeometry={visibleGeometries.lidTextInlay}
               gameContainerWidth={layerViewContainerWidth}
               gameContainerDepth={layerViewContainerDepth}
+              {gameContainerHeight}
+              gameContainerHeightIsAuto={globalSettings.gameContainerHeight === null}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -2910,6 +2926,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          {gameContainerHeight}
           onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
         />
@@ -2942,6 +2959,8 @@
               lidTextInlayGeometry={visibleGeometries.lidTextInlay}
               gameContainerWidth={layerViewContainerWidth}
               gameContainerDepth={layerViewContainerDepth}
+              {gameContainerHeight}
+              gameContainerHeightIsAuto={globalSettings.gameContainerHeight === null}
               exploded={visibleGeometries.exploded}
               showAllTrays={visibleGeometries.showAllTrays}
               showAllBoxes={visibleGeometries.showAllBoxes}
@@ -3220,6 +3239,7 @@
           {isLayoutEditMode}
           {gameContainerWidth}
           {gameContainerDepth}
+          {gameContainerHeight}
           onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
         />
