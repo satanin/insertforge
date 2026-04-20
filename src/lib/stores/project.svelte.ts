@@ -115,6 +115,7 @@ export type {
 // Default counter thickness (used when migrating old shapes without thickness)
 export const DEFAULT_COUNTER_THICKNESS = 1.3;
 export const DEFAULT_PROJECT_NAME = 'InsertForge Project';
+export const CURRENT_PROJECT_SCHEMA_VERSION = 3;
 
 // Default counter shapes (global)
 export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [

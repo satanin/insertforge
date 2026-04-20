@@ -261,7 +261,9 @@ export interface GlobalSettings {
 }
 
 export interface Project {
-  version?: number; // For migration (2 = layers format)
+  schemaVersion: number;
+  appVersion: string;
+  version?: number; // Legacy Counter Slayer format marker (2 = layers format)
   name: string;
   layers: Layer[];
   counterShapes: CounterShape[];
@@ -278,6 +280,9 @@ export interface Project {
 
 // Legacy project format (pre-layers)
 export interface LegacyProject {
+  version?: number;
+  schemaVersion?: number;
+  appVersion?: string;
   name?: string;
   boxes: Box[];
   counterShapes: CounterShape[];

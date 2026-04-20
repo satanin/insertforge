@@ -62,7 +62,8 @@ function createLayeredBoxFixture(): LayeredBox {
 
 function createProjectFixture(): Project {
   return {
-    version: 2,
+    schemaVersion: 3,
+    appVersion: '1.1.0',
     name: 'Test Project',
     layers: [
       {
@@ -165,6 +166,25 @@ describe('project store project name', () => {
   });
 });
 
+describe('project store schema version', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('migrates legacy Counter Slayer version marker to InsertForge schema version', () => {
+    importProject({
+      ...createProjectFixture(),
+      version: 2,
+      schemaVersion: undefined as unknown as number,
+      appVersion: undefined as unknown as string
+    });
+
+    expect(getProject().version).toBeUndefined();
+    expect(getProject().schemaVersion).toBe(3);
+    expect(getProject().appVersion).toBe('1.1.0');
+  });
+});
+
 describe('project store global settings', () => {
   beforeEach(() => {
     resetProject();
@@ -190,7 +210,8 @@ describe('box placeholder dimensions', () => {
 
   it('clears empty-box placeholder dimensions when moving the first tray into it', () => {
     importProject({
-      version: 2,
+      schemaVersion: 3,
+      appVersion: '1.1.0',
       name: 'Test Project',
       layers: [
         {

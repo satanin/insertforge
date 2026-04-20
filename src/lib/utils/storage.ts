@@ -6,6 +6,7 @@ import {
   type EdgeLoadedStackDef,
   type TopLoadedStackDef
 } from '$lib/models/counterTray';
+import { APP_VERSION } from '$lib/appInfo';
 import { defaultLidParams } from '$lib/models/lid';
 import {
   DEFAULT_CARD_SIZES,
@@ -13,6 +14,7 @@ import {
   DEFAULT_COUNTER_THICKNESS,
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_PROJECT_NAME,
+  CURRENT_PROJECT_SCHEMA_VERSION,
   TRAY_COLORS
 } from '$lib/stores/project.svelte';
 import type { CupLayout } from '$lib/types/cupLayout';
@@ -582,7 +584,8 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     };
 
     return {
-      version: 2,
+      schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+      appVersion: APP_VERSION,
       name: projectName,
       layers: [layer],
       counterShapes,
@@ -629,7 +632,9 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
   return {
     ...project,
-    version: 2,
+    version: undefined,
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
     name: projectName,
     layers: migratedLayers,
     counterShapes,
