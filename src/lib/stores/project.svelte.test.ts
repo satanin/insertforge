@@ -15,6 +15,7 @@ import {
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
   selectLayeredBoxSection,
+  updateLayeredBoxSection,
   updateGlobalSettings,
   updateProjectName
 } from './project.svelte';
@@ -150,6 +151,26 @@ describe('project store layered box selection', () => {
     const manualLayout = getProject().layers[0].layeredBoxes[0].layers[0].manualLayout;
 
     expect(manualLayout).toBeUndefined();
+  });
+
+  it('allows reducing counters in an already width-constrained internal section', () => {
+    const section = getProject().layers[0].layeredBoxes[0].layers[0].sections[0];
+    section.counterParams = {
+      ...section.counterParams!,
+      trayWidthOverride: 20,
+      topLoadedStacks: [[DEFAULT_SHAPE_IDS.square, 5, 'Section A1']],
+      edgeLoadedStacks: []
+    };
+
+    const updated = updateLayeredBoxSection('layered-box-1', 'internal-layer-a', 'section-a1', {
+      counterParams: {
+        ...section.counterParams,
+        topLoadedStacks: [[DEFAULT_SHAPE_IDS.square, 1, 'Section A1']]
+      }
+    });
+
+    expect(updated).toBe(true);
+    expect(section.counterParams.topLoadedStacks[0][1]).toBe(1);
   });
 });
 

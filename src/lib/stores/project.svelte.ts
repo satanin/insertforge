@@ -2041,27 +2041,19 @@ export function updateLayeredBoxSection(
     Object.assign(section, updates);
     const nextOverflow = getLayeredBoxSectionContentOverflow(section);
     const nextLayoutOverflow = getLayeredBoxLayoutOverflow(layeredBox);
-    const improvesInvalidContent =
+    const doesNotWorsenInvalidContent =
       !nextOverflow.fits &&
       !previousOverflow.fits &&
       nextOverflow.widthOverflow <= previousOverflow.widthOverflow + 0.01 &&
-      nextOverflow.depthOverflow <= previousOverflow.depthOverflow + 0.01 &&
-      (nextOverflow.widthOverflow < previousOverflow.widthOverflow - 0.01 ||
-        nextOverflow.depthOverflow < previousOverflow.depthOverflow - 0.01);
-    const improvesInvalidLayout =
+      nextOverflow.depthOverflow <= previousOverflow.depthOverflow + 0.01;
+    const doesNotWorsenInvalidLayout =
       !nextLayoutOverflow.fits &&
       !previousLayoutOverflow.fits &&
       nextLayoutOverflow.widthOverflow <= previousLayoutOverflow.widthOverflow + 0.01 &&
       nextLayoutOverflow.depthOverflow <= previousLayoutOverflow.depthOverflow + 0.01 &&
-      nextLayoutOverflow.heightOverflow <= previousLayoutOverflow.heightOverflow + 0.01 &&
-      (nextLayoutOverflow.widthOverflow < previousLayoutOverflow.widthOverflow - 0.01 ||
-        nextLayoutOverflow.depthOverflow < previousLayoutOverflow.depthOverflow - 0.01 ||
-        nextLayoutOverflow.heightOverflow < previousLayoutOverflow.heightOverflow - 0.01);
+      nextLayoutOverflow.heightOverflow <= previousLayoutOverflow.heightOverflow + 0.01;
 
-    if (
-      (!nextOverflow.fits && !improvesInvalidContent) ||
-      (!nextLayoutOverflow.fits && !improvesInvalidLayout)
-    ) {
+    if ((!nextOverflow.fits && !doesNotWorsenInvalidContent) || (!nextLayoutOverflow.fits && !doesNotWorsenInvalidLayout)) {
       Object.assign(section, previous);
       return false;
     }

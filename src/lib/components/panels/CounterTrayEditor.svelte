@@ -72,11 +72,14 @@
     if (nextParams.trayWidthOverride > 0) {
       const currentMinWidth = getTrayDimensions({ ...tray.params, trayWidthOverride: 0 }, getCounterShapes()).width;
       const minWidth = getTrayDimensions({ ...nextParams, trayWidthOverride: 0 }, getCounterShapes()).width;
-      const currentlyInvalid = currentMinWidth > tray.params.trayWidthOverride + 0.01 && tray.params.trayWidthOverride > 0;
-      const nextInvalid = minWidth > nextParams.trayWidthOverride + 0.01;
-      const improvesInvalidState = currentlyInvalid && nextInvalid && minWidth < currentMinWidth - 0.01;
+      const currentOverflow =
+        tray.params.trayWidthOverride > 0 ? Math.max(currentMinWidth - tray.params.trayWidthOverride, 0) : 0;
+      const nextOverflow = Math.max(minWidth - nextParams.trayWidthOverride, 0);
+      const currentlyInvalid = currentOverflow > 0.01;
+      const nextInvalid = nextOverflow > 0.01;
+      const doesNotWorsenInvalidState = currentlyInvalid && nextInvalid && nextOverflow <= currentOverflow + 0.01;
 
-      if (nextInvalid && !improvesInvalidState) {
+      if (nextInvalid && !doesNotWorsenInvalidState) {
         addToast({
           data: {
             title: 'Tray does not fit',
