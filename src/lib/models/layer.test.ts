@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { defaultCardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultLidParams } from '$lib/models/lid';
-import { DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
-import type { CounterShape, Layer, LayeredBox, LayeredBoxSection } from '$lib/types/project';
+import { DEFAULT_CARD_SIZE_IDS, DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
+import type { CardSize, CounterShape, Layer, LayeredBox, LayeredBoxSection } from '$lib/types/project';
 
 import { arrangeLayerContents, calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from './layer';
 
@@ -15,6 +16,16 @@ const counterShapes: CounterShape[] = [
     width: 16,
     length: 16,
     thickness: 1.3
+  }
+];
+
+const cardSizes: CardSize[] = [
+  {
+    id: DEFAULT_CARD_SIZE_IDS.standard,
+    name: 'Standard',
+    width: 63.5,
+    length: 88,
+    thickness: 0.35
   }
 ];
 
@@ -169,5 +180,50 @@ describe('layered box layout model', () => {
 
     expect(arrangement.layerHeight).toBe(80);
     expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(80);
+  });
+
+  it('keeps card divider placement at natural height when auto height is disabled', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [
+        {
+          id: 'tray-1',
+          type: 'cardDivider',
+          name: 'Card Divider 1',
+          color: '#c9503c',
+          rotationOverride: 'auto',
+          autoHeight: false,
+          showStackLabels: true,
+          params: {
+            ...defaultCardDividerTrayParams,
+            orientation: 'horizontal',
+            stacks: [{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: 'Cards' }]
+          }
+        }
+      ],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 100
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    expect(arrangement.layerHeight).toBe(100);
+    expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(100);
   });
 });

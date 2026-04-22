@@ -199,7 +199,7 @@
     const placement = placements.find((p) => p.tray.id === selectedTray.id);
     if (!placement) return null;
     const height =
-      isCounterTray(selectedTray) && selectedTray.autoHeight === false
+      (isCounterTray(selectedTray) || isCardDividerTray(selectedTray)) && selectedTray.autoHeight === false
         ? placement.dimensions.height
         : maxTrayHeight > placement.dimensions.height
           ? maxTrayHeight

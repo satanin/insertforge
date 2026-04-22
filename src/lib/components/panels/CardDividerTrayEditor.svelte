@@ -269,6 +269,12 @@
       checked={tray.showStackLabels ?? true}
       onchange={(e) => onUpdateTray?.({ showStackLabels: e.currentTarget.checked })}
     />
+    <Spacer size="0.75rem" />
+    <InputCheckbox
+      label="Auto-adjust height to layer"
+      checked={tray.autoHeight ?? true}
+      onchange={(e) => onUpdateTray?.({ autoHeight: e.currentTarget.checked })}
+    />
     {#if (tray.showStackLabels ?? true) && tray.params.wallThickness < 2}
       <p class="settingHint">
         Thin walls reduce stack label emboss depth automatically to avoid cutting through the wall.
