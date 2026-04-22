@@ -199,7 +199,10 @@
     const placement = placements.find((p) => p.tray.id === selectedTray.id);
     if (!placement) return null;
     const height =
-      (isCounterTray(selectedTray) || isCardDividerTray(selectedTray) || isCardTray(selectedTray)) &&
+      (isCounterTray(selectedTray) ||
+        isCardDividerTray(selectedTray) ||
+        isCardTray(selectedTray) ||
+        isCardWellTray(selectedTray)) &&
       selectedTray.autoHeight === false
         ? placement.dimensions.height
         : maxTrayHeight > placement.dimensions.height
@@ -487,6 +490,7 @@
           tray={selectedTray as CardWellTray}
           {trayLetter}
           onUpdateParams={onUpdateCardWellParams}
+          {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

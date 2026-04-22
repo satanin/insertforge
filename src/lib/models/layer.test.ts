@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { defaultCardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams } from '$lib/models/cardTray';
+import { createDefaultCardWellTrayParams } from '$lib/models/cardWellTray';
 import { defaultLidParams } from '$lib/models/lid';
 import { DEFAULT_CARD_SIZE_IDS, DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
 import type { CardSize, CounterShape, Layer, LayeredBox, LayeredBoxSection } from '$lib/types/project';
@@ -246,6 +247,54 @@ describe('layered box layout model', () => {
             ...defaultCardDrawTrayParams,
             cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
             cardCount: 30
+          }
+        }
+      ],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 100
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    expect(arrangement.layerHeight).toBe(100);
+    expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(100);
+  });
+
+  it('keeps card well placement at natural height when auto height is disabled', () => {
+    const params = createDefaultCardWellTrayParams();
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [
+        {
+          id: 'tray-1',
+          type: 'cardWell',
+          name: 'Card Well 1',
+          color: '#c9503c',
+          rotationOverride: 'auto',
+          autoHeight: false,
+          params: {
+            ...params,
+            stacks: params.stacks.map((stack) => ({
+              ...stack,
+              cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
+              count: 30
+            }))
           }
         }
       ],

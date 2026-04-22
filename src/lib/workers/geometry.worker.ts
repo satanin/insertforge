@@ -503,14 +503,20 @@ function createTrayGeometry(
 }
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
-  if ((isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray)) && tray.autoHeight === false) {
+  if (
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray)) &&
+    tray.autoHeight === false
+  ) {
     return naturalHeight;
   }
   return adjustedHeight;
 }
 
 function getTraySpacerHeight(tray: Tray, adjustedSpacerHeight: number): number {
-  if ((isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray)) && tray.autoHeight === false) {
+  if (
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray)) &&
+    tray.autoHeight === false
+  ) {
     return 0;
   }
   return adjustedSpacerHeight;

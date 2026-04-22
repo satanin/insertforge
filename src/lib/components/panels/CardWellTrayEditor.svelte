@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
   import type { CardWellTray } from '$lib/types/project';
   import { type CardWellTrayParams, getCardWellTrayDimensions, syncStacksWithLayout } from '$lib/models/cardWellTray';
@@ -11,11 +11,12 @@
     tray: CardWellTray;
     trayLetter: string;
     onUpdateParams: (params: CardWellTrayParams) => void;
+    onUpdateTray?: (updates: Partial<CardWellTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
   }
 
-  let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+  let { tray, trayLetter, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props = $props();
 
   // Get available cell IDs from layout
   let cellIds = $derived(getAllCellIds(tray.params.layout));
@@ -196,6 +197,14 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    {#if onUpdateTray}
+      <Spacer size="1rem" />
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+    {/if}
   </section>
 </div>
 
