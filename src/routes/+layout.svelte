@@ -34,6 +34,9 @@
         <span class="headerVersion">
           <Link href={APP_LINKS.changelog} color="muted">v{APP_VERSION}</Link>
         </span>
+        <span>by</span>
+        <Link href={APP_LINKS.satanin} target="_blank" rel="noopener noreferrer" color="fg">satanin</Link>
+        <span>-</span>
         <span>based on</span>
         <Link href={APP_LINKS.counterSlayerApp} target="_blank" rel="noopener noreferrer" color="fg">Counter Slayer</Link>
         <span>by</span>
