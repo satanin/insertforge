@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, FormControl, Spacer, Select } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Select } from '@tableslayer/ui';
   import type { CardDrawTray } from '$lib/types/project';
   import { type CardDrawTrayParams, getCardDrawTrayDimensions } from '$lib/models/cardTray';
   import { getCardSizes } from '$lib/stores/project.svelte';
@@ -7,11 +7,12 @@
   interface Props {
     tray: CardDrawTray;
     onUpdateParams: (params: CardDrawTrayParams) => void;
+    onUpdateTray?: (updates: Partial<CardDrawTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
   }
 
-  let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+  let { tray, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props = $props();
 
   let cardSizes = $derived(getCardSizes());
   let selectedCardSize = $derived(cardSizes.find((s) => s.id === tray.params.cardSizeId));
@@ -146,6 +147,14 @@
         {#snippet end()}°{/snippet}
       </FormControl>
     </div>
+    {#if onUpdateTray}
+      <Spacer size="1rem" />
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+    {/if}
   </section>
 
   <Spacer size="0.5rem" />
