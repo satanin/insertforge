@@ -202,7 +202,8 @@
       (isCounterTray(selectedTray) ||
         isCardDividerTray(selectedTray) ||
         isCardTray(selectedTray) ||
-        isCardWellTray(selectedTray)) &&
+        isCardWellTray(selectedTray) ||
+        isCupTray(selectedTray)) &&
       selectedTray.autoHeight === false
         ? placement.dimensions.height
         : maxTrayHeight > placement.dimensions.height
@@ -498,6 +499,7 @@
         <CupTrayEditor
           tray={selectedTray as CupTray}
           onUpdateParams={onUpdateCupParams}
+          {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

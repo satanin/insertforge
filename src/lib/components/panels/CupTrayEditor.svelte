@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, FormControl, Spacer } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer } from '@tableslayer/ui';
   import type { CupTray } from '$lib/types/project';
   import type { CupLayout } from '$lib/types/cupLayout';
   import { countCups } from '$lib/types/cupLayout';
@@ -14,11 +14,12 @@
   interface Props {
     tray: CupTray;
     onUpdateParams: (params: CupTrayParams) => void;
+    onUpdateTray?: (updates: Partial<CupTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
   }
 
-  let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+  let { tray, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props = $props();
 
   // Cup count for display
   let cupCount = $derived(countCups(tray.params.layout));
@@ -197,6 +198,14 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    {#if onUpdateTray}
+      <Spacer size="1rem" />
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+    {/if}
   </section>
 </div>
 

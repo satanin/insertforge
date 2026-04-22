@@ -504,7 +504,7 @@ function createTrayGeometry(
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray)) &&
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
     tray.autoHeight === false
   ) {
     return naturalHeight;
@@ -514,7 +514,7 @@ function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: 
 
 function getTraySpacerHeight(tray: Tray, adjustedSpacerHeight: number): number {
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray)) &&
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
     tray.autoHeight === false
   ) {
     return 0;
