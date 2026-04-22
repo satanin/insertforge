@@ -16,6 +16,7 @@ import type {
   ManualLooseTrayPlacement,
   Tray
 } from '$lib/types/project';
+import { isCounterTray } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import { getBoxExteriorDimensions, getBoxVisibleAssembledHeight, getTrayDimensionsForTray } from './box';
 
@@ -343,6 +344,13 @@ export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes:
   };
 }
 
+function getLooseTrayPlacementHeight(tray: Tray, naturalHeight: number, layerHeight: number): number {
+  if (isCounterTray(tray) && tray.autoHeight === false) {
+    return naturalHeight;
+  }
+  return layerHeight;
+}
+
 /**
  * Arrange boxes and loose trays within a layer
  * Uses bin-packing similar to arrangeTrays but at the layer level
@@ -421,10 +429,11 @@ function arrangeLayerManual(
 
       const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
       // Apply rotation: 90° and 270° swap width/depth
+      const height = getLooseTrayPlacementHeight(tray, dims.height, layerHeight);
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims = swapDims
-        ? { width: dims.depth, depth: dims.width, height: layerHeight }
-        : { width: dims.width, depth: dims.depth, height: layerHeight };
+        ? { width: dims.depth, depth: dims.width, height }
+        : { width: dims.width, depth: dims.depth, height };
 
       looseTrayPlacements.push({
         tray,
@@ -640,9 +649,11 @@ function arrangeLayerAuto(
           rotation: rotated ? 90 : 0
         });
       } else if (data.itemType === 'looseTray') {
+        const tray = data.item as Tray;
+        const naturalHeight = getTrayDimensionsForTray(tray, cardSizes, counterShapes).height;
         looseTrayPlacements.push({
-          tray: data.item as Tray,
-          dimensions: { width, depth, height: layerHeight },
+          tray,
+          dimensions: { width, depth, height: getLooseTrayPlacementHeight(tray, naturalHeight, layerHeight) },
           x,
           y,
           rotation: rotated ? 90 : 0

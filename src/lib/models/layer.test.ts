@@ -4,7 +4,7 @@ import { defaultLidParams } from '$lib/models/lid';
 import { DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
 import type { CounterShape, Layer, LayeredBox, LayeredBoxSection } from '$lib/types/project';
 
-import { calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from './layer';
+import { arrangeLayerContents, calculateLayerHeight, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from './layer';
 
 const counterShapes: CounterShape[] = [
   {
@@ -125,5 +125,49 @@ describe('layered box layout model', () => {
     const height = calculateLayerHeight(layer, { cardSizes: [], counterShapes });
 
     expect(height).toBe(80);
+  });
+
+  it('keeps counter tray placement at natural height when auto height is disabled', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [
+        {
+          id: 'tray-1',
+          type: 'counter',
+          name: 'Counter Tray 1',
+          color: '#c9503c',
+          rotationOverride: 'auto',
+          autoHeight: false,
+          params: {
+            ...defaultParams,
+            topLoadedStacks: [[DEFAULT_SHAPE_IDS.square, 5, 'Counters']],
+            edgeLoadedStacks: []
+          }
+        }
+      ],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 80
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes: [],
+      counterShapes
+    });
+
+    expect(arrangement.layerHeight).toBe(80);
+    expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(80);
   });
 });

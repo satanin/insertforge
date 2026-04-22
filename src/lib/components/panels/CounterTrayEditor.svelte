@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Input, FormControl, Spacer, Select, Link, IconButton, Icon, addToast } from '@tableslayer/ui';
+  import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon, addToast } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CounterTray, CounterShapeCategory } from '$lib/types/project';
   import type { CounterTrayParams, EdgeOrientation } from '$lib/models/counterTray';
@@ -11,12 +11,21 @@
     tray: CounterTray;
     trayLetter: string;
     onUpdateParams: (params: CounterTrayParams) => void;
+    onUpdateTray?: (updates: Partial<CounterTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
     allowedShapeCategory?: CounterShapeCategory;
   }
 
-  let { tray, trayLetter, onUpdateParams, actualHeight, displayDimensions, allowedShapeCategory = 'counter' }: Props = $props();
+  let {
+    tray,
+    trayLetter,
+    onUpdateParams,
+    onUpdateTray,
+    actualHeight,
+    displayDimensions,
+    allowedShapeCategory = 'counter'
+  }: Props = $props();
 
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
@@ -435,6 +444,14 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    {#if onUpdateTray}
+      <Spacer size="1rem" />
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+    {/if}
   </section>
 
   <Spacer size="0.5rem" />

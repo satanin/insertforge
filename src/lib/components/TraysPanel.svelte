@@ -198,11 +198,17 @@
     });
     const placement = placements.find((p) => p.tray.id === selectedTray.id);
     if (!placement) return null;
-    // Use placement dimensions (already rotated) but override height with maxTrayHeight if larger
+    const height =
+      isCounterTray(selectedTray) && selectedTray.autoHeight === false
+        ? placement.dimensions.height
+        : maxTrayHeight > placement.dimensions.height
+          ? maxTrayHeight
+          : placement.dimensions.height;
+    // Use placement dimensions (already rotated) and apply layer height only when enabled.
     return {
       width: placement.dimensions.width,
       depth: placement.dimensions.depth,
-      height: maxTrayHeight > placement.dimensions.height ? maxTrayHeight : placement.dimensions.height
+      height
     };
   });
 
@@ -454,6 +460,7 @@
           tray={selectedTray as CounterTray}
           {trayLetter}
           onUpdateParams={onUpdateCounterParams}
+          {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

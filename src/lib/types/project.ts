@@ -38,6 +38,7 @@ interface BaseTray {
   color: string;
   rotationOverride?: 'auto' | 0 | 90; // User can force rotation: 'auto' = algorithm decides, 0 = no rotation, 90 = rotated
   showEmboss?: boolean; // Whether to emboss the tray name on the bottom (default: true)
+  autoHeight?: boolean; // Whether the tray should grow to match its layer/box height (default: true)
 }
 
 // Visual-only board item for layer planning

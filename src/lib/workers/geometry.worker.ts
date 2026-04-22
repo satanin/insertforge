@@ -34,7 +34,7 @@ import {
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
 import { sanitizeExportName } from '$lib/utils/exportNames';
 import { cleanGeometryForExport } from '$lib/utils/exportGeometryCleanup';
 import threemfSerializer from '@jscad/3mf-serializer';
@@ -502,6 +502,20 @@ function createTrayGeometry(
   return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);
 }
 
+function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
+  if (isCounterTray(tray) && tray.autoHeight === false) {
+    return naturalHeight;
+  }
+  return adjustedHeight;
+}
+
+function getTraySpacerHeight(tray: Tray, adjustedSpacerHeight: number): number {
+  if (isCounterTray(tray) && tray.autoHeight === false) {
+    return 0;
+  }
+  return adjustedSpacerHeight;
+}
+
 /**
  * Get stack positions based on tray type (returns CounterStack[] for compatibility)
  */
@@ -781,20 +795,23 @@ function handleGenerate(msg: GenerateMessage): void {
 
       if (tray) {
         const selectedSpacer = spacerInfo.find((s) => s.trayId === tray.id);
-        const selectedSpacerHeight = selectedSpacer?.floorSpacerHeight ?? 0;
-        cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+        const selectedNaturalHeight = getTrayDimensionsForTray(tray, cardSizes, counterShapes).height;
+        const selectedTargetHeight = getTrayTargetHeight(tray, selectedNaturalHeight, maxHeight);
+        const selectedSpacerHeight = getTraySpacerHeight(tray, selectedSpacer?.floorSpacerHeight ?? 0);
+        cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
         selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-        selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, selectedSpacerHeight);
+        selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
       }
 
       // Generate all trays for selected box
       cachedAllTrays = [];
       allTrayGeometries = placements.map((placement) => {
         const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
-        const spacerHeight = spacer?.floorSpacerHeight ?? 0;
+        const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, maxHeight);
+        const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
         let jscadGeom!: Geom3;
         time(`createTray (${placement.tray.name})`, () => {
-          jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+          jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
         });
 
         cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
@@ -808,10 +825,10 @@ function handleGenerate(msg: GenerateMessage): void {
             ...placement,
             dimensions: {
               ...placement.dimensions,
-              height: maxHeight
+              height: trayTargetHeight
             }
           },
-          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, maxHeight, spacerHeight),
+          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
         };
       });
@@ -837,7 +854,8 @@ function handleGenerate(msg: GenerateMessage): void {
       const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
       const naturalHeight = trayDims.height;
       // Use layer height if available, otherwise use natural height
-      const maxHeight = looseTrayLayerHeight > 0 ? looseTrayLayerHeight : naturalHeight;
+      const adjustedHeight = looseTrayLayerHeight > 0 ? looseTrayLayerHeight : naturalHeight;
+      const maxHeight = getTrayTargetHeight(tray, naturalHeight, adjustedHeight);
       const spacerHeight = 0; // No spacer for loose trays
 
       // Generate standalone tray
@@ -951,8 +969,9 @@ function handleGenerate(msg: GenerateMessage): void {
 
       const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement) => {
         const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
-        const spacerHeight = spacer?.floorSpacerHeight ?? 0;
-        const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, boxMaxHeight, spacerHeight);
+        const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, boxMaxHeight);
+        const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
+        const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
 
         // Cache for STL export
         cachedTraysForBox.push({ jscadGeom, name: placement.tray.name });
@@ -966,10 +985,10 @@ function handleGenerate(msg: GenerateMessage): void {
             ...placement,
             dimensions: {
               ...placement.dimensions,
-              height: boxMaxHeight
+              height: trayTargetHeight
             }
           },
-          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, boxMaxHeight, spacerHeight),
+          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
         };
       });
@@ -1098,7 +1117,8 @@ function handleGenerate(msg: GenerateMessage): void {
         // Calculate tray dimensions for width/depth
         const trayDims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
         // Use layer height for the tray height so loose trays match box exterior height
-        const maxHeight = layerHeight > 0 ? layerHeight : trayDims.height;
+        const adjustedHeight = layerHeight > 0 ? layerHeight : trayDims.height;
+        const maxHeight = getTrayTargetHeight(looseTray, trayDims.height, adjustedHeight);
         const spacerHeight = 0; // No spacer for loose trays
 
         // Generate tray geometry at the layer height
