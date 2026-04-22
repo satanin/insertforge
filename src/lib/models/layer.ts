@@ -354,6 +354,13 @@ function getLooseTrayPlacementHeight(tray: Tray, naturalHeight: number, layerHei
   return layerHeight;
 }
 
+function getBoxPlacementHeight(box: Box, naturalHeight: number, layerHeight: number): number {
+  if (box.autoHeight === false) {
+    return naturalHeight;
+  }
+  return layerHeight;
+}
+
 /**
  * Arrange boxes and loose trays within a layer
  * Uses bin-packing similar to arrangeTrays but at the layer level
@@ -409,10 +416,11 @@ function arrangeLayerManual(
       const dims = getBoxDimensions(box, cardSizes, counterShapes);
       // Apply rotation: 90° and 270° swap width/depth
       // Use layerHeight for consistent layer stacking
+      const height = getBoxPlacementHeight(box, dims.height, layerHeight);
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims: BoxDimensions = swapDims
-        ? { width: dims.depth, depth: dims.width, height: layerHeight }
-        : { width: dims.width, depth: dims.depth, height: layerHeight };
+        ? { width: dims.depth, depth: dims.width, height }
+        : { width: dims.width, depth: dims.depth, height };
 
       boxPlacements.push({
         box,
@@ -644,9 +652,11 @@ function arrangeLayerAuto(
       const { data, x, y, width, depth, rotated } = packed;
 
       if (data.itemType === 'box') {
+        const box = data.item as Box;
+        const naturalHeight = getBoxDimensions(box, cardSizes, counterShapes).height;
         boxPlacements.push({
-          box: data.item as Box,
-          dimensions: { width, depth, height: layerHeight },
+          box,
+          dimensions: { width, depth, height: getBoxPlacementHeight(box, naturalHeight, layerHeight) },
           x,
           y,
           rotation: rotated ? 90 : 0

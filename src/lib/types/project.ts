@@ -246,6 +246,7 @@ export interface Box {
   customWidth?: number; // Exterior X dimension
   customDepth?: number; // Exterior Y dimension
   customBoxHeight?: number; // Exterior Z dimension (box only, excludes lid; UI shows total height)
+  autoHeight?: boolean; // Whether the box should grow to match its layer height (default: true)
   // Gap-filling behavior
   fillSolidEmpty?: boolean; // true = solid fill (default), false = walls only
   // Manual layout (when set, overrides auto-arrangement)

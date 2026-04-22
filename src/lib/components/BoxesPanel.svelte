@@ -109,7 +109,12 @@
       ? {
           width: selectedBox.customWidth ?? minimums.minWidth,
           depth: selectedBox.customDepth ?? minimums.minDepth,
-          height: layerHeight > 0 ? Math.max(naturalBoxHeight, layerHeight) : naturalBoxHeight
+          height:
+            selectedBox.autoHeight === false
+              ? naturalBoxHeight
+              : layerHeight > 0
+                ? Math.max(naturalBoxHeight, layerHeight)
+                : naturalBoxHeight
         }
       : null
   );
@@ -286,6 +291,12 @@
         <Text color="var(--fgMuted)" size="0.875rem">
           {adaptToGapHelpText}
         </Text>
+        <Spacer size="0.5rem" />
+        <InputCheckbox
+          label="Auto-adjust height to layer"
+          checked={selectedBox.autoHeight ?? true}
+          onchange={(e) => onUpdateBox({ autoHeight: e.currentTarget.checked })}
+        />
         <Spacer size="0.5rem" />
 
         <div class="formGrid">

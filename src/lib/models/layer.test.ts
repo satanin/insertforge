@@ -363,4 +363,49 @@ describe('layered box layout model', () => {
     expect(arrangement.layerHeight).toBe(100);
     expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(100);
   });
+
+  it('keeps box placement at natural height when auto height is disabled', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [
+        {
+          id: 'box-1',
+          name: 'Box 1',
+          trays: [],
+          tolerance: 0.5,
+          wallThickness: 3,
+          floorThickness: 2,
+          lidParams: { ...defaultLidParams },
+          customWidth: 50,
+          customDepth: 50,
+          customBoxHeight: 30,
+          fillSolidEmpty: true,
+          autoHeight: false
+        }
+      ],
+      layeredBoxes: [],
+      looseTrays: [],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 100
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    expect(arrangement.layerHeight).toBe(100);
+    expect(arrangement.boxes[0].dimensions.height).toBeLessThan(100);
+  });
 });

@@ -657,10 +657,8 @@
               </Text>
               <Spacer size="1rem" />
               <Text size="0.875rem" color="fgMuted">
-                All boxes and loose trays in a layer are normalized to be the same height as the tallest tray. Trays
-                within a box will simlarly normalize to make sure the contents don't spill. If you are targeting
-                specific heights for a layer or box, please edit the stacks and heights individually in their child
-                trays.
+                Boxes and loose trays can auto-adjust to the tallest item in a layer. Disable auto height on an item to
+                keep its natural or custom height while the layer still reports the tallest overall item.
               </Text>
               <Spacer size="1rem" />
               <div class="layerContents">
