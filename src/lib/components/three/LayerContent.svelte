@@ -636,6 +636,7 @@
 {#each boxPlacements as boxPlacement (boxPlacement.box.id)}
   {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.box.id)}
   {@const boxHeight = boxPlacement.dimensions.height}
+  {@const boxBaseHeight = boxPlacement.baseHeight ?? 0}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
   {@const itemCenterX = boxPlacement.x + boxPlacement.dimensions.width / 2}
   {@const itemCenterZ = boxPlacement.y + boxPlacement.dimensions.depth / 2}
@@ -651,7 +652,7 @@
   {@const overlaySides = getDimensionOverlaySides(baseX, baseZ, boxPlacement.dimensions.width, boxPlacement.dimensions.depth)}
 
   <!-- Group for entire box assembly - rotation applied to group -->
-  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+  <T.Group position.x={baseX} position.y={boxBaseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if boxData}
       <BoxAssembly
         boxGeometry={boxData.boxGeometry}
@@ -705,7 +706,7 @@
       text={boxPlacement.box.name}
       font={monoFont}
       fontSize={6}
-      position={[baseX, boxHeight + 5, baseZ]}
+      position={[baseX, boxBaseHeight + boxHeight + 5, baseZ]}
       quaternion={labelQuaternion}
       color="#ffffff"
       anchorX="center"
@@ -719,7 +720,7 @@
       centerZ={baseZ}
       width={boxPlacement.dimensions.width}
       depth={boxPlacement.dimensions.depth}
-      height={boxHeight}
+      height={boxBaseHeight + boxHeight}
       widthSide={overlaySides.widthSide}
       depthSide={overlaySides.depthSide}
       {labelQuaternion}
@@ -731,6 +732,7 @@
 <!-- Render visual-only boards -->
 {#each boardPlacements as boardPlacement (boardPlacement.board.id)}
   {@const boardHeight = boardPlacement.dimensions.height}
+  {@const boardBaseHeight = boardPlacement.baseHeight ?? 0}
   {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
   {@const itemCenterX = boardPlacement.x + boardPlacement.dimensions.width / 2}
   {@const itemCenterZ = boardPlacement.y + boardPlacement.dimensions.depth / 2}
@@ -812,7 +814,7 @@
       : 0}
   {@const showFullLayeredBox = !layeredBoxGeometry || !isSelectedLayeredBox || selectionType === 'layeredBox'}
 
-  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+  <T.Group position.x={baseX} position.y={boardBaseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if !layeredBoxGeometry}
       <T.Mesh position.y={boardHeight / 2}>
         <T.BoxGeometry args={[boardPlacement.board.width, boardHeight, boardPlacement.board.depth]} />
@@ -1035,7 +1037,7 @@
       text={boardPlacement.board.name}
       font={monoFont}
       fontSize={6}
-      position={[baseX, boardHeight + 5, baseZ]}
+      position={[baseX, boardBaseHeight + boardHeight + 5, baseZ]}
       quaternion={labelQuaternion}
       color="#ffffff"
       anchorX="center"
@@ -1049,7 +1051,7 @@
       centerZ={baseZ}
       width={boardPlacement.dimensions.width}
       depth={boardPlacement.dimensions.depth}
-      height={dimensionHeight}
+      height={boardBaseHeight + dimensionHeight}
       widthSide={overlaySides.widthSide}
       depthSide={overlaySides.depthSide}
       {labelQuaternion}
@@ -1062,6 +1064,7 @@
 {#each looseTrayPlacements as trayPlacement (trayPlacement.tray.id)}
   {@const looseTrayGeom = allLooseTrayGeometries.find((lt) => lt.trayId === trayPlacement.tray.id)}
   {@const trayHeight = trayPlacement.dimensions.height}
+  {@const trayBaseHeight = trayPlacement.baseHeight ?? 0}
   {@const trayColor = trayPlacement.tray.color || TRAY_COLORS[0]}
   {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
   {@const itemCenterX = trayPlacement.x + trayPlacement.dimensions.width / 2}
@@ -1078,7 +1081,7 @@
 
   {#if looseTrayGeom}
     <!-- Render actual tray geometry -->
-    <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+    <T.Group position.x={baseX} position.y={trayBaseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
       <TrayInBox
         geometry={looseTrayGeom.geometry}
         color={getTrayColor(trayPlacement.tray.id, trayColor)}
@@ -1100,7 +1103,7 @@
     {@const fallbackZ = layerOffsetZ - trayPlacement.y - trayPlacement.dimensions.depth / 2 - explosion.offsetZ}
     <T.Mesh
       position.x={fallbackX}
-      position.y={trayHeight / 2}
+      position.y={trayBaseHeight + trayHeight / 2}
       position.z={fallbackZ}
       rotation.y={isRotated ? Math.PI / 2 : 0}
     >
@@ -1117,7 +1120,7 @@
       text={trayPlacement.tray.name}
       font={monoFont}
       fontSize={4}
-      position={[labelX, trayHeight + 3, labelZ]}
+      position={[labelX, trayBaseHeight + trayHeight + 3, labelZ]}
       quaternion={labelQuaternion}
       color="#ffffff"
       anchorX="center"
@@ -1134,7 +1137,7 @@
       centerZ={labelZ}
       width={trayPlacement.dimensions.width}
       depth={trayPlacement.dimensions.depth}
-      height={trayHeight}
+      height={trayBaseHeight + trayHeight}
       widthSide={overlaySides.widthSide}
       depthSide={overlaySides.depthSide}
       {labelQuaternion}

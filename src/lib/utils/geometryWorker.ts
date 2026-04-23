@@ -304,7 +304,8 @@ export class GeometryWorkerManager {
           name: project.name,
           layers: project.layers,
           cardSizes: project.cardSizes,
-          counterShapes: project.counterShapes
+          counterShapes: project.counterShapes,
+          globalSettings: project.globalSettings
         })
       );
 

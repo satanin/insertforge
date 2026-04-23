@@ -3,9 +3,9 @@
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '$lib/types/project';
   import { isCupTray } from '$lib/types/project';
-  import { getAllBoxes, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
+  import { getAllBoxes, getGlobalSettings, getProject, moveBoxToLayer } from '$lib/stores/project.svelte';
   import { calculateMinimumBoxDimensions, getLidHeight } from '$lib/models/box';
-  import { calculateLayerHeight } from '$lib/models/layer';
+  import { arrangeLayerContents } from '$lib/models/layer';
   import { getCardSizes, getCounterShapes } from '$lib/stores/project.svelte';
 
   interface Props {
@@ -84,16 +84,20 @@
     selectedBox?.customBoxHeight !== undefined ? selectedBox.customBoxHeight + lidHeight : undefined
   );
 
-  // Get the layer height for the selected box's layer
-  const layerHeight = $derived.by(() => {
+  // Get the selected box's effective local height within its layer.
+  const layerBoxHeight = $derived.by(() => {
     if (!selectedBox) return 0;
     const project = getProject();
+    const globalSettings = getGlobalSettings();
     for (const layer of project.layers) {
       if (layer.boxes.some((b) => b.id === selectedBox.id)) {
-        return calculateLayerHeight(layer, {
+        const arrangement = arrangeLayerContents(layer, {
+          gameContainerWidth: globalSettings.gameContainerWidth,
+          gameContainerDepth: globalSettings.gameContainerDepth,
           cardSizes: customCardSizes,
           counterShapes: customCounterShapes
         });
+        return arrangement.boxes.find((placement) => placement.box.id === selectedBox.id)?.dimensions.height ?? 0;
       }
     }
     return 0;
@@ -112,8 +116,8 @@
           height:
             selectedBox.autoHeight === false
               ? naturalBoxHeight
-              : layerHeight > 0
-                ? Math.max(naturalBoxHeight, layerHeight)
+              : layerBoxHeight > 0
+                ? Math.max(naturalBoxHeight, layerBoxHeight)
                 : naturalBoxHeight
         }
       : null

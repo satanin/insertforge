@@ -16,7 +16,10 @@
     setSnapGuides,
     getEffectiveBoardDimensions,
     getEffectiveBoxDimensions,
-    getEffectiveLooseTrayDimensions
+    getEffectiveLooseTrayDimensions,
+    getEditorBoardBaseHeight,
+    getEditorBoxBaseHeight,
+    getEditorLooseTrayBaseHeight
   } from '$lib/stores/layerLayoutEditor.svelte';
   import { snapLayerItemPosition, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
   import type { BoardPlacement } from '$lib/models/layer';
@@ -295,12 +298,13 @@
 {#each workingBoxPlacements as boxPlacement (boxPlacement.boxId)}
   {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.boxId)}
   {@const dims = getEffectiveBoxDimensions(boxPlacement)}
+  {@const baseHeight = getEditorBoxBaseHeight(boxPlacement)}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boxPlacement.boxId && selectedItemType === 'box'}
   {@const baseX = layerOffsetX + boxPlacement.x + dims.width / 2}
   {@const baseZ = layerOffsetZ - boxPlacement.y - dims.depth / 2}
 
-  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+  <T.Group position.x={baseX} position.y={baseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if boxData}
       <BoxAssembly
         boxGeometry={boxData.boxGeometry}
@@ -360,13 +364,14 @@
 {#each workingLooseTrayPlacements as trayPlacement (trayPlacement.trayId)}
   {@const looseTrayGeom = allLooseTrayGeometries.find((lt) => lt.trayId === trayPlacement.trayId)}
   {@const dims = getEffectiveLooseTrayDimensions(trayPlacement)}
+  {@const baseHeight = getEditorLooseTrayBaseHeight(trayPlacement)}
   {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
   {@const isSelected = selectedItemId === trayPlacement.trayId && selectedItemType === 'looseTray'}
   {@const isHovered = hoveredItemId === trayPlacement.trayId}
   {@const baseX = layerOffsetX + trayPlacement.x + (isRotated ? dims.width : 0)}
   {@const baseZ = layerOffsetZ - trayPlacement.y}
 
-  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+  <T.Group position.x={baseX} position.y={baseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if looseTrayGeom}
       <!-- Render tray geometry directly with emissive highlighting -->
       <T.Mesh geometry={looseTrayGeom.geometry} rotation.x={-Math.PI / 2}>
@@ -436,6 +441,7 @@
 <!-- Render boards at working positions -->
 {#each workingBoardPlacements as boardPlacement (boardPlacement.boardId)}
   {@const dims = getEffectiveBoardDimensions(boardPlacement)}
+  {@const baseHeight = getEditorBoardBaseHeight(boardPlacement)}
   {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boardPlacement.boardId && selectedItemType === 'board'}
   {@const isHovered = hoveredItemId === boardPlacement.boardId}
@@ -443,7 +449,7 @@
   {@const baseX = layerOffsetX + boardPlacement.x + dims.width / 2}
   {@const baseZ = layerOffsetZ - boardPlacement.y - dims.depth / 2}
 
-  <T.Group position.x={baseX} position.y={0} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
+  <T.Group position.x={baseX} position.y={baseHeight} position.z={baseZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
     {#if layeredBoxGeometry}
       <BoxAssembly
         boxGeometry={layeredBoxGeometry.shellGeometry}

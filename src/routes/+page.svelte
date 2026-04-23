@@ -101,7 +101,10 @@
     cancelLayerChanges,
     layerLayoutEditorState,
     getManualLayerPlacements,
-    rotateSelectedItem
+    rotateSelectedItem,
+    getEditorBoardBaseHeight,
+    getEditorBoxBaseHeight,
+    getEditorLooseTrayBaseHeight
   } from '$lib/stores/layerLayoutEditor.svelte';
   import {
     saveLayerLayout,
@@ -112,7 +115,7 @@
     selectBox,
     selectLayer
   } from '$lib/stores/project.svelte';
-  import { findLayerOverlaps, isLayerItemWithinBounds, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
+  import { isLayerItemWithinBounds, type LayerItemForSnapping } from '$lib/utils/layerLayoutSnapping';
 
   type ViewMode = 'tray' | 'all' | 'exploded' | 'all-no-lid' | 'layer';
   type SelectionType = 'dimensions' | 'layer' | 'box' | 'tray' | 'board' | 'layeredBox' | 'layeredBoxLayer' | 'layeredBoxSection';
@@ -122,6 +125,11 @@
     name: string;
     author: string;
     file: string;
+  }
+
+  interface LayerLayoutCollisionItem extends LayerItemForSnapping {
+    zMin: number;
+    zMax: number;
   }
 
   interface LayeredBoxSectionGeometryData {
@@ -2469,39 +2477,60 @@
 
   function handleSaveLayerLayout() {
     // Build items for overlap check
-    const items: LayerItemForSnapping[] = [];
+    const items: LayerLayoutCollisionItem[] = [];
     for (const bp of layerLayoutEditorState.workingBoxPlacements) {
       const isRotated = bp.rotation === 90 || bp.rotation === 270;
+      const zMin = getEditorBoxBaseHeight(bp);
       items.push({
         id: bp.boxId,
         x: bp.x,
         y: bp.y,
         width: isRotated ? bp.originalDepth : bp.originalWidth,
-        depth: isRotated ? bp.originalWidth : bp.originalDepth
+        depth: isRotated ? bp.originalWidth : bp.originalDepth,
+        zMin,
+        zMax: zMin + bp.height
       });
     }
     for (const ltp of layerLayoutEditorState.workingLooseTrayPlacements) {
       const isRotated = ltp.rotation === 90 || ltp.rotation === 270;
+      const zMin = getEditorLooseTrayBaseHeight(ltp);
       items.push({
         id: ltp.trayId,
         x: ltp.x,
         y: ltp.y,
         width: isRotated ? ltp.originalDepth : ltp.originalWidth,
-        depth: isRotated ? ltp.originalWidth : ltp.originalDepth
+        depth: isRotated ? ltp.originalWidth : ltp.originalDepth,
+        zMin,
+        zMax: zMin + ltp.height
       });
     }
     for (const bp of layerLayoutEditorState.workingBoardPlacements) {
       const isRotated = bp.rotation === 90 || bp.rotation === 270;
+      const zMin = getEditorBoardBaseHeight(bp);
       items.push({
         id: bp.boardId,
         x: bp.x,
         y: bp.y,
         width: isRotated ? bp.originalDepth : bp.originalWidth,
-        depth: isRotated ? bp.originalWidth : bp.originalDepth
+        depth: isRotated ? bp.originalWidth : bp.originalDepth,
+        zMin,
+        zMax: zMin + bp.height
       });
     }
 
-    const overlaps = findLayerOverlaps(items);
+    const overlaps: Array<[string, string]> = [];
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i];
+        const b = items[j];
+        const overlapsX = a.x < b.x + b.width && a.x + a.width > b.x;
+        const overlapsY = a.y < b.y + b.depth && a.y + a.depth > b.y;
+        const overlapsZ = a.zMin < b.zMax && a.zMax > b.zMin;
+        if (overlapsX && overlapsY && overlapsZ) {
+          overlaps.push([a.id, b.id]);
+        }
+      }
+    }
 
     if (overlaps.length > 0) {
       const allPlacements = [

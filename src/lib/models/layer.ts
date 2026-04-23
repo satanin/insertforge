@@ -17,7 +17,7 @@ import type {
   Tray
 } from '$lib/types/project';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray } from '$lib/types/project';
-import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
+import { packItems, stackItemsVertically, type PackingItem, type PackingResult } from '$lib/utils/binPacking';
 import { getBoxExteriorDimensions, getBoxVisibleAssembledHeight, getTrayDimensionsForTray } from './box';
 
 export interface BoxDimensions {
@@ -32,6 +32,7 @@ export interface BoxPlacement {
   x: number;
   y: number;
   rotation: 0 | 90 | 180 | 270;
+  baseHeight?: number;
 }
 
 export interface LooseTrayPlacement {
@@ -40,6 +41,7 @@ export interface LooseTrayPlacement {
   x: number;
   y: number;
   rotation: 0 | 90 | 180 | 270;
+  baseHeight?: number;
 }
 
 export interface BoardPlacement {
@@ -48,6 +50,7 @@ export interface BoardPlacement {
   x: number;
   y: number;
   rotation: 0 | 90 | 180 | 270;
+  baseHeight?: number;
 }
 
 export interface LayerArrangement {
@@ -310,7 +313,22 @@ export function calculateLayerHeight(
   }
 ): number {
   const { cardSizes, counterShapes } = options;
+  const contentHeight = calculateLayerContentHeight(layer, { cardSizes, counterShapes });
+  const boardHeight = Math.max(...layer.boards.map((board) => board.height), 0);
+  const hasStackableContent =
+    layer.boxes.length > 0 || layer.layeredBoxes.length > 0 || layer.looseTrays.length > 0;
 
+  return Math.max(contentHeight, boardHeight, hasStackableContent ? boardHeight + contentHeight : 0);
+}
+
+function calculateLayerContentHeight(
+  layer: Layer,
+  options: {
+    cardSizes: CardSize[];
+    counterShapes: CounterShape[];
+  }
+): number {
+  const { cardSizes, counterShapes } = options;
   // Get all box exterior heights
   const boxHeights = layer.boxes.map((box) => {
     return getBoxVisibleAssembledHeight(box, cardSizes, counterShapes);
@@ -326,10 +344,7 @@ export function calculateLayerHeight(
     return dims.height;
   });
 
-  const boardHeights = layer.boards.map((board) => board.height);
-
-  // Layer height = max of all items
-  return Math.max(...boxHeights, ...layeredBoxHeights, ...looseTrayHeights, ...boardHeights, 0);
+  return Math.max(...boxHeights, ...layeredBoxHeights, ...looseTrayHeights, 0);
 }
 
 /**
@@ -344,21 +359,121 @@ export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes:
   };
 }
 
-function getLooseTrayPlacementHeight(tray: Tray, naturalHeight: number, layerHeight: number): number {
+function isLooseTrayAutoHeightEnabled(tray: Tray): boolean {
   if (
     (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
     tray.autoHeight === false
   ) {
-    return naturalHeight;
+    return false;
   }
-  return layerHeight;
+  return true;
 }
 
-function getBoxPlacementHeight(box: Box, naturalHeight: number, layerHeight: number): number {
-  if (box.autoHeight === false) {
-    return naturalHeight;
-  }
-  return layerHeight;
+function isBoxAutoHeightEnabled(box: Box): boolean {
+  return box.autoHeight !== false;
+}
+
+function isLayeredBoxProxyBoard(board: Board): boolean {
+  return board.id.startsWith('layered-box-');
+}
+
+function rectsOverlap(
+  a: { x: number; y: number; width: number; depth: number },
+  b: { x: number; y: number; width: number; depth: number }
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.depth && a.y + a.depth > b.y;
+}
+
+function getBoardSupportHeight(
+  boardPlacements: BoardPlacement[],
+  rect: { x: number; y: number; width: number; depth: number }
+): number {
+  return boardPlacements.reduce((height, placement) => {
+    if (isLayeredBoxProxyBoard(placement.board)) return height;
+    const boardRect = {
+      x: placement.x,
+      y: placement.y,
+      width: placement.dimensions.width,
+      depth: placement.dimensions.depth
+    };
+    return rectsOverlap(rect, boardRect) ? Math.max(height, placement.dimensions.height) : height;
+  }, 0);
+}
+
+function applyBoardSupports(arrangement: LayerArrangement): LayerArrangement {
+  const boxesWithSupports = arrangement.boxes.map((placement) => ({
+    ...placement,
+    baseHeight: getBoardSupportHeight(arrangement.boards, {
+      x: placement.x,
+      y: placement.y,
+      width: placement.dimensions.width,
+      depth: placement.dimensions.depth
+    })
+  }));
+  const looseTraysWithSupports = arrangement.looseTrays.map((placement) => ({
+    ...placement,
+    baseHeight: getBoardSupportHeight(arrangement.boards, {
+      x: placement.x,
+      y: placement.y,
+      width: placement.dimensions.width,
+      depth: placement.dimensions.depth
+    })
+  }));
+  const boards = arrangement.boards.map((placement) => ({
+    ...placement,
+    baseHeight: isLayeredBoxProxyBoard(placement.board)
+      ? getBoardSupportHeight(arrangement.boards, {
+          x: placement.x,
+          y: placement.y,
+          width: placement.dimensions.width,
+          depth: placement.dimensions.depth
+        })
+      : 0
+  }));
+
+  const targetLayerHeight = Math.max(
+    ...boxesWithSupports.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    ...looseTraysWithSupports.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    ...boards.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    0
+  );
+
+  const boxes = boxesWithSupports.map((placement) => {
+    if (!isBoxAutoHeightEnabled(placement.box)) return placement;
+    return {
+      ...placement,
+      dimensions: {
+        ...placement.dimensions,
+        height: Math.max(placement.dimensions.height, targetLayerHeight - (placement.baseHeight ?? 0))
+      }
+    };
+  });
+
+  const looseTrays = looseTraysWithSupports.map((placement) => {
+    if (!isLooseTrayAutoHeightEnabled(placement.tray)) return placement;
+    return {
+      ...placement,
+      dimensions: {
+        ...placement.dimensions,
+        height: Math.max(placement.dimensions.height, targetLayerHeight - (placement.baseHeight ?? 0))
+      }
+    };
+  });
+
+  const layerHeight = Math.max(
+    ...boxes.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    ...looseTrays.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    ...boards.map((placement) => (placement.baseHeight ?? 0) + placement.dimensions.height),
+    0
+  );
+
+  return {
+    ...arrangement,
+    boxes,
+    looseTrays,
+    boards,
+    layerHeight
+  };
 }
 
 /**
@@ -375,18 +490,13 @@ export function arrangeLayerContents(
     gap?: number;
   }
 ): LayerArrangement {
-  const { cardSizes, counterShapes } = options;
-
-  // Calculate layer height first
-  const layerHeight = calculateLayerHeight(layer, { cardSizes, counterShapes });
-
   // If manual layout exists, use it
   if (layer.manualLayout) {
-    return arrangeLayerManual(layer, layerHeight, options);
+    return applyBoardSupports(arrangeLayerManual(layer, options));
   }
 
   // Auto-arrange using bin packing
-  return arrangeLayerAuto(layer, layerHeight, options);
+  return applyBoardSupports(arrangeLayerAuto(layer, options));
 }
 
 /**
@@ -394,7 +504,6 @@ export function arrangeLayerContents(
  */
 function arrangeLayerManual(
   layer: Layer,
-  layerHeight: number,
   options: {
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -415,8 +524,7 @@ function arrangeLayerManual(
 
       const dims = getBoxDimensions(box, cardSizes, counterShapes);
       // Apply rotation: 90° and 270° swap width/depth
-      // Use layerHeight for consistent layer stacking
-      const height = getBoxPlacementHeight(box, dims.height, layerHeight);
+      const height = dims.height;
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims: BoxDimensions = swapDims
         ? { width: dims.depth, depth: dims.width, height }
@@ -440,7 +548,7 @@ function arrangeLayerManual(
 
       const dims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
       // Apply rotation: 90° and 270° swap width/depth
-      const height = getLooseTrayPlacementHeight(tray, dims.height, layerHeight);
+      const height = dims.height;
       const swapDims = manual.rotation === 90 || manual.rotation === 270;
       const effectiveDims = swapDims
         ? { width: dims.depth, depth: dims.width, height }
@@ -514,7 +622,7 @@ function arrangeLayerManual(
       layeredBoxes: [],
       manualLayout: undefined
     };
-    const autoArrangement = arrangeLayerAuto(tempLayer, layerHeight, options);
+    const autoArrangement = arrangeLayerAuto(tempLayer, options);
 
     // Offset and add to placements
     for (const p of autoArrangement.boxes) {
@@ -557,7 +665,12 @@ function arrangeLayerManual(
     boxes: boxPlacements,
     looseTrays: looseTrayPlacements,
     boards: boardPlacements,
-    layerHeight,
+    layerHeight: Math.max(
+      ...boxPlacements.map((placement) => placement.dimensions.height),
+      ...looseTrayPlacements.map((placement) => placement.dimensions.height),
+      ...boardPlacements.map((placement) => placement.dimensions.height),
+      0
+    ),
     totalWidth,
     totalDepth
   };
@@ -576,7 +689,6 @@ interface LayerItemData {
  */
 function arrangeLayerAuto(
   layer: Layer,
-  layerHeight: number,
   options: {
     gameContainerWidth: number;
     gameContainerDepth: number;
@@ -599,6 +711,7 @@ function arrangeLayerAuto(
 
   // Collect all items with their dimensions
   const packingItems: PackingItem<LayerItemData>[] = [];
+  const boardPackingItems: PackingItem<LayerItemData>[] = [];
 
   // Add boxes
   for (const box of layer.boxes) {
@@ -621,7 +734,7 @@ function arrangeLayerAuto(
   }
 
   for (const board of layer.boards) {
-    packingItems.push({
+    boardPackingItems.push({
       data: { itemType: 'board', item: board, originalWidth: board.width, originalDepth: board.depth },
       width: board.width,
       depth: board.depth
@@ -638,17 +751,22 @@ function arrangeLayerAuto(
   }
 
   // Try bin packing
-  const packResult = packItems(packingItems, gameContainerWidth, gameContainerDepth);
+  const emptyPackResult: PackingResult<LayerItemData> = { items: [], totalWidth: 0, totalDepth: 0, area: 0 };
+  const packResult =
+    packingItems.length > 0 ? packItems(packingItems, gameContainerWidth, gameContainerDepth) : emptyPackResult;
+  const boardPackResult =
+    boardPackingItems.length > 0
+      ? packItems(boardPackingItems, gameContainerWidth, gameContainerDepth) ?? stackItemsVertically(boardPackingItems)
+      : emptyPackResult;
 
   // Convert packing result to layer placements
-  const convertToPlacement = (result: typeof packResult) => {
-    if (!result) return null;
-
+  const convertToPlacement = (result: PackingResult<LayerItemData>) => {
     const boxPlacements: BoxPlacement[] = [];
     const looseTrayPlacements: LooseTrayPlacement[] = [];
     const boardPlacements: BoardPlacement[] = [];
+    const packedItems = [...boardPackResult.items, ...result.items];
 
-    for (const packed of result.items) {
+    for (const packed of packedItems) {
       const { data, x, y, width, depth, rotated } = packed;
 
       if (data.itemType === 'box') {
@@ -656,7 +774,7 @@ function arrangeLayerAuto(
         const naturalHeight = getBoxDimensions(box, cardSizes, counterShapes).height;
         boxPlacements.push({
           box,
-          dimensions: { width, depth, height: getBoxPlacementHeight(box, naturalHeight, layerHeight) },
+          dimensions: { width, depth, height: naturalHeight },
           x,
           y,
           rotation: rotated ? 90 : 0
@@ -666,7 +784,7 @@ function arrangeLayerAuto(
         const naturalHeight = getTrayDimensionsForTray(tray, cardSizes, counterShapes).height;
         looseTrayPlacements.push({
           tray,
-          dimensions: { width, depth, height: getLooseTrayPlacementHeight(tray, naturalHeight, layerHeight) },
+          dimensions: { width, depth, height: naturalHeight },
           x,
           y,
           rotation: rotated ? 90 : 0
@@ -686,29 +804,23 @@ function arrangeLayerAuto(
       boxes: boxPlacements,
       looseTrays: looseTrayPlacements,
       boards: boardPlacements,
-      layerHeight,
-      totalWidth: result.totalWidth,
-      totalDepth: result.totalDepth
+      layerHeight: Math.max(
+        ...boxPlacements.map((placement) => placement.dimensions.height),
+        ...looseTrayPlacements.map((placement) => placement.dimensions.height),
+        ...boardPlacements.map((placement) => placement.dimensions.height),
+        0
+      ),
+      totalWidth: Math.max(result.totalWidth, boardPackResult.totalWidth),
+      totalDepth: Math.max(result.totalDepth, boardPackResult.totalDepth)
     };
   };
 
   // Use packing result if successful
-  const placement = convertToPlacement(packResult);
-  if (placement) return placement;
+  if (packResult) return convertToPlacement(packResult);
 
   // Fallback: stack vertically
   const fallback = stackItemsVertically(packingItems);
-  const fallbackPlacement = convertToPlacement(fallback);
-  return (
-    fallbackPlacement || {
-      boxes: [],
-      looseTrays: [],
-      boards: [],
-      layerHeight,
-      totalWidth: 0,
-      totalDepth: 0
-    }
-  );
+  return convertToPlacement(fallback);
 }
 
 /**

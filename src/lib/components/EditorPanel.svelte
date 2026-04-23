@@ -79,6 +79,7 @@
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
   import { getTrayDimensionsForTray } from '$lib/models/box';
   import {
+    arrangeLayerContents,
     getBoxDimensions,
     calculateLayerHeight,
     getLayeredBoxExteriorDimensions,
@@ -637,6 +638,12 @@
           {@const cardSizes = project.cardSizes ?? []}
           {@const counterShapes = project.counterShapes ?? []}
           {@const layerHeight = calculateLayerHeight(selectedLayer, { cardSizes, counterShapes })}
+          {@const layerArrangement = arrangeLayerContents(selectedLayer, {
+            gameContainerWidth,
+            gameContainerDepth,
+            cardSizes,
+            counterShapes
+          })}
           <div class="layerSettings">
             <div class="panelFormSection">
               <FormControl label="Layer name" name="layerName">
@@ -666,13 +673,16 @@
                 <div class="contentsTree">
                   {#each selectedLayer.boxes as box (box.id)}
                     {@const boxDims = getBoxDimensions(box, cardSizes, counterShapes)}
-                    {@const boxInteriorHeight = layerHeight - box.floorThickness}
+                    {@const boxPlacement = layerArrangement.boxes.find((placement) => placement.box.id === box.id)}
+                    {@const boxHeight = boxPlacement ? boxPlacement.dimensions.height : layerHeight}
+                    {@const boxOccupiedHeight = boxPlacement ? (boxPlacement.baseHeight ?? 0) + boxPlacement.dimensions.height : layerHeight}
+                    {@const boxInteriorHeight = boxHeight - box.floorThickness}
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{box.name}</span>
                       <span class="treeItemDims">
-                        {formatLayerContentDimension(boxDims.width)} ×
-                        {formatLayerContentDimension(boxDims.depth)} ×
-                        {formatLayerContentDimension(layerHeight)}
+                        {formatLayerContentDimension(boxPlacement?.dimensions.width ?? boxDims.width)} ×
+                        {formatLayerContentDimension(boxPlacement?.dimensions.depth ?? boxDims.depth)} ×
+                        {formatLayerContentDimension(boxOccupiedHeight)}
                       </span>
                     </div>
                     {#each box.trays as tray (tray.id)}
@@ -690,12 +700,17 @@
                   {#each selectedLayer.layeredBoxes as layeredBox (layeredBox.id)}
                     {@const layeredBoxDims = getLayeredBoxExteriorDimensions(layeredBox, cardSizes, counterShapes)}
                     {@const layeredBoxLayout = getLayeredBoxRenderLayout(layeredBox, cardSizes, counterShapes)}
+                    {@const layeredBoxPlacement = layerArrangement.boards.find((placement) => placement.board.id === `layered-box-${layeredBox.id}`)}
+                    {@const layeredBoxOccupiedHeight =
+                      layeredBoxPlacement
+                        ? (layeredBoxPlacement.baseHeight ?? 0) + layeredBoxPlacement.dimensions.height
+                        : getLayeredBoxLayerViewHeight(layeredBoxDims.height, layeredBox.wallThickness)}
                     <div class="treeItem treeItem--box">
                       <span class="treeItemName">{layeredBox.name}</span>
                       <span class="treeItemDims">
-                        {formatLayerContentDimension(layeredBoxDims.width)} ×
-                        {formatLayerContentDimension(layeredBoxDims.depth)} ×
-                        {formatLayerContentDimension(getLayeredBoxLayerViewHeight(layeredBoxDims.height, layeredBox.wallThickness))}
+                        {formatLayerContentDimension(layeredBoxPlacement?.dimensions.width ?? layeredBoxDims.width)} ×
+                        {formatLayerContentDimension(layeredBoxPlacement?.dimensions.depth ?? layeredBoxDims.depth)} ×
+                        {formatLayerContentDimension(layeredBoxOccupiedHeight)}
                       </span>
                     </div>
                     {#each layeredBox.layers as boxLayer (boxLayer.id)}
@@ -720,22 +735,27 @@
                   {/each}
                   {#each selectedLayer.looseTrays as tray (tray.id)}
                     {@const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes)}
+                    {@const trayPlacement = layerArrangement.looseTrays.find((placement) => placement.tray.id === tray.id)}
+                    {@const trayOccupiedHeight = trayPlacement ? (trayPlacement.baseHeight ?? 0) + trayPlacement.dimensions.height : layerHeight}
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{tray.name}</span>
                       <span class="treeItemDims">
-                        {formatLayerContentDimension(trayDims.width)} ×
-                        {formatLayerContentDimension(trayDims.depth)} ×
-                        {formatLayerContentDimension(layerHeight)}
+                        {formatLayerContentDimension(trayPlacement?.dimensions.width ?? trayDims.width)} ×
+                        {formatLayerContentDimension(trayPlacement?.dimensions.depth ?? trayDims.depth)} ×
+                        {formatLayerContentDimension(trayOccupiedHeight)}
                       </span>
                     </div>
                   {/each}
                   {#each selectedLayer.boards as board (board.id)}
+                    {@const boardPlacement = layerArrangement.boards.find((placement) => placement.board.id === board.id)}
+                    {@const boardOccupiedHeight =
+                      boardPlacement ? (boardPlacement.baseHeight ?? 0) + boardPlacement.dimensions.height : board.height}
                     <div class="treeItem treeItem--looseTray">
                       <span class="treeItemName">{board.name}</span>
                       <span class="treeItemDims">
-                        {formatLayerContentDimension(board.width)} ×
-                        {formatLayerContentDimension(board.depth)} ×
-                        {formatLayerContentDimension(board.height)}
+                        {formatLayerContentDimension(boardPlacement?.dimensions.width ?? board.width)} ×
+                        {formatLayerContentDimension(boardPlacement?.dimensions.depth ?? board.depth)} ×
+                        {formatLayerContentDimension(boardOccupiedHeight)}
                       </span>
                     </div>
                   {/each}

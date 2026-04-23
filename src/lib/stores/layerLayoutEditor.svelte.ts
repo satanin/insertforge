@@ -72,6 +72,46 @@ export function getEffectiveBoardDimensions(placement: EditorBoardPlacement): {
   return getEffectiveDimsBase(placement);
 }
 
+function isLayeredBoxProxyBoard(boardId: string): boolean {
+  return boardId.startsWith('layered-box-');
+}
+
+function rectsOverlap(
+  a: { x: number; y: number; width: number; depth: number },
+  b: { x: number; y: number; width: number; depth: number }
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.depth && a.y + a.depth > b.y;
+}
+
+function getBoardSupportHeight(
+  rect: { x: number; y: number; width: number; depth: number },
+  excludeBoardId?: string
+): number {
+  return workingBoardPlacements.reduce((height, placement) => {
+    if (placement.boardId === excludeBoardId || isLayeredBoxProxyBoard(placement.boardId)) return height;
+    const dims = getEffectiveBoardDimensions(placement);
+    return rectsOverlap(rect, { x: placement.x, y: placement.y, width: dims.width, depth: dims.depth })
+      ? Math.max(height, placement.height)
+      : height;
+  }, 0);
+}
+
+export function getEditorBoxBaseHeight(placement: EditorBoxPlacement): number {
+  const dims = getEffectiveBoxDimensions(placement);
+  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth });
+}
+
+export function getEditorLooseTrayBaseHeight(placement: EditorLooseTrayPlacement): number {
+  const dims = getEffectiveLooseTrayDimensions(placement);
+  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth });
+}
+
+export function getEditorBoardBaseHeight(placement: EditorBoardPlacement): number {
+  if (!isLayeredBoxProxyBoard(placement.boardId)) return 0;
+  const dims = getEffectiveBoardDimensions(placement);
+  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth }, placement.boardId);
+}
+
 // Reactive state
 let isEditMode = $state(false);
 let selectedItemId = $state<string | null>(null);

@@ -25,6 +25,7 @@ import {
 import { createCupTray } from '$lib/models/cupTray';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
 import {
+  arrangeLayerContents,
   getLayeredBoxExteriorDimensions,
   getLayeredBoxRenderLayout
 } from '$lib/models/layer';
@@ -297,6 +298,11 @@ interface GenerateMessage {
     layers: Layer[];
     cardSizes?: CardSize[];
     counterShapes?: CounterShape[];
+    globalSettings?: {
+      gameContainerWidth: number;
+      gameContainerDepth: number;
+      gameContainerHeight: number | null;
+    };
   };
   selectedBoxId: string;
   selectedTrayId: string;
@@ -743,12 +749,27 @@ function handleGenerate(msg: GenerateMessage): void {
     const cardSizes = project.cardSizes ?? [];
     const counterShapes = project.counterShapes ?? [];
 
-    // Pre-calculate unified layer heights for all layers FIRST
-    // All items in a layer should have the same total exterior height for proper stacking
+    const gameContainerWidth = project.globalSettings?.gameContainerWidth ?? 256;
+    const gameContainerDepth = project.globalSettings?.gameContainerDepth ?? 256;
+
+    // Pre-calculate layer arrangements so geometry uses the same stack-aware heights as the scene.
     const layerHeights = new Map<string, number>();
+    const boxPlacementHeights = new Map<string, number>();
+    const looseTrayPlacementHeights = new Map<string, number>();
     for (const layer of project.layers) {
-      const layerHeight = calculateUnifiedLayerHeight(layer, cardSizes, counterShapes);
-      layerHeights.set(layer.id, layerHeight);
+      const arrangement = arrangeLayerContents(layer, {
+        gameContainerWidth,
+        gameContainerDepth,
+        cardSizes,
+        counterShapes
+      });
+      layerHeights.set(layer.id, arrangement.layerHeight);
+      for (const placement of arrangement.boxes) {
+        boxPlacementHeights.set(placement.box.id, placement.dimensions.height);
+      }
+      for (const placement of arrangement.looseTrays) {
+        looseTrayPlacementHeights.set(placement.tray.id, placement.dimensions.height);
+      }
     }
 
     // Helper to find which layer contains a box
@@ -759,6 +780,15 @@ function handleGenerate(msg: GenerateMessage): void {
     // Helper to find which layer contains a loose tray
     function findLayerForLooseTray(trayId: string): Layer | undefined {
       return project.layers.find((layer) => layer.looseTrays.some((t) => t.id === trayId));
+    }
+
+    function getBoxPlacementTargetHeight(box: Box, fallbackLayerHeight: number): number {
+      if (box.autoHeight === false) return 0;
+      return boxPlacementHeights.get(box.id) ?? fallbackLayerHeight;
+    }
+
+    function getLooseTrayPlacementTargetHeight(tray: Tray, naturalHeight: number, fallbackLayerHeight: number): number {
+      return looseTrayPlacementHeights.get(tray.id) ?? (fallbackLayerHeight > 0 ? fallbackLayerHeight : naturalHeight);
     }
 
     // If tray is in a box, generate box-related geometry
@@ -783,7 +813,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Find the layer containing this box and get the unified layer height
       const selectedBoxLayer = findLayerForBox(box.id);
       const selectedLayerHeight = selectedBoxLayer ? (layerHeights.get(selectedBoxLayer.id) ?? 0) : 0;
-      const selectedBoxTargetLayerHeight = getBoxTargetLayerHeight(box, selectedLayerHeight);
+      const selectedBoxTargetLayerHeight = getBoxPlacementTargetHeight(box, selectedLayerHeight);
 
       // Calculate the required tray height to match the layer height
       const requiredTrayHeight = getRequiredTrayHeightForLayer(box, selectedBoxTargetLayerHeight);
@@ -868,7 +898,7 @@ function handleGenerate(msg: GenerateMessage): void {
       const trayDims = getTrayDimensionsForTray(tray, cardSizes, counterShapes);
       const naturalHeight = trayDims.height;
       // Use layer height if available, otherwise use natural height
-      const adjustedHeight = looseTrayLayerHeight > 0 ? looseTrayLayerHeight : naturalHeight;
+      const adjustedHeight = getLooseTrayPlacementTargetHeight(tray, naturalHeight, looseTrayLayerHeight);
       const maxHeight = getTrayTargetHeight(tray, naturalHeight, adjustedHeight);
       const spacerHeight = 0; // No spacer for loose trays
 
@@ -939,7 +969,7 @@ function handleGenerate(msg: GenerateMessage): void {
       // Find this box's layer and get the unified layer height
       const boxLayer = findLayerForBox(projectBox.id);
       const layerHeight = boxLayer ? (layerHeights.get(boxLayer.id) ?? 0) : 0;
-      const boxTargetLayerHeight = getBoxTargetLayerHeight(projectBox, layerHeight);
+      const boxTargetLayerHeight = getBoxPlacementTargetHeight(projectBox, layerHeight);
 
       // Calculate the required tray height to match the layer height
       // This ensures all boxes in a layer have the same exterior height
@@ -1018,7 +1048,8 @@ function handleGenerate(msg: GenerateMessage): void {
         trays: cachedTraysForBox
       });
 
-      const boxHeight = boxTargetLayerHeight > 0 ? layerHeight : getBoxVisibleAssembledHeight(projectBox, cardSizes, counterShapes);
+      const boxHeight =
+        boxTargetLayerHeight > 0 ? boxTargetLayerHeight : getBoxVisibleAssembledHeight(projectBox, cardSizes, counterShapes);
 
       // Add box dimensions using the effective height used for geometry
       allBoxGeometries.push({
@@ -1134,7 +1165,7 @@ function handleGenerate(msg: GenerateMessage): void {
         // Calculate tray dimensions for width/depth
         const trayDims = getTrayDimensionsForTray(looseTray, cardSizes, counterShapes);
         // Use layer height for the tray height so loose trays match box exterior height
-        const adjustedHeight = layerHeight > 0 ? layerHeight : trayDims.height;
+        const adjustedHeight = getLooseTrayPlacementTargetHeight(looseTray, trayDims.height, layerHeight);
         const maxHeight = getTrayTargetHeight(looseTray, trayDims.height, adjustedHeight);
         const spacerHeight = 0; // No spacer for loose trays
 
