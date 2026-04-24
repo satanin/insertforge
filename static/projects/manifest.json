@@ -4,13 +4,17 @@
       "id": "omaha",
       "name": "D-Day: Omaha Beach",
       "author": "Dave Snider",
-      "file": "omaha.json"
+      "file": "omaha.json",
+      "game": "D-Day: Omaha Beach",
+      "tags": ["wargame", "counters", "legacy"]
     },
     {
       "id": "burning-banners",
       "name": "Burning Banners",
       "author": "Dave Snider",
-      "file": "burning-banners.json"
+      "file": "burning-banners.json",
+      "game": "Burning Banners",
+      "tags": ["blocks", "cards", "legacy"]
     }
   ]
 }

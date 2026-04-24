@@ -125,11 +125,18 @@
     name: string;
     author: string;
     file: string;
+    description?: string;
+    game?: string;
+    tags?: string[];
   }
 
   interface LayerLayoutCollisionItem extends LayerItemForSnapping {
     zMin: number;
     zMax: number;
+  }
+
+  interface CommunityProjectsManifest {
+    projects?: CommunityProject[];
   }
 
   interface LayeredBoxSectionGeometryData {
@@ -700,32 +707,70 @@
     }
   });
 
+  function getCommunityProjectOptionLabel(project: CommunityProject): string {
+    return project.author ? `${project.name} by ${project.author}` : project.name;
+  }
+
+  async function loadCommunityProjectsManifest() {
+    try {
+      const res = await fetch('/projects/manifest.json');
+      if (!res.ok) {
+        throw new Error(`Manifest request failed (${res.status})`);
+      }
+
+      const data = (await res.json()) as CommunityProjectsManifest;
+      communityProjects = (data.projects ?? []).filter(
+        (project): project is CommunityProject =>
+          !!project?.id && !!project?.name && !!project?.file && typeof project.id === 'string' && typeof project.name === 'string' && typeof project.file === 'string'
+      );
+    } catch (err) {
+      communityProjects = [];
+      console.error('Failed to load community projects:', err);
+      addToast({
+        data: {
+          title: 'Community projects unavailable',
+          body: 'The project list could not be loaded.',
+          type: 'info'
+        }
+      });
+    }
+  }
+
   // Initialize project from localStorage and fetch community projects
   $effect(() => {
     if (browser) {
       initProject();
-      // Fetch community projects manifest
-      fetch('/projects/manifest.json')
-        .then((res) => res.json())
-        .then((data) => {
-          communityProjects = data.projects ?? [];
-        })
-        .catch((err) => {
-          console.error('Failed to load community projects:', err);
-        });
+      loadCommunityProjectsManifest();
     }
   });
 
   async function loadCommunityProject(project: CommunityProject) {
+    const confirmed = window.confirm(
+      `Load "${project.name}"${project.author ? ` by ${project.author}` : ''}?\n\nThis will replace the current local project in the browser.`
+    );
+    if (!confirmed) return;
+
     try {
       const res = await fetch(`/projects/${project.file}`);
+      if (!res.ok) {
+        throw new Error(`Project request failed (${res.status})`);
+      }
+
       const data = (await res.json()) as Project;
       importProject(data);
       regenerate(true);
       error = '';
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load project';
+      const message = e instanceof Error ? e.message : 'Failed to load project';
+      error = message;
       console.error('Load community project error:', e);
+      addToast({
+        data: {
+          title: 'Failed to load community project',
+          body: message,
+          type: 'danger'
+        }
+      });
     }
   }
 
@@ -2848,7 +2893,7 @@
                       {#snippet input({ inputProps })}
                         <Select
                           selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+                          options={communityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
                           onSelectedChange={(selected) => {
                             const project = communityProjects.find((p) => p.id === selected[0]);
                             if (project) {
@@ -3123,7 +3168,7 @@
                       {#snippet input({ inputProps })}
                         <Select
                           selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: p.name }))}
+                          options={communityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
                           onSelectedChange={(selected) => {
                             const project = communityProjects.find((p) => p.id === selected[0]);
                             if (project) {

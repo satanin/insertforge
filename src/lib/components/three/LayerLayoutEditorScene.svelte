@@ -298,6 +298,8 @@
 {#each workingBoxPlacements as boxPlacement (boxPlacement.boxId)}
   {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.boxId)}
   {@const dims = getEffectiveBoxDimensions(boxPlacement)}
+  {@const originalWidth = boxPlacement.originalWidth}
+  {@const originalDepth = boxPlacement.originalDepth}
   {@const baseHeight = getEditorBoxBaseHeight(boxPlacement)}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boxPlacement.boxId && selectedItemType === 'box'}
@@ -321,7 +323,7 @@
     {:else}
       <!-- Fallback: simple box geometry -->
       <T.Mesh position.y={boxPlacement.height / 2}>
-        <T.BoxGeometry args={[dims.width, boxPlacement.height, dims.depth]} />
+        <T.BoxGeometry args={[originalWidth, boxPlacement.height, originalDepth]} />
         <T.MeshStandardMaterial color="#444444" roughness={0.7} metalness={0.1} />
       </T.Mesh>
     {/if}
@@ -339,15 +341,16 @@
         hoveredItemId = null;
       }}
     >
-      <T.BoxGeometry args={[dims.width, boxPlacement.height, dims.depth]} />
+      <T.BoxGeometry args={[originalWidth, boxPlacement.height, originalDepth]} />
       <T.MeshBasicMaterial transparent opacity={0} />
     </T.Mesh>
 
     <!-- Selection wireframe -->
     {#if isSelected}
-      {@const edgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(dims.width, dims.depth, boxPlacement.height))}
+      {@const edgesGeom = new THREE.EdgesGeometry(
+        new THREE.BoxGeometry(originalWidth, boxPlacement.height, originalDepth)
+      )}
       <T.LineSegments
-        rotation.x={-Math.PI / 2}
         position.y={boxPlacement.height / 2}
         geometry={edgesGeom}
         oncreate={(ref) => {
