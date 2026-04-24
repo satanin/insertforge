@@ -83,33 +83,59 @@ function rectsOverlap(
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.depth && a.y + a.depth > b.y;
 }
 
-function getBoardSupportHeight(
+type StackedEditorBoardPlacement = EditorBoardPlacement & { baseHeight: number };
+
+function getBoardSupportHeightFromPlacements(
+  boardPlacements: StackedEditorBoardPlacement[],
   rect: { x: number; y: number; width: number; depth: number },
   excludeBoardId?: string
 ): number {
-  return workingBoardPlacements.reduce((height, placement) => {
+  return boardPlacements.reduce((height, placement) => {
     if (placement.boardId === excludeBoardId || isLayeredBoxProxyBoard(placement.boardId)) return height;
     const dims = getEffectiveBoardDimensions(placement);
+    const topHeight = placement.baseHeight + placement.height;
     return rectsOverlap(rect, { x: placement.x, y: placement.y, width: dims.width, depth: dims.depth })
-      ? Math.max(height, placement.height)
+      ? Math.max(height, topHeight)
       : height;
   }, 0);
 }
 
+function getStackedEditorBoardPlacements(): StackedEditorBoardPlacement[] {
+  return workingBoardPlacements.reduce<StackedEditorBoardPlacement[]>((stackedBoards, placement) => {
+    const dims = getEffectiveBoardDimensions(placement);
+    const baseHeight = getBoardSupportHeightFromPlacements(stackedBoards, {
+      x: placement.x,
+      y: placement.y,
+      width: dims.width,
+      depth: dims.depth
+    });
+    stackedBoards.push({ ...placement, baseHeight });
+    return stackedBoards;
+  }, []);
+}
+
 export function getEditorBoxBaseHeight(placement: EditorBoxPlacement): number {
   const dims = getEffectiveBoxDimensions(placement);
-  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth });
+  return getBoardSupportHeightFromPlacements(getStackedEditorBoardPlacements(), {
+    x: placement.x,
+    y: placement.y,
+    width: dims.width,
+    depth: dims.depth
+  });
 }
 
 export function getEditorLooseTrayBaseHeight(placement: EditorLooseTrayPlacement): number {
   const dims = getEffectiveLooseTrayDimensions(placement);
-  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth });
+  return getBoardSupportHeightFromPlacements(getStackedEditorBoardPlacements(), {
+    x: placement.x,
+    y: placement.y,
+    width: dims.width,
+    depth: dims.depth
+  });
 }
 
 export function getEditorBoardBaseHeight(placement: EditorBoardPlacement): number {
-  if (!isLayeredBoxProxyBoard(placement.boardId)) return 0;
-  const dims = getEffectiveBoardDimensions(placement);
-  return getBoardSupportHeight({ x: placement.x, y: placement.y, width: dims.width, depth: dims.depth }, placement.boardId);
+  return getStackedEditorBoardPlacements().find((boardPlacement) => boardPlacement.boardId === placement.boardId)?.baseHeight ?? 0;
 }
 
 // Reactive state

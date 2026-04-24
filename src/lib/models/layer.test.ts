@@ -475,6 +475,110 @@ describe('layered box layout model', () => {
     expect(stackedPlacement?.dimensions.height).toBe(51);
   });
 
+  it('stacks boards using board placement order', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Board 1',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 20
+        },
+        {
+          id: 'board-2',
+          name: 'Board 2',
+          color: '#6b7f95',
+          width: 90,
+          depth: 70,
+          height: 30
+        }
+      ],
+      manualLayout: {
+        boxes: [],
+        looseTrays: [],
+        boards: [
+          { boardId: 'board-1', x: 0, y: 0, rotation: 0 },
+          { boardId: 'board-2', x: 5, y: 5, rotation: 0 }
+        ]
+      }
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    const lowerBoard = arrangement.boards.find((placement) => placement.board.id === 'board-1');
+    const upperBoard = arrangement.boards.find((placement) => placement.board.id === 'board-2');
+
+    expect(lowerBoard?.baseHeight).toBe(0);
+    expect(upperBoard?.baseHeight).toBe(20);
+    expect(arrangement.layerHeight).toBe(50);
+  });
+
+  it('uses stacked board height as support for auto-height boxes', () => {
+    const tallBox = createEmptyBox('tall-box', 94, false);
+    const stackedBox = createEmptyBox('stacked-box', 28, true);
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [tallBox, stackedBox],
+      layeredBoxes: [],
+      looseTrays: [],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Board 1',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 20
+        },
+        {
+          id: 'board-2',
+          name: 'Board 2',
+          color: '#6b7f95',
+          width: 90,
+          depth: 70,
+          height: 25
+        }
+      ],
+      manualLayout: {
+        boxes: [
+          { boxId: 'tall-box', x: 120, y: 0, rotation: 0 },
+          { boxId: 'stacked-box', x: 10, y: 10, rotation: 0 }
+        ],
+        looseTrays: [],
+        boards: [
+          { boardId: 'board-1', x: 0, y: 0, rotation: 0 },
+          { boardId: 'board-2', x: 5, y: 5, rotation: 0 }
+        ]
+      }
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    const stackedPlacement = arrangement.boxes.find((placement) => placement.box.id === 'stacked-box');
+
+    expect(arrangement.layerHeight).toBe(96);
+    expect(stackedPlacement?.baseHeight).toBe(45);
+    expect(stackedPlacement?.dimensions.height).toBe(51);
+  });
+
   it('uses the tallest occupied stack as auto-height reference', () => {
     const shortStackedBox = createEmptyBox('short-stacked-box', 28, true);
     const tallStackedBox = createEmptyBox('tall-stacked-box', 53, true);

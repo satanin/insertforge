@@ -396,14 +396,32 @@ function getBoardSupportHeight(
       width: placement.dimensions.width,
       depth: placement.dimensions.depth
     };
-    return rectsOverlap(rect, boardRect) ? Math.max(height, placement.dimensions.height) : height;
+    const topHeight = (placement.baseHeight ?? 0) + placement.dimensions.height;
+    return rectsOverlap(rect, boardRect) ? Math.max(height, topHeight) : height;
   }, 0);
 }
 
+function applyBoardStacking(boardPlacements: BoardPlacement[]): BoardPlacement[] {
+  return boardPlacements.reduce<BoardPlacement[]>((stackedBoards, placement) => {
+    const baseHeight = getBoardSupportHeight(stackedBoards, {
+      x: placement.x,
+      y: placement.y,
+      width: placement.dimensions.width,
+      depth: placement.dimensions.depth
+    });
+    stackedBoards.push({
+      ...placement,
+      baseHeight
+    });
+    return stackedBoards;
+  }, []);
+}
+
 function applyBoardSupports(arrangement: LayerArrangement): LayerArrangement {
+  const boards = applyBoardStacking(arrangement.boards);
   const boxesWithSupports = arrangement.boxes.map((placement) => ({
     ...placement,
-    baseHeight: getBoardSupportHeight(arrangement.boards, {
+    baseHeight: getBoardSupportHeight(boards, {
       x: placement.x,
       y: placement.y,
       width: placement.dimensions.width,
@@ -412,23 +430,12 @@ function applyBoardSupports(arrangement: LayerArrangement): LayerArrangement {
   }));
   const looseTraysWithSupports = arrangement.looseTrays.map((placement) => ({
     ...placement,
-    baseHeight: getBoardSupportHeight(arrangement.boards, {
+    baseHeight: getBoardSupportHeight(boards, {
       x: placement.x,
       y: placement.y,
       width: placement.dimensions.width,
       depth: placement.dimensions.depth
     })
-  }));
-  const boards = arrangement.boards.map((placement) => ({
-    ...placement,
-    baseHeight: isLayeredBoxProxyBoard(placement.board)
-      ? getBoardSupportHeight(arrangement.boards, {
-          x: placement.x,
-          y: placement.y,
-          width: placement.dimensions.width,
-          depth: placement.dimensions.depth
-        })
-      : 0
   }));
 
   const targetLayerHeight = Math.max(
