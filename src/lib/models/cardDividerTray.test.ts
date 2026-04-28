@@ -5,6 +5,7 @@ import {
   defaultCardDividerTrayParams,
   getCardDividerPositions,
   getCardDividerTrayDimensions,
+  sanitizeCardDividerTrayParams,
   validateCardDividerHeight
 } from './cardDividerTray';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
@@ -60,6 +61,25 @@ describe('card divider tray angled height limits', () => {
     expect(validation.valid).toBe(false);
     expect(validation.minimumHeight).toBeGreaterThan(invalidParams.maxHeight ?? 0);
     expect(dimensions.height).toBeCloseTo(natural.height);
+  });
+
+  it('clears an invalid max height when orientation changes to a taller card stance', () => {
+    const params = {
+      ...defaultCardDividerTrayParams,
+      orientation: 'vertical' as const,
+      stackDirection: 'sideBySide' as const,
+      rimHeight: 0,
+      maxHeight: 65,
+      stacks: [
+        { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: 'A' },
+        { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: 'B' },
+        { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: 'C' }
+      ]
+    };
+
+    const sanitized = sanitizeCardDividerTrayParams(params, cardSizes);
+
+    expect(sanitized.maxHeight).toBeNull();
   });
 
   it('resolves angles per stack when the tray mixes card sizes', () => {

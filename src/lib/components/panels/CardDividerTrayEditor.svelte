@@ -5,6 +5,7 @@
   import {
     type CardDividerTrayParams,
     getCardDividerTrayDimensions,
+    sanitizeCardDividerTrayParams,
     validateCardDividerHeight,
     MIN_CARD_DIVIDER_ANGLE_DEGREES
   } from '$lib/models/cardDividerTray';
@@ -41,6 +42,18 @@
   });
 
   let heightValidation = $derived.by(() => validateCardDividerHeight(tray.params, getCardSizes()));
+
+  $effect(() => {
+    if (tray.params.maxHeight === null || heightValidation.valid) {
+      return;
+    }
+
+    maxHeightWarning = `Height reset to auto. Minimum viable height is ${heightValidation.minimumHeight.toFixed(1)} mm at ${MIN_CARD_DIVIDER_ANGLE_DEGREES}°.`;
+    const sanitizedParams = sanitizeCardDividerTrayParams(tray.params, getCardSizes());
+    if (sanitizedParams.maxHeight !== tray.params.maxHeight) {
+      onUpdateParams(sanitizedParams);
+    }
+  });
 
   function updateParam<K extends keyof CardDividerTrayParams>(key: K, value: CardDividerTrayParams[K]) {
     onUpdateParams({ ...tray.params, [key]: value });

@@ -49,7 +49,7 @@ export const defaultCardDividerTrayParams: CardDividerTrayParams = {
   maxHeight: null
 };
 
-export const MIN_CARD_DIVIDER_ANGLE_DEGREES = 60;
+export const MIN_CARD_DIVIDER_ANGLE_DEGREES = 50;
 const MIN_CARD_DIVIDER_ANGLE_RADIANS = (MIN_CARD_DIVIDER_ANGLE_DEGREES * Math.PI) / 180;
 
 // Helper to get card dimensions from global card sizes by ID
@@ -285,6 +285,25 @@ export function validateCardDividerHeight(
     minimumHeight: layout.minimumHeight,
     valid: layout.valid,
     usesAngledCards: layout.usesAngledCards
+  };
+}
+
+export function sanitizeCardDividerTrayParams(
+  params: CardDividerTrayParams,
+  customCardSizes: CustomCardSize[]
+): CardDividerTrayParams {
+  if (params.maxHeight === null) {
+    return params;
+  }
+
+  const validation = validateCardDividerHeight(params, customCardSizes);
+  if (validation.valid) {
+    return params;
+  }
+
+  return {
+    ...params,
+    maxHeight: null
   };
 }
 

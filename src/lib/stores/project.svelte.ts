@@ -1,5 +1,5 @@
 import defaultProjectJson from '$lib/data/defaultProject.json';
-import { defaultCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
 import {
@@ -3139,18 +3139,19 @@ export const updateCardTrayParams = updateCardDrawTrayParams;
 
 // Update card divider tray params
 export function updateCardDividerTrayParams(trayId: string, params: CardDividerTrayParams): void {
+  const sanitizedParams = sanitizeCardDividerTrayParams(params, project.cardSizes);
   for (const layer of project.layers) {
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardDividerTray(tray)) {
-        tray.params = params;
+        tray.params = sanitizedParams;
         autosave();
         return;
       }
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardDividerTray(looseTray)) {
-      looseTray.params = params;
+      looseTray.params = sanitizedParams;
       autosave();
       return;
     }

@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.1.13`
+- Version visible actual: `1.1.15`
 
 ## Desarrollo local
 
