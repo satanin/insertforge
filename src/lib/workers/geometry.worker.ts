@@ -617,7 +617,11 @@ function getTrayPositions(
         slotDepth: stack.slotDepth,
         // Mark as card divider so TrayScene uses cardDividerHeight for Y
         isCardDivider: true,
-        cardDividerHeight: standingHeight
+        cardDividerHeight: standingHeight,
+        cardDividerProjectedHeight: stack.projectedHeight,
+        cardDividerBaseDepth: stack.stackDepth,
+        cardDividerLeanOffset: stack.leanOffset,
+        cardDividerTiltAngle: stack.tiltAngle
       };
     });
   }

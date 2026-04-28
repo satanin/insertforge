@@ -2,7 +2,12 @@
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CardDividerTray } from '$lib/types/project';
-  import { type CardDividerTrayParams, getCardDividerTrayDimensions } from '$lib/models/cardDividerTray';
+  import {
+    type CardDividerTrayParams,
+    getCardDividerTrayDimensions,
+    validateCardDividerHeight,
+    MIN_CARD_DIVIDER_ANGLE_DEGREES
+  } from '$lib/models/cardDividerTray';
   import { getCardSizes } from '$lib/stores/project.svelte';
   import { DEFAULT_CARD_SIZE_IDS } from '$lib/models/counterTray';
 
@@ -20,6 +25,7 @@
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
   let dragOverIndex: number | null = $state(null);
+  let maxHeightWarning = $state('');
 
   // Compute dimensions, using actualHeight if provided (when tray expands to match box height)
   // If displayDimensions is provided (with rotation applied), use those for display
@@ -33,6 +39,8 @@
       height: actualHeight && actualHeight > baseDims.height ? actualHeight : baseDims.height
     };
   });
+
+  let heightValidation = $derived.by(() => validateCardDividerHeight(tray.params, getCardSizes()));
 
   function updateParam<K extends keyof CardDividerTrayParams>(key: K, value: CardDividerTrayParams[K]) {
     onUpdateParams({ ...tray.params, [key]: value });
@@ -94,6 +102,34 @@
   function removeStack(index: number) {
     const newStacks = tray.params.stacks.filter((_, i) => i !== index);
     onUpdateParams({ ...tray.params, stacks: newStacks });
+  }
+
+  function handleMaxHeightChange(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const value = input.value.trim();
+
+    if (value === '') {
+      maxHeightWarning = '';
+      updateParam('maxHeight', null);
+      return;
+    }
+
+    const nextHeight = parseFloat(value);
+    if (Number.isNaN(nextHeight)) {
+      return;
+    }
+
+    const nextParams = { ...tray.params, maxHeight: nextHeight };
+    const validation = validateCardDividerHeight(nextParams, getCardSizes());
+
+    if (!validation.valid) {
+      maxHeightWarning = `Height reset to auto. Minimum viable height is ${validation.minimumHeight.toFixed(1)} mm at ${MIN_CARD_DIVIDER_ANGLE_DEGREES}°.`;
+      updateParam('maxHeight', null);
+      return;
+    }
+
+    maxHeightWarning = '';
+    updateParam('maxHeight', nextHeight);
   }
 </script>
 
@@ -262,6 +298,19 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <FormControl label="Max height" name="maxHeight">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            step="0.1"
+            placeholder="Auto"
+            value={tray.params.maxHeight ?? ''}
+            onchange={handleMaxHeightChange}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
     </div>
     <Spacer size="1rem" />
     <InputCheckbox
@@ -275,6 +324,20 @@
       checked={tray.autoHeight ?? true}
       onchange={(e) => onUpdateTray?.({ autoHeight: e.currentTarget.checked })}
     />
+    {#if tray.params.maxHeight !== null}
+      <p class="settingHint">
+        Tray walls are limited to {heightValidation.effectiveHeight.toFixed(1)} mm. Cards below that height stay upright;
+        taller stacks tilt back as needed.
+      </p>
+    {/if}
+    {#if maxHeightWarning}
+      <p class="warningText">{maxHeightWarning}</p>
+    {:else if tray.params.maxHeight !== null && heightValidation.usesAngledCards}
+      <p class="warningText">
+        Minimum viable height with the current cards is {heightValidation.minimumHeight.toFixed(1)} mm at a fixed
+        {MIN_CARD_DIVIDER_ANGLE_DEGREES}° support angle.
+      </p>
+    {/if}
     {#if (tray.showStackLabels ?? true) && tray.params.wallThickness < 2}
       <p class="settingHint">
         Thin walls reduce stack label emboss depth automatically to avoid cutting through the wall.
@@ -322,6 +385,13 @@
     margin-top: 0.5rem;
     font-size: 0.75rem;
     color: var(--fgMuted);
+    line-height: 1.4;
+  }
+
+  .warningText {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--dangerText, #b94a48);
     line-height: 1.4;
   }
 

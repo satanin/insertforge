@@ -124,6 +124,10 @@ export interface CounterStack {
   // Card divider specific fields
   isCardDivider?: boolean; // True if this is a card divider stack
   cardDividerHeight?: number; // Standing height for card divider cards
+  cardDividerProjectedHeight?: number; // Visible height after tilt
+  cardDividerBaseDepth?: number; // Stack depth before extra lean offset
+  cardDividerLeanOffset?: number; // Additional depth introduced by the tilt
+  cardDividerTiltAngle?: number; // Radians from vertical leaning backwards
 }
 
 // Generate harmonious colors for counter stacks (warm earth tones matching primary red)

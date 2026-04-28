@@ -156,7 +156,11 @@
               : stack.shape === 'custom'
                 ? Math.min(stack.width, stack.length)
                 : Math.max(stack.width, stack.length)}
-        {@const counterY = stack.z + standingHeight / 2}
+        {@const projectedHeight = stack.isCardDivider ? (stack.cardDividerProjectedHeight ?? standingHeight) : standingHeight}
+        {@const baseDepth = stack.isCardDivider ? (stack.cardDividerBaseDepth ?? stack.slotDepth ?? stack.count * stack.thickness) : (stack.slotDepth ?? stack.count * stack.thickness)}
+        {@const leanOffset = stack.isCardDivider ? (stack.cardDividerLeanOffset ?? 0) : 0}
+        {@const edgeTiltAngle = stack.isCardDivider ? (stack.cardDividerTiltAngle ?? 0) : 0}
+        {@const counterY = stack.z + projectedHeight / 2}
         {@const isAlt = counterIdx % 2 === 1}
         {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
         {@const triGeom =
@@ -166,7 +170,7 @@
         {#if stack.edgeOrientation === 'lengthwise'}
           {@const counterSpacing = (stack.slotWidth ?? stack.count * stack.thickness) / stack.count}
           {@const posX = stack.x + (counterIdx + 0.5) * counterSpacing}
-          {@const posZ = -stack.y - (stack.slotDepth ?? stack.length) / 2}
+          {@const posZ = -stack.y - (stack.slotDepth ?? stack.length) / 2 - leanOffset / 2}
           <CounterMesh
             shape={effectiveShape}
             {posX}
@@ -181,11 +185,12 @@
             isEdgeLoaded={true}
             edgeOrientation="lengthwise"
             {standingHeight}
+            {edgeTiltAngle}
           />
         {:else}
-          {@const counterSpacing = (stack.slotDepth ?? stack.count * stack.thickness) / stack.count}
+          {@const counterSpacing = baseDepth / stack.count}
           {@const posX = stack.x + (stack.slotWidth ?? stack.length) / 2}
-          {@const posZ = -stack.y - (counterIdx + 0.5) * counterSpacing}
+          {@const posZ = -stack.y - leanOffset / 2 - (counterIdx + 0.5) * counterSpacing}
           <CounterMesh
             shape={effectiveShape}
             {posX}
@@ -200,6 +205,7 @@
             isEdgeLoaded={true}
             edgeOrientation="crosswise"
             {standingHeight}
+            {edgeTiltAngle}
           />
         {/if}
       {/each}

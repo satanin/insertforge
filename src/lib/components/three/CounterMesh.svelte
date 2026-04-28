@@ -23,6 +23,7 @@
     isEdgeLoaded?: boolean;
     edgeOrientation?: 'lengthwise' | 'crosswise';
     standingHeight?: number;
+    edgeTiltAngle?: number;
     // Top-loaded specific
     slopeAngle?: number;
     rowAssignment?: 'front' | 'back';
@@ -48,6 +49,7 @@
     isEdgeLoaded = false,
     edgeOrientation = 'lengthwise',
     standingHeight,
+    edgeTiltAngle = 0,
     slopeAngle = 0,
     rowAssignment,
     isSleevedCard = false,
@@ -59,13 +61,14 @@
 
   // Calculate effective standing height for edge-loaded counters
   const effectiveHeight = $derived(standingHeight ?? width);
+  const previewEdgeTilt = $derived(-edgeTiltAngle);
 </script>
 
 {#if isEdgeLoaded}
   <!-- Edge-loaded counter (standing up) -->
   {#if edgeOrientation === 'lengthwise'}
     {#if shape === 'square' || shape === 'rectangle'}
-      <T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+      <T.Mesh position.x={posX} position.y={posY} position.z={posZ} rotation.x={previewEdgeTilt}>
         <T.BoxGeometry args={[thickness, effectiveHeight, length]} />
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />
       </T.Mesh>
@@ -100,12 +103,12 @@
   {:else}
     <!-- crosswise orientation -->
     {#if shape === 'square' || shape === 'rectangle'}
-      <T.Mesh position.x={posX} position.y={posY} position.z={posZ}>
+      <T.Mesh position.x={posX} position.y={posY} position.z={posZ} rotation.x={previewEdgeTilt}>
         <T.BoxGeometry args={[length, effectiveHeight, thickness]} />
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />
       </T.Mesh>
     {:else if shape === 'circle'}
-      <T.Mesh position.x={posX} position.y={posY} position.z={posZ} rotation.x={Math.PI / 2}>
+      <T.Mesh position.x={posX} position.y={posY} position.z={posZ} rotation.x={Math.PI / 2 + previewEdgeTilt}>
         <T.CylinderGeometry args={[width / 2, width / 2, thickness, 32]} />
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />
       </T.Mesh>
@@ -114,14 +117,14 @@
         position.x={posX}
         position.y={posY}
         position.z={posZ}
-        rotation.x={Math.PI / 2}
+        rotation.x={Math.PI / 2 + previewEdgeTilt}
         rotation.y={hexPointyTop ? Math.PI / 6 : 0}
       >
         <T.CylinderGeometry args={[width / 2, width / 2, thickness, 6]} />
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />
       </T.Mesh>
     {:else if shape === 'triangle' && triangleGeometry}
-      <T.Mesh geometry={triangleGeometry} position.x={posX} position.y={posY} position.z={posZ} rotation.x={Math.PI}>
+      <T.Mesh geometry={triangleGeometry} position.x={posX} position.y={posY} position.z={posZ} rotation.x={Math.PI + previewEdgeTilt}>
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />
       </T.Mesh>
     {/if}

@@ -1,7 +1,7 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
-const { cuboid, cylinder } = jscad.primitives;
+const { cuboid, cylinder, polygon } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
 const { translate, scale, mirrorY, rotateX, rotateZ } = jscad.transforms;
 const { path2 } = jscad.geometries;
@@ -32,6 +32,7 @@ export interface CardDividerTrayParams {
   floorThickness: number;
   clearance: number; // Tolerance around cards
   rimHeight: number; // Extra height above cards
+  maxHeight: number | null; // null = natural height, lower values tilt cards to fit
 }
 
 export const defaultCardDividerTrayParams: CardDividerTrayParams = {
@@ -44,8 +45,12 @@ export const defaultCardDividerTrayParams: CardDividerTrayParams = {
   wallThickness: 2.0,
   floorThickness: 2.0,
   clearance: 1.5,
-  rimHeight: 3.0
+  rimHeight: 3.0,
+  maxHeight: null
 };
+
+export const MIN_CARD_DIVIDER_ANGLE_DEGREES = 60;
+const MIN_CARD_DIVIDER_ANGLE_RADIANS = (MIN_CARD_DIVIDER_ANGLE_DEGREES * Math.PI) / 180;
 
 // Helper to get card dimensions from global card sizes by ID
 export function getCardSize(cardSizeId: string, cardSizes: CardSize[]): CardSize | null {
@@ -60,6 +65,11 @@ export interface CardDividerStackPosition {
   slotWidth: number; // Width of the slot (card dimension + clearance)
   slotDepth: number; // Depth of the slot based on card count
   slotHeight: number; // Height of the slot (card standing dimension)
+  stackDepth: number; // Base stack depth before tilt allowance
+  tiltAngle: number; // Lean angle from vertical in radians
+  angleFromBaseDegrees: number; // Angle relative to tray floor
+  leanOffset: number; // Extra depth needed by the tilt
+  projectedHeight: number; // Vertical card projection after tilt
   cardSizeId: string;
   count: number;
   label?: string;
@@ -71,6 +81,213 @@ export interface CardDividerStackPosition {
   orientation: 'vertical' | 'horizontal';
 }
 
+interface CardDividerSlotMetrics {
+  stack: CardDividerStack;
+  cardSize: CardSize;
+  slotWidth: number;
+  stackDepth: number;
+  standingHeight: number;
+}
+
+interface ResolvedCardDividerSlot extends CardDividerSlotMetrics {
+  projectedHeight: number;
+  leanOffset: number;
+  slotDepth: number;
+  tiltAngle: number;
+  angleFromBaseRadians: number;
+  angleFromBaseDegrees: number;
+  frontLeanOffset: number;
+  sharesDividerWithPrevious: boolean;
+  sharesDividerWithNext: boolean;
+  baseStart: number;
+}
+
+export interface CardDividerHeightValidation {
+  requestedHeight: number | null;
+  naturalHeight: number;
+  effectiveHeight: number;
+  minimumHeight: number;
+  valid: boolean;
+  usesAngledCards: boolean;
+}
+
+interface ResolvedCardDividerLayout {
+  width: number;
+  depth: number;
+  wallHeight: number;
+  naturalHeight: number;
+  minimumHeight: number;
+  valid: boolean;
+  usesAngledCards: boolean;
+  slots: ResolvedCardDividerSlot[];
+  maxProjectedHeight: number;
+}
+
+function getStandingHeight(cardSize: CardSize, orientation: 'vertical' | 'horizontal'): number {
+  return orientation === 'vertical' ? cardSize.length : cardSize.width;
+}
+
+function getSlotWidth(cardSize: CardSize, clearance: number, orientation: 'vertical' | 'horizontal'): number {
+  return (orientation === 'vertical' ? cardSize.width : cardSize.length) + clearance * 2;
+}
+
+function getStackDepth(cardSize: CardSize, count: number, clearance: number): number {
+  return count * cardSize.thickness + clearance * 2;
+}
+
+function getCardDividerSlotMetrics(
+  params: CardDividerTrayParams,
+  customCardSizes: CustomCardSize[]
+): CardDividerSlotMetrics[] {
+  const metrics: CardDividerSlotMetrics[] = [];
+
+  for (const stack of params.stacks) {
+    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+    if (!cardSize) continue;
+
+    metrics.push({
+      stack,
+      cardSize,
+      slotWidth: getSlotWidth(cardSize, params.clearance, params.orientation),
+      stackDepth: getStackDepth(cardSize, stack.count, params.clearance),
+      standingHeight: getStandingHeight(cardSize, params.orientation)
+    });
+  }
+
+  return metrics;
+}
+
+function resolveCardDividerLayout(
+  params: CardDividerTrayParams,
+  customCardSizes: CustomCardSize[]
+): ResolvedCardDividerLayout {
+  const slotMetrics = getCardDividerSlotMetrics(params, customCardSizes);
+  const { wallThickness, floorThickness, rimHeight, stackDirection } = params;
+
+  if (slotMetrics.length === 0) {
+    return {
+      width: wallThickness * 2,
+      depth: wallThickness * 2,
+      wallHeight: floorThickness,
+      naturalHeight: floorThickness,
+      minimumHeight: floorThickness,
+      valid: true,
+      usesAngledCards: false,
+      slots: [],
+      maxProjectedHeight: 0
+    };
+  }
+
+  const maxStandingHeight = Math.max(...slotMetrics.map((slot) => slot.standingHeight));
+  const naturalHeight = floorThickness + maxStandingHeight + rimHeight;
+  const minimumProjectedHeight = Math.max(
+    ...slotMetrics.map((slot) => slot.standingHeight * Math.sin(MIN_CARD_DIVIDER_ANGLE_RADIANS))
+  );
+  const minimumHeight = floorThickness + minimumProjectedHeight + rimHeight;
+
+  let requestedWallHeight = params.maxHeight ?? naturalHeight;
+  if (requestedWallHeight > naturalHeight) {
+    requestedWallHeight = naturalHeight;
+  }
+
+  const valid = requestedWallHeight >= minimumHeight;
+  const effectiveWallHeight = valid ? requestedWallHeight : naturalHeight;
+  const usableHeight = Math.max(0, effectiveWallHeight - floorThickness - rimHeight);
+
+  const preliminarySlots: ResolvedCardDividerSlot[] = slotMetrics.map((slot) => {
+    const projectedHeight = Math.min(slot.standingHeight, usableHeight);
+    const leanOffset =
+      projectedHeight >= slot.standingHeight
+        ? 0
+        : Math.sqrt(Math.max(0, slot.standingHeight ** 2 - projectedHeight ** 2));
+    const tiltAngle =
+      projectedHeight >= slot.standingHeight
+        ? 0
+        : Math.PI / 2 - Math.asin(projectedHeight / slot.standingHeight);
+    const angleFromBaseRadians = Math.PI / 2 - tiltAngle;
+
+    return {
+      ...slot,
+      projectedHeight,
+      leanOffset,
+      slotDepth: slot.stackDepth + leanOffset,
+      tiltAngle,
+      angleFromBaseRadians,
+      angleFromBaseDegrees: (angleFromBaseRadians * 180) / Math.PI,
+      frontLeanOffset: 0,
+      sharesDividerWithPrevious: false,
+      sharesDividerWithNext: false,
+      baseStart: 0
+    };
+  });
+
+  for (let index = 0; index < preliminarySlots.length - 1; index++) {
+    const current = preliminarySlots[index];
+    const next = preliminarySlots[index + 1];
+    const canShareDivider =
+      current.leanOffset > 0 &&
+      next.leanOffset > 0 &&
+      Math.abs(current.tiltAngle - next.tiltAngle) < 0.0001;
+
+    if (canShareDivider) {
+      current.sharesDividerWithNext = true;
+      next.sharesDividerWithPrevious = true;
+      next.frontLeanOffset = current.leanOffset;
+    }
+  }
+
+  let currentBaseStart = wallThickness;
+  for (const slot of preliminarySlots) {
+    slot.baseStart = currentBaseStart;
+    currentBaseStart += slot.stackDepth + wallThickness + (slot.sharesDividerWithNext ? 0 : slot.leanOffset);
+    slot.slotDepth = slot.stackDepth + Math.max(slot.frontLeanOffset, slot.leanOffset);
+  }
+
+  const slots = preliminarySlots;
+  const usesAngledCards = slots.some((slot) => slot.tiltAngle > 0.0001);
+  const maxProjectedHeight = Math.max(...slots.map((slot) => slot.projectedHeight));
+
+  let width: number;
+  let depth: number;
+
+  if (stackDirection === 'sideBySide') {
+    width = wallThickness + slots.reduce((sum, slot) => sum + slot.slotWidth + wallThickness, 0);
+    depth = wallThickness * 2 + Math.max(...slots.map((slot) => slot.slotDepth));
+  } else {
+    width = wallThickness * 2 + Math.max(...slots.map((slot) => slot.slotWidth));
+    const lastSlot = slots[slots.length - 1];
+    depth = lastSlot.baseStart + lastSlot.stackDepth + lastSlot.leanOffset + wallThickness;
+  }
+
+  return {
+    width,
+    depth,
+    wallHeight: effectiveWallHeight,
+    naturalHeight,
+    minimumHeight,
+    valid,
+    usesAngledCards,
+    slots,
+    maxProjectedHeight
+  };
+}
+
+export function validateCardDividerHeight(
+  params: CardDividerTrayParams,
+  customCardSizes: CustomCardSize[]
+): CardDividerHeightValidation {
+  const layout = resolveCardDividerLayout(params, customCardSizes);
+
+  return {
+    requestedHeight: params.maxHeight ?? null,
+    naturalHeight: layout.naturalHeight,
+    effectiveHeight: layout.wallHeight,
+    minimumHeight: layout.minimumHeight,
+    valid: layout.valid,
+    usesAngledCards: layout.usesAngledCards
+  };
+}
+
 export function getCardDividerTrayDimensions(
   params: CardDividerTrayParams,
   customCardSizes: CustomCardSize[]
@@ -79,75 +296,8 @@ export function getCardDividerTrayDimensions(
   depth: number;
   height: number;
 } {
-  const { stacks, orientation, stackDirection, wallThickness, floorThickness, clearance, rimHeight } = params;
-
-  if (stacks.length === 0) {
-    return { width: wallThickness * 2, depth: wallThickness * 2, height: floorThickness };
-  }
-
-  let maxSlotHeight = 0;
-
-  // Calculate slot dimensions for each stack
-  const slotDimensions: { slotWidth: number; slotDepth: number; slotHeight: number }[] = [];
-
-  for (const stack of stacks) {
-    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-    if (!cardSize) continue;
-
-    const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
-
-    // Calculate slot dimensions based on orientation
-    // Vertical: cards stand with long edge up (card width is slot width, card length is height)
-    // Horizontal: cards stand with short edge up (card length is slot width, card width is height)
-    let slotWidth: number;
-    let slotHeight: number;
-
-    if (orientation === 'vertical') {
-      slotWidth = cardWidth + clearance * 2;
-      slotHeight = cardLength;
-    } else {
-      slotWidth = cardLength + clearance * 2;
-      slotHeight = cardWidth;
-    }
-
-    // Slot depth is based on card count (cards stacked on top of each other)
-    const slotDepth = stack.count * cardThickness + clearance * 2;
-
-    slotDimensions.push({ slotWidth, slotDepth, slotHeight });
-    maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
-  }
-
-  // If no valid card sizes were found, return minimal dimensions
-  if (slotDimensions.length === 0) {
-    return { width: wallThickness * 2, depth: wallThickness * 2, height: floorThickness };
-  }
-
-  let trayWidth: number;
-  let trayDepth: number;
-
-  if (stackDirection === 'sideBySide') {
-    // Stacks arranged horizontally (side by side along X)
-    // Width = sum of all slot widths + walls between
-    // Depth = max slot depth + front/back walls
-    const totalSlotWidth = slotDimensions.reduce((sum, d) => sum + d.slotWidth, 0);
-    const maxSlotDepth = Math.max(...slotDimensions.map((d) => d.slotDepth));
-
-    trayWidth = wallThickness + totalSlotWidth + wallThickness * stacks.length;
-    trayDepth = wallThickness * 2 + maxSlotDepth;
-  } else {
-    // Stacks arranged vertically (front to back along Y)
-    // Width = max slot width + left/right walls
-    // Depth = sum of all slot depths + walls between
-    const maxSlotWidth = Math.max(...slotDimensions.map((d) => d.slotWidth));
-    const totalSlotDepth = slotDimensions.reduce((sum, d) => sum + d.slotDepth, 0);
-
-    trayWidth = wallThickness * 2 + maxSlotWidth;
-    trayDepth = wallThickness + totalSlotDepth + wallThickness * stacks.length;
-  }
-
-  const trayHeight = floorThickness + maxSlotHeight + rimHeight;
-
-  return { width: trayWidth, depth: trayDepth, height: trayHeight };
+  const layout = resolveCardDividerLayout(params, customCardSizes);
+  return { width: layout.width, depth: layout.depth, height: layout.wallHeight };
 }
 
 export function getCardDividerPositions(
@@ -156,7 +306,7 @@ export function getCardDividerPositions(
   targetHeight?: number,
   spacerHeight?: number
 ): CardDividerStackPosition[] {
-  const { stacks: originalStacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
+  const { stacks: originalStacks, orientation, stackDirection, wallThickness, floorThickness } = params;
 
   // Reverse stacks so first item in UI list appears at front of tray
   const stacks = [...originalStacks].reverse();
@@ -164,7 +314,8 @@ export function getCardDividerPositions(
   const positions: CardDividerStackPosition[] = [];
   const colors = ['#4a90a4', '#a4784a', '#4aa474', '#a44a74', '#744aa4', '#a4a44a'];
 
-  const dims = getCardDividerTrayDimensions(params, customCardSizes);
+  const layout = resolveCardDividerLayout(params, customCardSizes);
+  const dims = { width: layout.width, depth: layout.depth, height: layout.wallHeight };
 
   // Calculate effective tray height and floor position
   const baseSpacerHeight = spacerHeight ?? 0;
@@ -174,15 +325,8 @@ export function getCardDividerPositions(
   }
   const extraHeight = trayHeight - dims.height;
   const effectiveFloorHeight = floorThickness + extraHeight;
-
-  // Calculate max slot height across all stacks for floor adjustment
-  let maxSlotHeight = 0;
-  for (const stack of stacks) {
-    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-    if (!cardSize) continue;
-    const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
-    maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
-  }
+  const maxProjectedHeight = layout.maxProjectedHeight;
+  const resolvedSlots = [...layout.slots].reverse();
 
   if (stackDirection === 'sideBySide') {
     // Stacks arranged horizontally (side by side along X)
@@ -190,26 +334,14 @@ export function getCardDividerPositions(
 
     for (let i = 0; i < stacks.length; i++) {
       const stack = stacks[i];
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
-
+      const resolvedSlot = resolvedSlots[i];
+      if (!resolvedSlot) continue;
+      const { cardSize, slotWidth, standingHeight: slotHeight, slotDepth, stackDepth, tiltAngle, angleFromBaseDegrees, leanOffset, projectedHeight } =
+        resolvedSlot;
       const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-      let slotWidth: number;
-      let slotHeight: number;
-
-      if (orientation === 'vertical') {
-        slotWidth = cardWidth + clearance * 2;
-        slotHeight = cardLength;
-      } else {
-        slotWidth = cardLength + clearance * 2;
-        slotHeight = cardWidth;
-      }
-
-      const slotDepth = stack.count * cardThickness + clearance * 2;
-
-      // Raise floor for shorter cards so tops are accessible
-      const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+      // Raise floor for shorter cards so tops are aligned and accessible.
+      const stackFloorHeight = effectiveFloorHeight + (maxProjectedHeight - projectedHeight);
 
       // Center the slot in Y (all slots share the same Y position, centered)
       const slotY = dims.depth / 2;
@@ -222,6 +354,11 @@ export function getCardDividerPositions(
         slotWidth,
         slotDepth,
         slotHeight,
+        stackDepth,
+        tiltAngle,
+        angleFromBaseDegrees,
+        leanOffset,
+        projectedHeight,
         cardSizeId: stack.cardSizeId,
         count: stack.count,
         label: stack.label,
@@ -236,43 +373,20 @@ export function getCardDividerPositions(
     }
   } else {
     // Stacks arranged vertically (front to back along Y)
-    let currentY = wallThickness;
-
-    // Calculate max slot width for centering
-    let maxSlotWidth = 0;
-    for (const stack of stacks) {
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
-      const slotWidth = orientation === 'vertical' ? cardSize.width + clearance * 2 : cardSize.length + clearance * 2;
-      maxSlotWidth = Math.max(maxSlotWidth, slotWidth);
-    }
-
     for (let i = 0; i < stacks.length; i++) {
       const stack = stacks[i];
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
-
+      const resolvedSlot = resolvedSlots[i];
+      if (!resolvedSlot) continue;
+      const { cardSize, slotWidth, standingHeight: slotHeight, slotDepth, stackDepth, tiltAngle, angleFromBaseDegrees, leanOffset, projectedHeight } =
+        resolvedSlot;
       const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
-      let slotWidth: number;
-      let slotHeight: number;
-
-      if (orientation === 'vertical') {
-        slotWidth = cardWidth + clearance * 2;
-        slotHeight = cardLength;
-      } else {
-        slotWidth = cardLength + clearance * 2;
-        slotHeight = cardWidth;
-      }
-
-      const slotDepth = stack.count * cardThickness + clearance * 2;
-
-      // Raise floor for shorter cards so tops are accessible
-      const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
+      // Raise floor for shorter cards so tops are aligned and accessible.
+      const stackFloorHeight = effectiveFloorHeight + (maxProjectedHeight - projectedHeight);
 
       // Center the slot in X (all slots share the same X position, centered)
       const slotX = dims.width / 2;
-      const slotY = currentY + slotDepth / 2;
+      const slotY = resolvedSlot.baseStart + resolvedSlot.stackDepth / 2 + resolvedSlot.leanOffset / 2;
 
       positions.push({
         x: slotX,
@@ -281,6 +395,11 @@ export function getCardDividerPositions(
         slotWidth,
         slotDepth,
         slotHeight,
+        stackDepth,
+        tiltAngle,
+        angleFromBaseDegrees,
+        leanOffset,
+        projectedHeight,
         cardSizeId: stack.cardSizeId,
         count: stack.count,
         label: stack.label,
@@ -290,8 +409,6 @@ export function getCardDividerPositions(
         cardThickness,
         orientation
       });
-
-      currentY += slotDepth + wallThickness;
     }
   }
 
@@ -422,6 +539,29 @@ function createStackLabelGeometry(
   return combinedText;
 }
 
+function createCardDividerSlotCavity(
+  slotWidth: number,
+  stackDepth: number,
+  projectedHeight: number,
+  frontLeanOffset: number,
+  leanOffset: number,
+  openHeight: number
+): Geom3 {
+  const profile = polygon({
+    points: [
+      [0, 0],
+      [stackDepth, 0],
+      [stackDepth + leanOffset, projectedHeight],
+      [stackDepth + leanOffset, openHeight],
+      [frontLeanOffset, openHeight],
+      [frontLeanOffset, projectedHeight]
+    ]
+  });
+
+  const cavity = extrudeLinear({ height: slotWidth }, profile);
+  return rotateZ(Math.PI / 2, rotateX(Math.PI / 2, cavity));
+}
+
 export function createCardDividerTray(
   params: CardDividerTrayParams,
   customCardSizes: CustomCardSize[],
@@ -445,7 +585,8 @@ export function createCardDividerTray(
   }
 
   // Calculate dimensions
-  const dims = getCardDividerTrayDimensions(params, customCardSizes);
+  const layout = resolveCardDividerLayout(params, customCardSizes);
+  const dims = { width: layout.width, depth: layout.depth, height: layout.wallHeight };
   const spacerHeight = floorSpacerHeight ?? 0;
   let trayHeight = dims.height + spacerHeight;
 
@@ -469,102 +610,53 @@ export function createCardDividerTray(
 
   // Subtract individual slot cavities
   let tray = outerBox;
-
-  // Calculate max slot height for per-stack floor adjustment
-  let maxSlotHeight = 0;
-  for (const stack of stacks) {
-    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-    if (!cardSize) continue;
-    const slotHeight = orientation === 'vertical' ? cardSize.length : cardSize.width;
-    maxSlotHeight = Math.max(maxSlotHeight, slotHeight);
-  }
+  const maxProjectedHeight = layout.maxProjectedHeight;
+  const resolvedSlots = [...layout.slots].reverse();
 
   if (stackDirection === 'sideBySide') {
     // Stacks arranged horizontally (side by side along X)
     let currentX = wallThickness;
 
-    for (const stack of stacks) {
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
+    for (let index = 0; index < stacks.length; index++) {
+      const resolvedSlot = resolvedSlots[index];
+      if (!resolvedSlot) continue;
 
-      const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
-
-      let slotWidth: number;
-      let slotHeight: number;
-
-      if (orientation === 'vertical') {
-        slotWidth = cardWidth + clearance * 2;
-        slotHeight = cardLength;
-      } else {
-        slotWidth = cardLength + clearance * 2;
-        slotHeight = cardWidth;
-      }
-
-      const slotDepth = stack.count * cardThickness + clearance * 2;
-
-      // Raise floor for shorter cards so tops are accessible
-      const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
-
-      // Cavity goes from raised floor to top (open top)
+      const stackFloorHeight = effectiveFloorHeight + (maxProjectedHeight - resolvedSlot.projectedHeight);
       const cavityHeight = trayHeight - stackFloorHeight + 0.1;
-
-      // Create slot cavity - centered in Y, at currentX position
       const slotCavity = translate(
-        [currentX + slotWidth / 2, trayDepth / 2, stackFloorHeight + cavityHeight / 2],
-        cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
+        [currentX, (trayDepth - resolvedSlot.slotDepth) / 2, stackFloorHeight],
+        createCardDividerSlotCavity(
+          resolvedSlot.slotWidth,
+          resolvedSlot.stackDepth,
+          resolvedSlot.projectedHeight,
+          0,
+          resolvedSlot.leanOffset,
+          cavityHeight
+        )
       );
 
       tray = subtract(tray, slotCavity);
 
-      currentX += slotWidth + wallThickness;
+      currentX += resolvedSlot.slotWidth + wallThickness;
     }
   } else {
     // Stacks arranged vertically (front to back along Y)
-    let currentY = wallThickness;
-
-    // Calculate max slot width for cavity centering
-    let maxSlotWidth = 0;
-    for (const stack of stacks) {
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
-      const slotWidth = orientation === 'vertical' ? cardSize.width + clearance * 2 : cardSize.length + clearance * 2;
-      maxSlotWidth = Math.max(maxSlotWidth, slotWidth);
-    }
-
-    for (const stack of stacks) {
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-      if (!cardSize) continue;
-
-      const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
-
-      let slotWidth: number;
-      let slotHeight: number;
-
-      if (orientation === 'vertical') {
-        slotWidth = cardWidth + clearance * 2;
-        slotHeight = cardLength;
-      } else {
-        slotWidth = cardLength + clearance * 2;
-        slotHeight = cardWidth;
-      }
-
-      const slotDepth = stack.count * cardThickness + clearance * 2;
-
-      // Raise floor for shorter cards so tops are accessible
-      const stackFloorHeight = effectiveFloorHeight + (maxSlotHeight - slotHeight);
-
-      // Cavity goes from raised floor to top (open top)
+    for (const resolvedSlot of resolvedSlots) {
+      const stackFloorHeight = effectiveFloorHeight + (maxProjectedHeight - resolvedSlot.projectedHeight);
       const cavityHeight = trayHeight - stackFloorHeight + 0.1;
-
-      // Create slot cavity - centered in X, at currentY position
       const slotCavity = translate(
-        [trayWidth / 2, currentY + slotDepth / 2, stackFloorHeight + cavityHeight / 2],
-        cuboid({ size: [slotWidth, slotDepth, cavityHeight] })
+        [(trayWidth - resolvedSlot.slotWidth) / 2, resolvedSlot.baseStart, stackFloorHeight],
+        createCardDividerSlotCavity(
+          resolvedSlot.slotWidth,
+          resolvedSlot.stackDepth,
+          resolvedSlot.projectedHeight,
+          resolvedSlot.frontLeanOffset,
+          resolvedSlot.leanOffset,
+          cavityHeight
+        )
       );
 
       tray = subtract(tray, slotCavity);
-
-      currentY += slotDepth + wallThickness;
     }
   }
 
@@ -684,28 +776,21 @@ export function createCardDividerTray(
   if (showStackLabels) {
     const stackLabelCuts: Geom3[] = [];
 
-    if (stackDirection === 'sideBySide') {
-      // Labels on front wall, beneath each stack
+  if (stackDirection === 'sideBySide') {
+    // Labels on front wall, beneath each stack
       let currentX = wallThickness;
 
-      for (const stack of stacks) {
-        const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-        if (!cardSize) continue;
-
-        const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
-
-        const slotWidth = orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
-        const slotDepth = stack.count * cardThickness + clearance * 2;
-        const slotCenterX = currentX + slotWidth / 2;
+      for (const resolvedSlot of resolvedSlots) {
+        const slotCenterX = currentX + resolvedSlot.slotWidth / 2;
         const slotCenterY = trayDepth / 2;
 
-        if (stack.label?.trim()) {
+        if (resolvedSlot.stack.label?.trim()) {
           const labelGeom = createStackLabelGeometry(
-            stack.label,
+            resolvedSlot.stack.label,
             slotCenterX,
             slotCenterY,
-            slotWidth,
-            slotDepth,
+            resolvedSlot.slotWidth,
+            resolvedSlot.slotDepth,
             trayHeight,
             floorThickness,
             wallThickness,
@@ -714,30 +799,21 @@ export function createCardDividerTray(
           if (labelGeom) stackLabelCuts.push(labelGeom);
         }
 
-        currentX += slotWidth + wallThickness;
+        currentX += resolvedSlot.slotWidth + wallThickness;
       }
     } else {
       // Labels on left wall, next to each stack
-      let currentY = wallThickness;
-
-      for (const stack of stacks) {
-        const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
-        if (!cardSize) continue;
-
-        const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
-
-        const slotWidth = orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
-        const slotDepth = stack.count * cardThickness + clearance * 2;
+      for (const resolvedSlot of resolvedSlots) {
         const slotCenterX = trayWidth / 2;
-        const slotCenterY = currentY + slotDepth / 2;
+        const slotCenterY = resolvedSlot.baseStart + resolvedSlot.slotDepth / 2;
 
-        if (stack.label?.trim()) {
+        if (resolvedSlot.stack.label?.trim()) {
           const labelGeom = createStackLabelGeometry(
-            stack.label,
+            resolvedSlot.stack.label,
             slotCenterX,
             slotCenterY,
-            slotWidth,
-            slotDepth,
+            resolvedSlot.slotWidth,
+            resolvedSlot.slotDepth,
             trayHeight,
             floorThickness,
             wallThickness,
@@ -745,8 +821,6 @@ export function createCardDividerTray(
           );
           if (labelGeom) stackLabelCuts.push(labelGeom);
         }
-
-        currentY += slotDepth + wallThickness;
       }
     }
 
