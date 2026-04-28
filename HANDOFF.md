@@ -3,9 +3,10 @@
 ## Proyecto
 
 - Workspace: `/Users/raul/projects/insertforge`
-- Rama actual: `codex/insertforge`
+- Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
+- Version visible actual: `1.1.11`
 
 ## Desarrollo local
 
@@ -29,7 +30,7 @@ pnpm run check
 
 ## Nota de ramas
 
-- Rama estable actual: `codex/insertforge`
+- Rama estable actual: `main`
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
@@ -148,7 +149,20 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - soporte de `Layered Box` en `Edit layout` de layer normal
 - render de `Layered Box` en `Edit layout` alineado con la vista normal para distinguir multiples cajas
 - posicion y rotacion de `Board` guardadas correctamente
+- `Board` puede actuar como soporte visual para `Box`, `Loose tray` y `Layered Box` en vistas de layer
+- `Board` puede apilarse sobre otros `Board` dentro de la misma layer siguiendo el orden actual de la lista
+- `Edit layout` eleva items soportados por `Board` y valida solapes en 3D, no solo en X/Y
+- `autoHeight` de `Box` y `Loose tray` ya tiene en cuenta la altura del `Board` o pila de `Board` sobre la que apoyan
+- fix de seleccion en `Edit layout` para que la caja seleccionable de `Box` rote alineada con la geometria visible
 - navegacion entre `layers` reutiliza la geometria cacheada una vez generada y ya no relanza `Generating Geometry...` en cada cambio de layer si no ha cambiado la geometria real
+
+### Community projects
+
+- `Load community project` sigue siendo un flujo estatico basado en `static/projects/manifest.json`
+- ahora muestra `nombre + autor`
+- pide confirmacion antes de reemplazar el proyecto local del navegador
+- maneja mejor errores de carga de `manifest` y JSON de proyecto
+- el `manifest` ya admite metadata adicional (`game`, `tags`, `description`) aunque la UI todavia no la explota
 
 ### Emboss
 
@@ -165,6 +179,9 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Commits recientes relevantes
 
+- `28ce348` Improve community project loading UX
+- `573701b` Support stacking boards in layers
+- `fb808b2` Add stackable board layer support
 - `7f93d2f` Add triangular rack side walls and spacing defaults
 - `3d7cfd9` Fill miniature rack preview with stacked bases
 - `9d68c0c` Refine miniature rack tolerances and preview
@@ -195,6 +212,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - `/Users/raul/projects/insertforge/src/lib/stores/project.svelte.ts`
 - Modelo de layer:
   - `/Users/raul/projects/insertforge/src/lib/models/layer.ts`
+- Worker de geometria:
+  - `/Users/raul/projects/insertforge/src/lib/workers/geometry.worker.ts`
 - Panel de edicion general:
   - `/Users/raul/projects/insertforge/src/lib/components/EditorPanel.svelte`
 - Panel de box:
@@ -209,6 +228,10 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - `/Users/raul/projects/insertforge/src/lib/components/three/LayerContent.svelte`
 - Editor visual de layout de layer:
   - `/Users/raul/projects/insertforge/src/lib/components/three/LayerLayoutEditorScene.svelte`
+- Overlay de layout de layer:
+  - `/Users/raul/projects/insertforge/src/lib/components/LayerLayoutEditorOverlay.svelte`
+- Manifest de community projects:
+  - `/Users/raul/projects/insertforge/static/projects/manifest.json`
 
 ## Cosas a vigilar
 
@@ -254,3 +277,5 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 - explorar una fuente/vector de texto de mayor calidad si se quiere mejorar de verdad la suavidad de curvas
 - trabajar el `README` publico con creditos y cambios introducidos en el fork
 - revisar por separado la generacion de geometria fuera de la layer activa; la navegacion por layers ya usa cache, pero el alcance de generacion/render por capa sigue siendo mejorable
+- si `Board` sobre `Board` se queda corto, valorar UI explicita para reordenar boards en Z en vez de depender del orden actual de la lista
+- si `Load community project` crece, valorar galeria enriquecida con preview, metadata visible y backup/restore antes de reemplazar el proyecto local
