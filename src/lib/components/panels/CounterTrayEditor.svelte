@@ -15,6 +15,7 @@
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
     allowedShapeCategory?: CounterShapeCategory;
+    renderMode?: 'all' | 'settings' | 'counters';
   }
 
   let {
@@ -24,7 +25,8 @@
     onUpdateTray,
     actualHeight,
     displayDimensions,
-    allowedShapeCategory = 'counter'
+    allowedShapeCategory = 'counter',
+    renderMode = 'all'
   }: Props = $props();
 
   // Drag and drop state
@@ -203,7 +205,8 @@
   }
 </script>
 
-<div class="panelFormSection">
+{#if renderMode === 'all' || renderMode === 'counters'}
+  <div class="panelFormSection">
   <!-- Top-Loaded Stacks -->
   <section class="section">
     <h3 class="sectionTitle">Top-Loaded Stacks</h3>
@@ -344,8 +347,10 @@
     </div>
   </section>
 </div>
+{/if}
 
-<div class="panelFormSection">
+{#if renderMode === 'all' || renderMode === 'settings'}
+  <div class="panelFormSection">
   <!-- Tray Settings -->
   <section class="section">
     <div class="sectionHeader">
@@ -490,6 +495,7 @@
     </div>
   </section>
 </div>
+{/if}
 
 <style>
   .panelFormSection {

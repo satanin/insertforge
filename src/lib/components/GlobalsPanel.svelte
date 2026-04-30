@@ -57,6 +57,7 @@
   let expandedTileIndex: number | null = $state(null);
   // Track which card size is expanded (null = none)
   let expandedCardIndex: number | null = $state(null);
+  let activeTab = $state<'project' | 'counters' | 'cards' | 'tiles' | 'boards'>('project');
 
   // Get shapes and card sizes from project level
   let counterShapes = $derived(getCounterShapes());
@@ -299,83 +300,125 @@
 </script>
 
 <div class="globalsPanel">
-  <section class="section">
-    <h3 class="sectionTitle">Project</h3>
-    <Spacer size="0.5rem" />
-    <FormControl label="Name" name="projectName">
-      {#snippet input({ inputProps })}
-        <Input
-          {...inputProps}
-          type="text"
-          value={projectName}
-          onchange={(e) => onProjectNameChange(e.currentTarget.value)}
-          placeholder="InsertForge Project"
-        />
-      {/snippet}
-    </FormControl>
-    <Spacer size="0.5rem" />
-    <Text size="0.875rem" color="var(--fgMuted)">Used as the default filename for project exports.</Text>
-  </section>
+  <div class="tabs" role="tablist" aria-label="Dimension sections">
+    <button
+      class:active={activeTab === 'project'}
+      role="tab"
+      aria-selected={activeTab === 'project'}
+      onclick={() => (activeTab = 'project')}
+    >
+      <span class="tabLabel">Project</span>
+    </button>
+    <button
+      class:active={activeTab === 'counters'}
+      role="tab"
+      aria-selected={activeTab === 'counters'}
+      onclick={() => (activeTab = 'counters')}
+    >
+      <span class="tabLabel">Counters</span> <span class="tabCount">{counterTokenShapes.length}</span>
+    </button>
+    <button
+      class:active={activeTab === 'cards'}
+      role="tab"
+      aria-selected={activeTab === 'cards'}
+      onclick={() => (activeTab = 'cards')}
+    >
+      <span class="tabLabel">Cards</span> <span class="tabCount">{cardSizes.length}</span>
+    </button>
+    <button
+      class:active={activeTab === 'tiles'}
+      role="tab"
+      aria-selected={activeTab === 'tiles'}
+      onclick={() => (activeTab = 'tiles')}
+    >
+      <span class="tabLabel">Tiles</span> <span class="tabCount">{tileShapes.length}</span>
+    </button>
+    <button
+      class:active={activeTab === 'boards'}
+      role="tab"
+      aria-selected={activeTab === 'boards'}
+      onclick={() => (activeTab = 'boards')}
+    >
+      <span class="tabLabel">Boards</span> <span class="tabCount">{playerBoardShapes.length}</span>
+    </button>
+  </div>
 
-  <Hr />
-
-  <section class="section">
-    <h3 class="sectionTitle">Game Container</h3>
-    <div class="gameContainerInputs">
-      <FormControl label="Width" name="gameContainerWidth">
+  {#if activeTab === 'project'}
+    <section class="section">
+      <h3 class="sectionTitle">Project</h3>
+      <Spacer size="0.5rem" />
+      <FormControl label="Name" name="projectName">
         {#snippet input({ inputProps })}
           <Input
             {...inputProps}
-            type="number"
-            step="1"
-            min="100"
-            value={globalSettings.gameContainerWidth}
-            onchange={(e) => onGlobalSettingsChange({ gameContainerWidth: parseInt(e.currentTarget.value) })}
+            type="text"
+            value={projectName}
+            onchange={(e) => onProjectNameChange(e.currentTarget.value)}
+            placeholder="InsertForge Project"
           />
         {/snippet}
-        {#snippet end()}mm{/snippet}
       </FormControl>
-      <FormControl label="Depth" name="gameContainerDepth">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="100"
-            value={globalSettings.gameContainerDepth}
-            onchange={(e) => onGlobalSettingsChange({ gameContainerDepth: parseInt(e.currentTarget.value) })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Height" name="gameContainerHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="1"
-            value={globalSettings.gameContainerHeight ?? ''}
-            placeholder={`Auto (${effectiveGameContainerHeight.toFixed(0)}mm)`}
-            onchange={(e) => {
-              const value = e.currentTarget.value.trim();
-              onGlobalSettingsChange({ gameContainerHeight: value ? parseInt(value) : null });
-            }}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-    <Spacer size="0.5rem" />
-    <Text size="0.875rem" color="var(--fgMuted)">
-      Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
-      calculations. Leave height empty to use the current stacked layer height automatically.
-    </Text>
-  </section>
+      <Spacer size="0.5rem" />
+      <Text size="0.875rem" color="var(--fgMuted)">Used as the default filename for project exports.</Text>
+    </section>
 
-  <Hr />
+    <Hr />
 
-  <section class="section">
+    <section class="section">
+      <h3 class="sectionTitle">Game Container</h3>
+      <div class="gameContainerInputs">
+        <FormControl label="Width" name="gameContainerWidth">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="100"
+              value={globalSettings.gameContainerWidth}
+              onchange={(e) => onGlobalSettingsChange({ gameContainerWidth: parseInt(e.currentTarget.value) })}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Depth" name="gameContainerDepth">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="100"
+              value={globalSettings.gameContainerDepth}
+              onchange={(e) => onGlobalSettingsChange({ gameContainerDepth: parseInt(e.currentTarget.value) })}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Height" name="gameContainerHeight">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="1"
+              value={globalSettings.gameContainerHeight ?? ''}
+              placeholder={`Auto (${effectiveGameContainerHeight.toFixed(0)}mm)`}
+              onchange={(e) => {
+                const value = e.currentTarget.value.trim();
+                onGlobalSettingsChange({ gameContainerHeight: value ? parseInt(value) : null });
+              }}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+      </div>
+      <Spacer size="0.5rem" />
+      <Text size="0.875rem" color="var(--fgMuted)">
+        Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
+        calculations. Leave height empty to use the current stacked layer height automatically.
+      </Text>
+    </section>
+  {:else if activeTab === 'counters'}
+    <section class="section">
     <h3 class="sectionTitle">Counters</h3>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
@@ -572,10 +615,8 @@
     <Spacer />
     <Link as="button" onclick={() => handleAddShape('counter')}>+ New counter</Link>
   </section>
-
-  <Hr />
-
-  <section class="section">
+  {:else if activeTab === 'tiles'}
+    <section class="section">
     <h3 class="sectionTitle">Tiles</h3>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
@@ -770,10 +811,8 @@
     <Spacer />
     <Link as="button" onclick={() => handleAddShape('tile')}>+ New tile</Link>
   </section>
-
-  <Hr />
-
-  <section class="section">
+  {:else if activeTab === 'boards'}
+    <section class="section">
     <h3 class="sectionTitle">Player Boards</h3>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
@@ -972,10 +1011,8 @@
     <Spacer />
     <Link as="button" onclick={() => handleAddShape('playerBoard')}>+ New player board</Link>
   </section>
-
-  <Hr />
-
-  <section class="section">
+  {:else if activeTab === 'cards'}
+    <section class="section">
     <h3 class="sectionTitle">Card Sizes (Sleeved)</h3>
     <p class="sectionHint">Default thickness is for regular sleeves, change it to 0.75~0.8 for premium sleeves.</p>
     <Spacer size="0.5rem" />
@@ -1090,8 +1127,7 @@
     <Spacer />
     <Link as="button" onclick={handleAddCardSize}>+ New card size</Link>
   </section>
-
-  <Hr />
+  {/if}
 </div>
 
 <style>
@@ -1102,6 +1138,75 @@
     flex-direction: column;
     gap: 1rem;
     padding: 0.75rem 0;
+  }
+
+  .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    container-type: inline-size;
+    display: flex;
+    gap: 0;
+    padding: 0 0.75rem 0.5rem;
+    background: var(--panel);
+  }
+
+  .tabs::before {
+    content: '';
+    position: absolute;
+    inset: 0 0.75rem 0.5rem;
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    pointer-events: none;
+  }
+
+  .tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.5rem 0.25rem;
+    border: 0;
+    border-right: var(--borderThin);
+    background: var(--contrastLowest);
+    color: var(--fgMuted);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .tabs button:first-child {
+    border-radius: var(--radius-2) 0 0 var(--radius-2);
+  }
+
+  .tabs button:last-child {
+    border-right: 0;
+    border-radius: 0 var(--radius-2) var(--radius-2) 0;
+  }
+
+  .tabs button:hover {
+    background: var(--contrastLow);
+    color: var(--fg);
+  }
+
+  .tabs button.active {
+    position: relative;
+    background: var(--contrastEmpty);
+    color: var(--fg);
+    box-shadow:
+      inset 0 0 0 1px var(--contrastHigh),
+      inset 0 -2px 0 var(--fg);
+  }
+
+  .tabLabel {
+    font-size: clamp(0.8125rem, 2.8cqi, 1rem);
+  }
+
+  .tabCount {
+    color: var(--fgMuted);
+    font-family: var(--font-mono);
+    font-size: clamp(0.6875rem, 1.8cqi, 0.75rem);
+    font-weight: 500;
   }
 
   .section {

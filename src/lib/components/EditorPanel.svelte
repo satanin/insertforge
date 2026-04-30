@@ -841,105 +841,95 @@
             selectedLayeredBox.customBoxHeight !== undefined
               ? selectedLayeredBox.customBoxHeight + layeredBoxLidHeight
               : undefined}
-          <div class="panelFormSection">
-            <FormControl label="Name" name="layeredBoxName">
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="text"
-                  value={selectedLayeredBox.name}
-                  onchange={(e) => handleLayeredBoxUpdate({ name: (e.target as HTMLInputElement).value })}
-                />
-              {/snippet}
-            </FormControl>
-            <Spacer size="1rem" />
-            <FormControl label="Layer" name="moveLayeredBoxToLayer">
-              {#snippet input({ inputProps })}
-                <Select
-                  {...inputProps}
-                  selected={selectedLayeredBoxCurrentLayerId ? [selectedLayeredBoxCurrentLayerId] : []}
-                  options={layerOptions}
-                  onSelectedChange={(selected) => {
-                    if (selected[0]) {
-                      handleLayeredBoxLayerChange(selected[0]);
-                    }
-                  }}
-                />
-              {/snippet}
-            </FormControl>
-            <Spacer size="1rem" />
-            <div class="buttonRow">
-              <button class="secondaryButton" onclick={handleDuplicateSelectedLayeredBox}>Duplicate box</button>
-            </div>
-            <Spacer size="1rem" />
-            <div class="formGrid">
-              <FormControl label="Tolerance" name="layeredBoxTolerance">
-                {#snippet input({ inputProps })}
-                  <Input
-                    {...inputProps}
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={selectedLayeredBox.tolerance}
-                    onchange={(e) =>
-                      handleLayeredBoxUpdate({
-                        tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
-                      })}
-                  />
-                {/snippet}
-                {#snippet end()}mm{/snippet}
-              </FormControl>
-              <FormControl label="Wall" name="layeredBoxWallThickness">
-                {#snippet input({ inputProps })}
-                  <Input
-                    {...inputProps}
-                    type="number"
-                    step="0.5"
-                    min="1"
-                    value={selectedLayeredBox.wallThickness}
-                    onchange={(e) =>
-                      handleLayeredBoxUpdate({
-                        wallThickness: parseFloat((e.target as HTMLInputElement).value) || 3
-                      })}
-                  />
-                {/snippet}
-                {#snippet end()}mm{/snippet}
-              </FormControl>
-              <FormControl label="Floor" name="layeredBoxFloorThickness" class="formGrid__spanTwo">
-                {#snippet input({ inputProps })}
-                  <Input
-                    {...inputProps}
-                    type="number"
-                    step="0.5"
-                    min="1"
-                    value={selectedLayeredBox.floorThickness}
-                    onchange={(e) =>
-                      handleLayeredBoxUpdate({
-                        floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2
-                      })}
-                  />
-                {/snippet}
-                {#snippet end()}mm{/snippet}
-              </FormControl>
-            </div>
-            <Hr />
-
-            <div class="panelFormSection">
+          <div class="panelFormSection layeredBoxForm">
+            <section class="layeredBoxSection">
               <div class="sectionHeader">
-                <h4 class="sectionTitle">Box Size</h4>
-                <span class="dimensionsInfo">{layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm</span>
+                <h4 class="sectionTitle">Details</h4>
               </div>
               <Spacer size="0.5rem" />
-              <div class="buttonRow">
-                <button class="secondaryButton" onclick={handleExpandLayeredBoxToAvailableSpace}>
-                  Adapt to gap
-                </button>
+              <FormControl label="Name" name="layeredBoxName">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="text"
+                    value={selectedLayeredBox.name}
+                    onchange={(e) => handleLayeredBoxUpdate({ name: (e.target as HTMLInputElement).value })}
+                  />
+                {/snippet}
+              </FormControl>
+              <Spacer size="1rem" />
+              <FormControl label="Layer" name="moveLayeredBoxToLayer">
+                {#snippet input({ inputProps })}
+                  <Select
+                    {...inputProps}
+                    selected={selectedLayeredBoxCurrentLayerId ? [selectedLayeredBoxCurrentLayerId] : []}
+                    options={layerOptions}
+                    onSelectedChange={(selected) => {
+                      if (selected[0]) {
+                        handleLayeredBoxLayerChange(selected[0]);
+                      }
+                    }}
+                  />
+                {/snippet}
+              </FormControl>
+            </section>
+
+            <Hr class="layeredBoxDivider" />
+
+            <section class="layeredBoxSection">
+              <div class="sectionHeader">
+                <h4 class="sectionTitle">Options</h4>
               </div>
-              <Text color="var(--fgMuted)" size="0.875rem">
-                {layeredBoxAdaptToGapHelpText}
-              </Text>
               <Spacer size="0.5rem" />
               <div class="formGrid">
+                <FormControl label="Tolerance" name="layeredBoxTolerance">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={selectedLayeredBox.tolerance}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Wall" name="layeredBoxWallThickness">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={selectedLayeredBox.wallThickness}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          wallThickness: parseFloat((e.target as HTMLInputElement).value) || 3
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                <FormControl label="Floor" name="layeredBoxFloorThickness" class="formGrid__spanTwo">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={selectedLayeredBox.floorThickness}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
                 <FormControl label="Width (min: {minBodyWidth.toFixed(1)})" name="layeredBoxCustomWidth">
                   {#snippet input({ inputProps })}
                     <Input
@@ -997,11 +987,30 @@
                   {#snippet end()}mm{/snippet}
                 </FormControl>
               </div>
-            </div>
+              <Spacer size="1rem" />
+              <div class="buttonRow">
+                <button
+                  class="secondaryButton layeredBoxActionButton layeredBoxActionButton--danger"
+                  onclick={handleExpandLayeredBoxToAvailableSpace}
+                >
+                  Adapt to gap
+                </button>
+              </div>
+              <Text color="var(--fgMuted)" size="0.875rem">
+                {layeredBoxAdaptToGapHelpText}
+              </Text>
+              <Spacer size="1rem" />
+              <div class="sectionHeader">
+                <h4 class="sectionTitle sectionTitle--featured">Box Size</h4>
+                <span class="dimensionsInfo">
+                  {layeredBoxExterior.width.toFixed(1)} × {layeredBoxExterior.depth.toFixed(1)} × {layeredBoxExterior.height.toFixed(1)} mm
+                </span>
+              </div>
+            </section>
 
-            <Hr />
+            <Hr class="layeredBoxDivider" />
 
-            <div class="panelFormSection">
+            <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Print Options</h4>
               </div>
@@ -1059,27 +1068,69 @@
                   Lid text is disabled when honeycomb pattern is enabled
                 </Text>
               {/if}
-            </div>
+            </section>
 
-            <Hr />
+            <Hr class="layeredBoxDivider" />
 
-            <div class="panelFormSection">
+            <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Internal Layers</h4>
               </div>
               <Spacer size="0.5rem" />
               <div class="buttonRow">
-                <button class="secondaryButton" onclick={handleAddLayeredBoxLayer}>Add internal layer</button>
+                <button
+                  class="secondaryButton layeredBoxActionButton layeredBoxActionButton--success"
+                  onclick={handleAddLayeredBoxLayer}
+                >
+                  Add internal layer
+                </button>
               </div>
               <Spacer size="0.5rem" />
               <div class="contentsTree">
                 {#each selectedLayeredBox.layers as boxLayer (boxLayer.id)}
+                  {@const internalLayerDims = layeredBoxLayout.internalLayers.find((entry) => entry.id === boxLayer.id)}
                   <div class="treeItem treeItem--box">
                     <span class="treeItemName">{boxLayer.name}</span>
+                    <span class="treeItemDims">
+                      {formatLayerContentDimension(internalLayerDims?.width ?? layeredBoxLayout.width)} ×
+                      {formatLayerContentDimension(internalLayerDims?.depth ?? layeredBoxLayout.depth)} ×
+                      {formatLayerContentDimension(internalLayerDims?.height ?? 0)}
+                    </span>
                   </div>
+                  {#if boxLayer.sections.length === 0}
+                    <div class="treeItem treeItem--tray treeItem--nested">
+                      <span class="treeItemName">No sections yet</span>
+                      <span class="treeItemDims">0 sections</span>
+                    </div>
+                  {:else}
+                    {#each boxLayer.sections as section (section.id)}
+                      {@const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes)}
+                      <div class="treeItem treeItem--tray treeItem--nested">
+                        <span class="treeItemName">{section.name}</span>
+                        <span class="treeItemDims">
+                          {formatLayerContentDimension(sectionDims.width)} ×
+                          {formatLayerContentDimension(sectionDims.depth)} ×
+                          {formatLayerContentDimension(sectionDims.height)}
+                        </span>
+                      </div>
+                    {/each}
+                  {/if}
                 {/each}
               </div>
-            </div>
+            </section>
+
+            <Hr class="layeredBoxDivider" />
+
+            <section class="layeredBoxSection">
+              <div class="buttonRow">
+                <button
+                  class="secondaryButton layeredBoxActionButton layeredBoxActionButton--info"
+                  onclick={handleDuplicateSelectedLayeredBox}
+                >
+                  Duplicate box
+                </button>
+              </div>
+            </section>
           </div>
         {:else}
           <div class="emptyState">
@@ -1547,6 +1598,33 @@
     padding: 0 0.75rem;
   }
 
+  .layeredBoxForm {
+    padding-top: 0.75rem;
+  }
+
+  .layeredBoxSection {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.layeredBoxDivider) {
+    display: block;
+    height: 1px;
+    min-height: 1px;
+    margin: 2rem 0 1.55rem;
+    border: 0;
+    background: var(--contrastMedium);
+  }
+
+  .layeredBoxForm .contentsTree .treeItem {
+    font-size: 0.875rem;
+    padding: 0.35rem 0;
+  }
+
+  .layeredBoxForm .contentsTree .treeItemDims {
+    font-size: 0.75rem;
+  }
+
   .formGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1581,6 +1659,12 @@
 
   .sectionHeader .sectionTitle {
     margin-bottom: 0;
+  }
+
+  .sectionTitle--featured {
+    color: var(--fg);
+    font-size: 0.875rem;
+    letter-spacing: 0.025em;
   }
 
   .dimensionsInfo {
@@ -1666,7 +1750,7 @@
     border: var(--borderThin);
     border-radius: var(--radius-2);
     background: var(--contrastLow);
-    color: #000;
+    color: var(--fg);
     cursor: pointer;
     padding: 0.4rem 0.75rem;
     font: inherit;
@@ -1674,11 +1758,52 @@
     flex: 1 1 8.5rem;
     white-space: normal;
     overflow-wrap: anywhere;
-    text-align: left;
+    text-align: center;
   }
 
   .secondaryButton:hover {
     background: var(--contrastMedium);
+  }
+
+  .layeredBoxActionButton {
+    justify-content: center;
+    background: var(--contrastLow);
+    border-color: var(--contrastMedium);
+    font-weight: 600;
+  }
+
+  .layeredBoxActionButton:hover {
+    background: var(--contrastMedium);
+  }
+
+  .layeredBoxActionButton--danger {
+    border-color: #a63b2d;
+    background: #c9503c;
+    color: #fff;
+  }
+
+  .layeredBoxActionButton--danger:hover {
+    background: #a63b2d;
+  }
+
+  .layeredBoxActionButton--success {
+    border-color: #146c37;
+    background: #188a42;
+    color: #fff;
+  }
+
+  .layeredBoxActionButton--success:hover {
+    background: #146c37;
+  }
+
+  .layeredBoxActionButton--info {
+    border-color: #1d4ed8;
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .layeredBoxActionButton--info:hover {
+    background: #1d4ed8;
   }
 
   .disabledOption {

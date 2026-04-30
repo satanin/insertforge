@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { APP_VERSION } from '$lib/appInfo';
 import { defaultLidParams } from '$lib/models/lid';
 import { DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
 import type { LayeredBox, LayeredBoxSection, Project } from '$lib/types/project';
@@ -203,7 +204,7 @@ describe('project store schema version', () => {
 
     expect(getProject().version).toBeUndefined();
     expect(getProject().schemaVersion).toBe(3);
-    expect(getProject().appVersion).toBe('1.1.23');
+    expect(getProject().appVersion).toBe(APP_VERSION);
   });
 });
 

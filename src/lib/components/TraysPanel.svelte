@@ -96,6 +96,8 @@
     hideList = false
   }: Props = $props();
 
+  let activeStackedTrayTab = $state<'tray' | 'contents'>('tray');
+
   // Get the tray letter based on cumulative position across all layers
   let trayLetter = $derived.by(() => {
     const project = getProject();
@@ -405,91 +407,114 @@
   <!-- Tray Settings -->
   {#if selectedTray}
     <div class="panelForm">
-      <div class="panelFormSection">
-        <!-- Name -->
-        <FormControl label="Name" name="trayName">
-          {#snippet input({ inputProps })}
-            <Input
-              {...inputProps}
-              type="text"
-              value={selectedTray.name}
-              onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
-            />
-          {/snippet}
-        </FormControl>
+      {#if isCounterTray(selectedTray) || isCardDividerTray(selectedTray)}
+        <div class="trayEditorTabs" role="tablist" aria-label={isCounterTray(selectedTray) ? 'Counter tray sections' : 'Card divider sections'}>
+          <button
+            class:active={activeStackedTrayTab === 'tray'}
+            role="tab"
+            aria-selected={activeStackedTrayTab === 'tray'}
+            onclick={() => (activeStackedTrayTab = 'tray')}
+          >
+            Tray
+          </button>
+          <button
+            class:active={activeStackedTrayTab === 'contents'}
+            role="tab"
+            aria-selected={activeStackedTrayTab === 'contents'}
+            onclick={() => (activeStackedTrayTab = 'contents')}
+          >
+            {isCounterTray(selectedTray) ? 'Counters' : 'Card Stacks'}
+          </button>
+        </div>
+      {/if}
 
-        <Spacer size="1rem" />
+      {#if (!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray)) || activeStackedTrayTab === 'tray'}
+        <div class="panelFormSection">
+          <!-- Name -->
+          <FormControl label="Name" name="trayName">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="text"
+                value={selectedTray.name}
+                onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
+              />
+            {/snippet}
+          </FormControl>
 
-        <!-- Move to Box/Layer -->
-        <FormControl label="Location" name="moveToLocation">
-          {#snippet input({ inputProps })}
-            <Select
-              {...inputProps}
-              selected={currentTrayLocation ? [currentTrayLocation] : []}
-              options={moveDestinations}
-              onSelectedChange={(selected) => {
-                if (selected[0]) {
-                  handleMoveDestination(selected[0]);
-                }
-              }}
-            />
-          {/snippet}
-        </FormControl>
-        {#if isMiniatureRackTray(selectedTray) || isTileTray(selectedTray)}
-          <Spacer size="0.5rem" />
-          <Text size="0.875rem" color="fgMuted">
-            {isMiniatureRackTray(selectedTray)
-              ? 'Miniature racks are loose-only for now and cannot be moved into boxes.'
-              : 'Tile trays are loose-only for now and cannot be moved into boxes.'}
-          </Text>
-        {/if}
-
-        <Spacer size="1rem" />
-
-        {#if onDuplicateTray}
-          <div class="buttonRow">
-            <button class="secondaryButton" type="button" onclick={() => selectedTray && onDuplicateTray(selectedTray.id)}>
-              Duplicate tray
-            </button>
-          </div>
           <Spacer size="1rem" />
-        {/if}
 
-        <!-- Color -->
-        <FormControl label="Color" name="trayColor">
-          {#snippet start()}
-            <Popover>
-              {#snippet trigger()}
-                <ColorPickerSwatch color={selectedTray.color} />
-              {/snippet}
-              {#snippet content()}
-                <ColorPicker
-                  showOpacity={false}
-                  hex={selectedTray.color}
-                  onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
-                />
-              {/snippet}
-            </Popover>
-          {/snippet}
-          {#snippet input({ inputProps })}
-            <Input
-              {...inputProps}
-              value={selectedTray.color}
-              oninput={(e) => handleColorUpdate(e.currentTarget.value)}
-            />
-          {/snippet}
-        </FormControl>
+          <!-- Move to Box/Layer -->
+          <FormControl label="Location" name="moveToLocation">
+            {#snippet input({ inputProps })}
+              <Select
+                {...inputProps}
+                selected={currentTrayLocation ? [currentTrayLocation] : []}
+                options={moveDestinations}
+                onSelectedChange={(selected) => {
+                  if (selected[0]) {
+                    handleMoveDestination(selected[0]);
+                  }
+                }}
+              />
+            {/snippet}
+          </FormControl>
+          {#if isMiniatureRackTray(selectedTray) || isTileTray(selectedTray)}
+            <Spacer size="0.5rem" />
+            <Text size="0.875rem" color="fgMuted">
+              {isMiniatureRackTray(selectedTray)
+                ? 'Miniature racks are loose-only for now and cannot be moved into boxes.'
+                : 'Tile trays are loose-only for now and cannot be moved into boxes.'}
+            </Text>
+          {/if}
 
-        <Spacer size="1rem" />
+          <Spacer size="1rem" />
 
-        <InputCheckbox
-          label="Emboss name on tray bottom"
-          checked={selectedTray.showEmboss ?? true}
-          onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-        />
-      </div>
+          {#if onDuplicateTray}
+            <div class="buttonRow">
+              <button class="secondaryButton" type="button" onclick={() => selectedTray && onDuplicateTray(selectedTray.id)}>
+                Duplicate tray
+              </button>
+            </div>
+            <Spacer size="1rem" />
+          {/if}
 
-      <Hr />
+          <!-- Color -->
+          <FormControl label="Color" name="trayColor">
+            {#snippet start()}
+              <Popover>
+                {#snippet trigger()}
+                  <ColorPickerSwatch color={selectedTray.color} />
+                {/snippet}
+                {#snippet content()}
+                  <ColorPicker
+                    showOpacity={false}
+                    hex={selectedTray.color}
+                    onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
+                  />
+                {/snippet}
+              </Popover>
+            {/snippet}
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                value={selectedTray.color}
+                oninput={(e) => handleColorUpdate(e.currentTarget.value)}
+              />
+            {/snippet}
+          </FormControl>
+
+          <Spacer size="1rem" />
+
+          <InputCheckbox
+            label="Emboss name on tray bottom"
+            checked={selectedTray.showEmboss ?? true}
+            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+          />
+        </div>
+
+        <Hr />
+      {/if}
 
       {#if isCounterTray(selectedTray) && onUpdateCounterParams}
         <CounterTrayEditor
@@ -499,6 +524,7 @@
           {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
+          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'counters'}
         />
       {:else if isCardDividerTray(selectedTray) && onUpdateCardDividerParams}
         <CardDividerTrayEditor
@@ -508,6 +534,7 @@
           {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
+          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'stacks'}
         />
       {:else if isCardTray(selectedTray) && onUpdateCardParams}
         <CardDrawTrayEditor
@@ -626,6 +653,63 @@
 
   .panelFormSection {
     padding: 0 0.75rem;
+  }
+
+  .trayEditorTabs {
+    position: sticky;
+    top: -0.75rem;
+    z-index: 1;
+    display: flex;
+    gap: 0;
+    padding: 0 0.75rem;
+    background: var(--contrastLowest);
+  }
+
+  .trayEditorTabs::before {
+    content: '';
+    position: absolute;
+    inset: 0 0.75rem;
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    pointer-events: none;
+  }
+
+  .trayEditorTabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.55rem 0.5rem;
+    border: 0;
+    border-right: var(--borderThin);
+    background: var(--contrastLowest);
+    color: var(--fgMuted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .trayEditorTabs button:first-child {
+    border-radius: var(--radius-2) 0 0 var(--radius-2);
+  }
+
+  .trayEditorTabs button:last-child {
+    border-right: 0;
+    border-radius: 0 var(--radius-2) var(--radius-2) 0;
+  }
+
+  .trayEditorTabs button:hover {
+    background: var(--contrastLow);
+    color: var(--fg);
+  }
+
+  .trayEditorTabs button.active {
+    position: relative;
+    background: var(--contrastEmpty);
+    color: var(--fg);
+    box-shadow:
+      inset 0 0 0 1px var(--contrastHigh),
+      inset 0 -2px 0 var(--fg);
   }
 
   .buttonRow {

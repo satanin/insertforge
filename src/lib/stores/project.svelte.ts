@@ -205,6 +205,7 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
 // Default card sizes (global)
 export const DEFAULT_CARD_SIZES: CardSize[] = [
   { id: DEFAULT_CARD_SIZE_IDS.standard, name: 'Standard', width: 66, length: 91, thickness: 0.5 },
+  { id: DEFAULT_CARD_SIZE_IDS.standardPremium, name: 'Standard Premium', width: 66, length: 91, thickness: 0.8 },
   {
     id: DEFAULT_CARD_SIZE_IDS.miniAmerican,
     name: 'Mini American',
@@ -213,16 +214,34 @@ export const DEFAULT_CARD_SIZES: CardSize[] = [
     thickness: 0.5
   },
   {
+    id: DEFAULT_CARD_SIZE_IDS.miniAmericanPremium,
+    name: 'Mini American Premium',
+    width: 44,
+    length: 66,
+    thickness: 0.8
+  },
+  {
     id: DEFAULT_CARD_SIZE_IDS.miniEuropean,
     name: 'Mini European',
     width: 47,
     length: 71,
     thickness: 0.5
   },
+  {
+    id: DEFAULT_CARD_SIZE_IDS.miniEuropeanPremium,
+    name: 'Mini European Premium',
+    width: 47,
+    length: 71,
+    thickness: 0.8
+  },
   { id: DEFAULT_CARD_SIZE_IDS.euro, name: 'Euro', width: 62, length: 95, thickness: 0.5 },
+  { id: DEFAULT_CARD_SIZE_IDS.euroPremium, name: 'Euro Premium', width: 62, length: 95, thickness: 0.8 },
   { id: DEFAULT_CARD_SIZE_IDS.japanese, name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
+  { id: DEFAULT_CARD_SIZE_IDS.japanesePremium, name: 'Japanese Premium', width: 62, length: 89, thickness: 0.8 },
   { id: DEFAULT_CARD_SIZE_IDS.tarot, name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.square, name: 'Square', width: 73, length: 73, thickness: 0.5 }
+  { id: DEFAULT_CARD_SIZE_IDS.tarotPremium, name: 'Tarot Premium', width: 73, length: 123, thickness: 0.8 },
+  { id: DEFAULT_CARD_SIZE_IDS.square, name: 'Square', width: 73, length: 73, thickness: 0.5 },
+  { id: DEFAULT_CARD_SIZE_IDS.squarePremium, name: 'Square Premium', width: 73, length: 73, thickness: 0.8 }
 ];
 
 function generateId(): string {
@@ -1116,6 +1135,11 @@ function offsetPlacement<T extends { x: number; y: number }>(placement: T, amoun
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
   project.name = project.name?.trim() || DEFAULT_PROJECT_NAME;
+  const existingCardSizeIds = new Set((project.cardSizes ?? []).map((size) => size.id));
+  project.cardSizes = [
+    ...(project.cardSizes ?? []),
+    ...DEFAULT_CARD_SIZES.filter((size) => !existingCardSizeIds.has(size.id)).map((size) => ({ ...size }))
+  ];
   project.selectedBoardId = null;
   project.selectedLayeredBoxId = null;
   project.selectedLayeredBoxLayerId = null;

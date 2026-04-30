@@ -54,12 +54,19 @@ export const DEFAULT_SHAPE_IDS = {
 
 export const DEFAULT_CARD_SIZE_IDS = {
   standard: 'card-standard',
+  standardPremium: 'card-standard-premium',
   miniAmerican: 'card-mini-american',
+  miniAmericanPremium: 'card-mini-american-premium',
   miniEuropean: 'card-mini-european',
+  miniEuropeanPremium: 'card-mini-european-premium',
   euro: 'card-euro',
+  euroPremium: 'card-euro-premium',
   japanese: 'card-japanese',
+  japanesePremium: 'card-japanese-premium',
   tarot: 'card-tarot',
-  square: 'card-square'
+  tarotPremium: 'card-tarot-premium',
+  square: 'card-square',
+  squarePremium: 'card-square-premium'
 };
 
 export const defaultParams: CounterTrayParams = {

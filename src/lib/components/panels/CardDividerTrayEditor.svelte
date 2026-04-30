@@ -19,9 +19,11 @@
     onUpdateTray?: (updates: Partial<CardDividerTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
+    renderMode?: 'all' | 'settings' | 'stacks';
   }
 
-  let { tray, trayLetter, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props = $props();
+  let { tray, trayLetter, onUpdateParams, onUpdateTray, actualHeight, displayDimensions, renderMode = 'all' }: Props =
+    $props();
 
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
@@ -146,7 +148,8 @@
   }
 </script>
 
-<div class="panelFormSection">
+{#if renderMode === 'all' || renderMode === 'settings'}
+  <div class="panelFormSection">
   <section class="section">
     <h3 class="sectionTitle">Layout</h3>
     <Spacer size="0.5rem" />
@@ -186,7 +189,11 @@
       {/snippet}
     </FormControl>
   </section>
+</div>
+{/if}
 
+{#if renderMode === 'all' || renderMode === 'stacks'}
+  <div class="panelFormSection">
   <Spacer size="0.5rem" />
 
   <section class="section">
@@ -249,7 +256,11 @@
       <Link as="button" onclick={addStack}>Add card stack</Link>
     </div>
   </section>
+</div>
+{/if}
 
+{#if renderMode === 'all' || renderMode === 'settings'}
+  <div class="panelFormSection">
   <Spacer size="0.5rem" />
 
   <section class="section">
@@ -358,6 +369,7 @@
     {/if}
   </section>
 </div>
+{/if}
 
 <style>
   .panelFormSection {
