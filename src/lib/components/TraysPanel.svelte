@@ -429,91 +429,91 @@
       {/if}
 
       {#if (!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray)) || activeStackedTrayTab === 'tray'}
-        <div class="panelFormSection">
-          <!-- Name -->
-          <FormControl label="Name" name="trayName">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="text"
-                value={selectedTray.name}
-                onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
-              />
-            {/snippet}
-          </FormControl>
-
-          <Spacer size="1rem" />
-
-          <!-- Move to Box/Layer -->
-          <FormControl label="Location" name="moveToLocation">
-            {#snippet input({ inputProps })}
-              <Select
-                {...inputProps}
-                selected={currentTrayLocation ? [currentTrayLocation] : []}
-                options={moveDestinations}
-                onSelectedChange={(selected) => {
-                  if (selected[0]) {
-                    handleMoveDestination(selected[0]);
-                  }
-                }}
-              />
-            {/snippet}
-          </FormControl>
-          {#if isMiniatureRackTray(selectedTray) || isTileTray(selectedTray)}
-            <Spacer size="0.5rem" />
-            <Text size="0.875rem" color="fgMuted">
-              {isMiniatureRackTray(selectedTray)
-                ? 'Miniature racks are loose-only for now and cannot be moved into boxes.'
-                : 'Tile trays are loose-only for now and cannot be moved into boxes.'}
-            </Text>
-          {/if}
-
-          <Spacer size="1rem" />
-
-          {#if onDuplicateTray}
-            <div class="buttonRow">
-              <button class="secondaryButton" type="button" onclick={() => selectedTray && onDuplicateTray(selectedTray.id)}>
-                Duplicate tray
-              </button>
+        <div class="panelFormSection trayForm">
+          <section class="traySection">
+            <div class="sectionHeader">
+              <h4 class="sectionTitle">Details</h4>
             </div>
+            <Spacer size="0.5rem" />
+            <FormControl label="Name" name="trayName">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  value={selectedTray.name}
+                  onchange={(e) => onUpdateTray({ name: (e.currentTarget as HTMLInputElement).value })}
+                />
+              {/snippet}
+            </FormControl>
+
             <Spacer size="1rem" />
-          {/if}
 
-          <!-- Color -->
-          <FormControl label="Color" name="trayColor">
-            {#snippet start()}
-              <Popover>
-                {#snippet trigger()}
-                  <ColorPickerSwatch color={selectedTray.color} />
-                {/snippet}
-                {#snippet content()}
-                  <ColorPicker
-                    showOpacity={false}
-                    hex={selectedTray.color}
-                    onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
-                  />
-                {/snippet}
-              </Popover>
-            {/snippet}
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                value={selectedTray.color}
-                oninput={(e) => handleColorUpdate(e.currentTarget.value)}
-              />
-            {/snippet}
-          </FormControl>
+            <FormControl label="Location" name="moveToLocation">
+              {#snippet input({ inputProps })}
+                <Select
+                  {...inputProps}
+                  selected={currentTrayLocation ? [currentTrayLocation] : []}
+                  options={moveDestinations}
+                  onSelectedChange={(selected) => {
+                    if (selected[0]) {
+                      handleMoveDestination(selected[0]);
+                    }
+                  }}
+                />
+              {/snippet}
+            </FormControl>
+            {#if isMiniatureRackTray(selectedTray) || isTileTray(selectedTray)}
+              <Spacer size="0.5rem" />
+              <Text size="0.875rem" color="fgMuted">
+                {isMiniatureRackTray(selectedTray)
+                  ? 'Miniature racks are loose-only for now and cannot be moved into boxes.'
+                  : 'Tile trays are loose-only for now and cannot be moved into boxes.'}
+              </Text>
+            {/if}
+          </section>
 
-          <Spacer size="1rem" />
+          <Hr class="trayDivider" />
 
-          <InputCheckbox
-            label="Emboss name on tray bottom"
-            checked={selectedTray.showEmboss ?? true}
-            onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
-          />
+          <section class="traySection">
+            <div class="sectionHeader">
+              <h4 class="sectionTitle">Appearance</h4>
+            </div>
+            <Spacer size="0.5rem" />
+            <FormControl label="Color" name="trayColor">
+              {#snippet start()}
+                <Popover>
+                  {#snippet trigger()}
+                    <ColorPickerSwatch color={selectedTray.color} />
+                  {/snippet}
+                  {#snippet content()}
+                    <ColorPicker
+                      showOpacity={false}
+                      hex={selectedTray.color}
+                      onUpdate={(colorData) => handleColorUpdate(colorData.hex)}
+                    />
+                  {/snippet}
+                </Popover>
+              {/snippet}
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  value={selectedTray.color}
+                  oninput={(e) => handleColorUpdate(e.currentTarget.value)}
+                />
+              {/snippet}
+            </FormControl>
+
+            <Spacer size="1rem" />
+
+            <InputCheckbox
+              label="Emboss name on tray bottom"
+              checked={selectedTray.showEmboss ?? true}
+              onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
+            />
+          </section>
         </div>
 
-        <Hr />
+        <Hr class="trayDivider" />
       {/if}
 
       {#if isCounterTray(selectedTray) && onUpdateCounterParams}
@@ -576,6 +576,22 @@
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />
+      {/if}
+
+      {#if onDuplicateTray && ((!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray)) || activeStackedTrayTab === 'tray')}
+        <Hr class="trayDivider" />
+
+        <section class="panelFormSection traySection">
+          <div class="buttonRow">
+            <button
+              class="secondaryButton trayActionButton trayActionButton--info"
+              type="button"
+              onclick={() => selectedTray && onDuplicateTray(selectedTray.id)}
+            >
+              Duplicate tray
+            </button>
+          </div>
+        </section>
       {/if}
     </div>
   {:else}
@@ -655,6 +671,50 @@
     padding: 0 0.75rem;
   }
 
+  .trayForm {
+    padding-top: 0.75rem;
+  }
+
+  .traySection {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.trayDivider) {
+    display: block;
+    height: 1px;
+    min-height: 1px;
+    margin: 1.35rem 0 1rem;
+    border: 0;
+    background: var(--contrastMedium);
+  }
+
+  .sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .sectionTitle {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--fgMuted);
+  }
+
+  .sectionHeader .sectionTitle {
+    margin-bottom: 0;
+  }
+
+  :global(.sectionTitle--featured) {
+    color: var(--fg);
+    font-size: 0.875rem;
+    letter-spacing: 0.025em;
+  }
+
   .trayEditorTabs {
     position: sticky;
     top: -0.75rem;
@@ -721,19 +781,40 @@
     border: var(--borderThin);
     border-radius: var(--radius-2);
     background: var(--contrastLow);
-    color: var(--fgPrimary);
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    font-weight: 600;
+    color: var(--fg);
+    padding: 0.4rem 0.75rem;
+    font: inherit;
+    min-width: 0;
+    flex: 1 1 8.5rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
     cursor: pointer;
-    transition:
-      background-color 0.15s ease,
-      border-color 0.15s ease;
   }
 
   .secondaryButton:hover {
     background: var(--contrastMedium);
-    border-color: var(--fgMuted);
+  }
+
+  .trayActionButton {
+    justify-content: center;
+    background: var(--contrastLow);
+    border-color: var(--contrastMedium);
+    font-weight: 600;
+  }
+
+  .trayActionButton:hover {
+    background: var(--contrastMedium);
+  }
+
+  .trayActionButton--info {
+    border-color: #1d4ed8;
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .trayActionButton--info:hover {
+    background: #1d4ed8;
   }
 
   .emptyState {

@@ -1125,6 +1125,7 @@
                   handleAddLooseTray(layer.id, 'miniatureRack');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('miniatureRack', e.currentTarget)}
                 onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Miniature rack</Text>

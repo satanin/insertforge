@@ -79,7 +79,7 @@
   <!-- Tray Dimensions (Primary Controls) -->
   <section class="section">
     <div class="sectionHeader">
-      <h3 class="sectionTitle">Tray Dimensions</h3>
+      <h3 class="sectionTitle sectionTitle--featured">Tray Dimensions</h3>
       <span class="dimensionsInfo">
         {dimensions.width.toFixed(1)} &times; {dimensions.depth.toFixed(1)} &times; {dimensions.height.toFixed(1)} mm
       </span>

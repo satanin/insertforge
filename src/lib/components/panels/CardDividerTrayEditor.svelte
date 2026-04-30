@@ -265,7 +265,7 @@
 
   <section class="section">
     <div class="sectionHeader">
-      <h3 class="sectionTitle">Tray Settings</h3>
+      <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
       {#if dimensions}
         <span class="dimensionsInfo">
           {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
@@ -336,6 +336,9 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    <p class="settingHint">
+      When Max height is set, card stacks taller than that value tilt back automatically to fit.
+    </p>
     <Spacer size="1rem" />
     <InputCheckbox
       label="Emboss stack labels on tray"
@@ -348,12 +351,6 @@
       checked={tray.autoHeight ?? true}
       onchange={(e) => onUpdateTray?.({ autoHeight: e.currentTarget.checked })}
     />
-    {#if tray.params.maxHeight !== null}
-      <p class="settingHint">
-        Tray walls are limited to {heightValidation.effectiveHeight.toFixed(1)} mm. Cards below that height stay upright;
-        taller stacks tilt back as needed.
-      </p>
-    {/if}
     {#if maxHeightWarning}
       <p class="warningText">{maxHeightWarning}</p>
     {:else if tray.params.maxHeight !== null && heightValidation.usesAngledCards}

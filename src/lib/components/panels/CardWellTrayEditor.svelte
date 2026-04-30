@@ -139,7 +139,7 @@
 
   <section class="section">
     <div class="sectionHeader">
-      <h3 class="sectionTitle">Tray Settings</h3>
+      <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
       {#if dimensions}
         <span class="dimensionsInfo">
           {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
