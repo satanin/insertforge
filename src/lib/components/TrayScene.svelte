@@ -1749,7 +1749,7 @@
             ? stack.cardDividerHeight
             : effectiveShape === 'triangle'
               ? stack.length
-              : stack.shape === 'custom'
+              : effectiveShape === 'hex' || stack.shape === 'custom'
                 ? Math.min(stack.width, stack.length)
                 : Math.max(stack.width, stack.length)}
         {@const projectedHeight = stack.isCardDivider ? (stack.cardDividerProjectedHeight ?? standingHeight) : standingHeight}
@@ -1758,7 +1758,7 @@
         {@const edgeTiltAngle = stack.isCardDivider ? (stack.cardDividerTiltAngle ?? 0) : 0}
         {@const counterY = stack.z + projectedHeight / 2}
         {@const isAlt = counterIdx % 2 === 1}
-        {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+        {@const counterColor = stack.disableAlternateColors ? stack.color : getAlternateColor(stackIdx, isAlt, stack.color)}
         {@const triGeom =
           effectiveShape === 'triangle'
             ? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
@@ -1813,7 +1813,7 @@
         {@const posY = counterZ}
         {@const posZ = meshOffset.z - stack.y}
         {@const isAlt = counterIdx % 2 === 1}
-        {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+        {@const counterColor = stack.disableAlternateColors ? stack.color : getAlternateColor(stackIdx, isAlt, stack.color)}
         {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
         {@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
         {@const sleeveColors = getSleeveColors(isAlt)}
@@ -1871,7 +1871,7 @@
                 ? stack.cardDividerHeight
                 : effectiveShape === 'triangle'
                   ? stack.length
-                  : stack.shape === 'custom'
+                  : effectiveShape === 'hex' || stack.shape === 'custom'
                     ? Math.min(stack.width, stack.length)
                     : Math.max(stack.width, stack.length)}
             {@const projectedHeight = stack.isCardDivider ? (stack.cardDividerProjectedHeight ?? standingHeight) : standingHeight}
@@ -1880,7 +1880,7 @@
             {@const edgeTiltAngle = stack.isCardDivider ? (stack.cardDividerTiltAngle ?? 0) : 0}
             {@const counterY = stack.z + projectedHeight / 2}
             {@const isAlt = counterIdx % 2 === 1}
-            {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+            {@const counterColor = stack.disableAlternateColors ? stack.color : getAlternateColor(stackIdx, isAlt, stack.color)}
             {@const triGeom =
               effectiveShape === 'triangle'
                 ? createRoundedTriangleGeometry(stack.width, stack.thickness, triangleCornerRadius)
@@ -1935,7 +1935,7 @@
             {@const posY = counterZ}
             {@const posZ = -stack.y}
             {@const isAlt = counterIdx % 2 === 1}
-            {@const counterColor = getAlternateColor(stackIdx, isAlt, stack.color)}
+            {@const counterColor = stack.disableAlternateColors ? stack.color : getAlternateColor(stackIdx, isAlt, stack.color)}
             {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}
             {@const isSleevedCard = !!(stack.innerWidth && stack.innerLength)}
             {@const sleeveColors = getSleeveColors(isAlt)}
@@ -2009,7 +2009,7 @@
             return stack.isEdgeLoaded
               ? effectiveShape === 'triangle'
                 ? stack.length
-                : stack.shape === 'custom'
+                : effectiveShape === 'hex' || stack.shape === 'custom'
                   ? Math.min(stack.width, stack.length)
                   : Math.max(stack.width, stack.length)
               : stack.z + stack.count * stack.thickness;

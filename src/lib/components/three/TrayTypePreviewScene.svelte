@@ -22,6 +22,7 @@
   // Map tray types to STL file paths
   const stlPaths: Record<string, string> = {
     counter: '/stls/counter.stl',
+    tile: '/stls/counter.stl',
     cardDraw: '/stls/card-draw.stl',
     cardDivider: '/stls/card-divider.stl',
     cardWell: '/stls/card-well.stl',

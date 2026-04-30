@@ -112,6 +112,7 @@ export interface CounterStack {
   hexPointyTop: boolean;
   color: string; // Random color for this stack
   label?: string; // User-provided label for this stack
+  disableAlternateColors?: boolean; // Keep the whole stack in one color for clearer previews
   // Edge-loaded stack fields
   isEdgeLoaded?: boolean;
   edgeOrientation?: 'lengthwise' | 'crosswise';

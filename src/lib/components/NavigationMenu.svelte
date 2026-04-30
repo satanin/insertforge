@@ -41,6 +41,7 @@
     isCardWellTray,
     isCupTray,
     isMiniatureRackTray,
+    isTileTray,
     type Board,
     type Box,
     type Layer,
@@ -326,6 +327,7 @@
     isCardDivider: boolean;
     isCardWell: boolean;
     isCupTray: boolean;
+    isTileTray: boolean;
   } {
     if (isMiniatureRackTray(tray)) {
       return {
@@ -334,7 +336,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCupTray(tray)) {
@@ -345,7 +348,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: true
+        isCupTray: true,
+        isTileTray: false
       };
     }
     if (isCardWellTray(tray)) {
@@ -357,7 +361,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: true,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCardDividerTray(tray)) {
@@ -368,7 +373,8 @@
         isCardTray: false,
         isCardDivider: true,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCardTray(tray)) {
@@ -378,7 +384,19 @@
         isCardTray: true,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
+      };
+    }
+    if (isTileTray(tray)) {
+      return {
+        stacks: 1,
+        counters: tray.params.count,
+        isCardTray: false,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false,
+        isTileTray: true
       };
     }
     const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
@@ -389,7 +407,8 @@
       isCardTray: false,
       isCardDivider: false,
       isCardWell: false,
-      isCupTray: false
+      isCupTray: false,
+      isTileTray: false
     };
   }
 </script>
@@ -509,6 +528,8 @@
                         ? stats.counters + ' cards/' + stats.stacks + 's'
                         : stats.isCardWell
                           ? stats.counters + ' cards/' + stats.stacks + 'c'
+                          : stats.isTileTray
+                            ? stats.counters + ' tiles'
                           : stats.isCupTray
                             ? stats.stacks + ' cups'
                             : stats.counters + 'c in ' + stats.stacks + 's'})"
@@ -828,6 +849,8 @@
                   ? stats.counters + ' cards/' + stats.stacks + 's'
                   : stats.isCardWell
                     ? stats.counters + ' cards/' + stats.stacks + 'c'
+                    : stats.isTileTray
+                      ? stats.counters + ' tiles'
                     : stats.isCupTray
                       ? stats.stacks + ' cups'
                       : isMiniatureRackTray(tray)
@@ -1118,6 +1141,18 @@
               >
                 <Text weight={500}>Counters</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Stacks of geometric tokens</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'tile');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleTrayTypeHover('tile', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Tile tray</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Single stack of larger tiles in a square tray</Text>
               </button>
               <button
                 class="trayTypeOption"

@@ -420,6 +420,14 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'tile') {
+    return {
+      ...tray,
+      type: 'tile',
+      color
+    } as Tray;
+  }
+
   // Counter tray (either explicit or migrated from old format)
   return {
     ...tray,

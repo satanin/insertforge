@@ -54,6 +54,7 @@
   // Track which counter is expanded (null = none)
   let expandedCounterIndex: number | null = $state(null);
   let expandedPlayerBoardIndex: number | null = $state(null);
+  let expandedTileIndex: number | null = $state(null);
   // Track which card size is expanded (null = none)
   let expandedCardIndex: number | null = $state(null);
 
@@ -61,6 +62,7 @@
   let counterShapes = $derived(getCounterShapes());
   let counterTokenShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'counter'));
   let playerBoardShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'playerBoard'));
+  let tileShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'tile'));
   let cardSizes = $derived(getCardSizes());
 
   // Get the shape icon component for a base shape
@@ -110,24 +112,35 @@
 
   // Custom shape handlers - now using project-level store functions
   function handleAddShape(category: CounterShapeCategory) {
-    const sourceShapes = category === 'playerBoard' ? playerBoardShapes : counterTokenShapes;
-    const newName = category === 'playerBoard' ? `Player Board ${sourceShapes.length + 1}` : `Custom ${sourceShapes.length + 1}`;
+    const sourceShapes = category === 'playerBoard' ? playerBoardShapes : category === 'tile' ? tileShapes : counterTokenShapes;
+    const newName =
+      category === 'playerBoard'
+        ? `Player Board ${sourceShapes.length + 1}`
+        : category === 'tile'
+          ? `Tile ${sourceShapes.length + 1}`
+          : `Custom ${sourceShapes.length + 1}`;
     const newShape = addCounterShape({
       name: newName,
       category,
       baseShape: 'rectangle',
-      width: category === 'playerBoard' ? 114 : 20,
-      length: category === 'playerBoard' ? 280 : 30,
-      thickness: DEFAULT_COUNTER_THICKNESS
+      width: category === 'playerBoard' ? 114 : category === 'tile' ? 30 : 20,
+      length: category === 'playerBoard' ? 280 : category === 'tile' ? 30 : 30,
+      thickness: category === 'tile' ? 2 : DEFAULT_COUNTER_THICKNESS
     });
     const newShapes = getCounterShapes().filter((s) => (s.category ?? 'counter') === category);
     const newIndex = newShapes.findIndex((s) => s.id === newShape.id);
     if (category === 'playerBoard') {
       expandedPlayerBoardIndex = newIndex;
       expandedCounterIndex = null;
+      expandedTileIndex = null;
+    } else if (category === 'tile') {
+      expandedTileIndex = newIndex;
+      expandedCounterIndex = null;
+      expandedPlayerBoardIndex = null;
     } else {
       expandedCounterIndex = newIndex;
       expandedPlayerBoardIndex = null;
+      expandedTileIndex = null;
     }
   }
 
@@ -186,6 +199,8 @@
           if (isCounterTray(tray)) {
             count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
             count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+          } else if (tray.type === 'tile') {
+            count += tray.params.tileShapeId === shapeId ? 1 : 0;
           }
         }
       }
@@ -193,6 +208,8 @@
         if (isCounterTray(tray)) {
           count += tray.params.topLoadedStacks.filter((stack) => stack[0] === shapeId).length;
           count += tray.params.edgeLoadedStacks.filter((stack) => stack[0] === shapeId).length;
+        } else if (tray.type === 'tile') {
+          count += tray.params.tileShapeId === shapeId ? 1 : 0;
         }
       }
       for (const layeredBox of layer.layeredBoxes) {
@@ -214,6 +231,7 @@
     deleteCounterShape(shapeId);
     expandedCounterIndex = null;
     expandedPlayerBoardIndex = null;
+    expandedTileIndex = null;
   }
 
   // Card size handlers - now using project-level store functions
@@ -553,6 +571,204 @@
     </div>
     <Spacer />
     <Link as="button" onclick={() => handleAddShape('counter')}>+ New counter</Link>
+  </section>
+
+  <Hr />
+
+  <section class="section">
+    <h3 class="sectionTitle">Tiles</h3>
+    <Spacer size="0.5rem" />
+    <div class="customShapesList">
+      {#each tileShapes as shape, index (shape.id)}
+        {@const baseShape = shape.baseShape ?? 'rectangle'}
+        {@const isExpanded = expandedTileIndex === index}
+        {#if isExpanded}
+          <Panel class="shapePanel">
+            <div class="shapePanelContent">
+              <div class="shapeFormGrid">
+                <FormControl label="Name" name="tileName-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="text"
+                      value={shape.name}
+                      onchange={(e) => handleUpdateShape(shape.id, 'name', e.currentTarget.value)}
+                      placeholder="Name"
+                    />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Shape" name="tileBaseShape-{index}">
+                  {#snippet input({ inputProps })}
+                    <Select
+                      selected={[baseShape]}
+                      onSelectedChange={(selected) => handleUpdateShape(shape.id, 'baseShape', selected[0])}
+                      options={baseShapeOptions}
+                      {...inputProps}
+                    />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Thickness" name="tileThickness-{index}">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={shape.thickness}
+                      onchange={(e) => handleUpdateShape(shape.id, 'thickness', parseFloat(e.currentTarget.value))}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+                {#if baseShape === 'rectangle'}
+                  <FormControl label="Width" name="tileWidth-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Length" name="tileLength-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.length}
+                        onchange={(e) => handleUpdateShape(shape.id, 'length', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'square'}
+                  <FormControl label="Size" name="tileSize-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'circle'}
+                  <FormControl label="Diameter" name="tileDiameter-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {:else if baseShape === 'hex'}
+                  <FormControl label="Flat-to-flat" name="tileFlatToFlat-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <InputCheckbox
+                    checked={shape.pointyTop ?? false}
+                    onchange={(e) => handleUpdateShape(shape.id, 'pointyTop', e.currentTarget.checked ? 1 : 0)}
+                    label="Pointy top"
+                  />
+                {:else if baseShape === 'triangle'}
+                  <FormControl label="Side" name="tileSide-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        value={shape.width}
+                        onchange={(e) => handleUpdateShape(shape.id, 'width', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Radius" name="tileCornerRadius-{index}">
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={shape.cornerRadius ?? 1.5}
+                        onchange={(e) => handleUpdateShape(shape.id, 'cornerRadius', parseFloat(e.currentTarget.value))}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                {/if}
+              </div>
+            </div>
+            <Hr />
+            {@const stackCount = countStacksUsingShape(shape.id)}
+            <div class="shapePanelActions">
+              <Button size="sm" onclick={() => (expandedTileIndex = null)}>Save</Button>
+              <ConfirmActionButton action={() => handleRemoveShape(shape.id)} actionButtonText="Delete tile">
+                {#snippet trigger({ triggerProps })}
+                  <Button {...triggerProps} size="sm" variant="ghost">Delete</Button>
+                {/snippet}
+                {#snippet actionMessage()}
+                  <div style="max-width: 15rem;">
+                    <Text weight={600} color="var(--fgDanger)">Warning</Text>
+                    <Spacer size="0.5rem" />
+                    {#if stackCount > 0}
+                      <Text size="0.875rem">
+                        Deleting the "{shape.name}" tile will also remove
+                        <Text as="span" color="var(--fgDanger)">
+                          {stackCount}
+                          use{stackCount === 1 ? '' : 's'}
+                        </Text>.
+                      </Text>
+                    {:else}
+                      <Text size="0.875rem">Delete the "{shape.name}" tile?</Text>
+                    {/if}
+                    <Spacer size="0.5rem" />
+                  </div>
+                {/snippet}
+              </ConfirmActionButton>
+            </div>
+          </Panel>
+        {:else}
+          {@const iconScale = getRelativeIconScale(shape, tileShapes)}
+          <div class="shapeCard">
+            <button class="shapeSummary" onclick={() => (expandedTileIndex = index)} title="Click to edit {shape.name}">
+              <span class="shapeIcon" style="transform: scale({iconScale}); --stroke-width: {2 / iconScale};">
+                <Icon Icon={getShapeIcon(baseShape)} size={16} />
+              </span>
+              <span class="shapeName">{shape.name}</span>
+              <span class="shapeSize">{getSizeDisplay(shape)} mm</span>
+            </button>
+          </div>
+        {/if}
+      {/each}
+    </div>
+    <Spacer />
+    <Link as="button" onclick={() => handleAddShape('tile')}>+ New tile</Link>
   </section>
 
   <Hr />

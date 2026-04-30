@@ -8,6 +8,7 @@
   import CardDividerTrayEditor from './panels/CardDividerTrayEditor.svelte';
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
+  import TileTrayEditor from './panels/TileTrayEditor.svelte';
   import type { MiniatureRackParams } from '$lib/models/miniatureRack';
   import { getTrayDimensions } from '$lib/models/box';
   import {
@@ -44,6 +45,7 @@
     updateCardWellTrayParams,
     updateCupTrayParams,
     updateMiniatureRackParams,
+    updateTileTrayParams,
     updateLayer,
     getTrayLetterById,
     isCounterTray,
@@ -52,6 +54,7 @@
     isCardWellTray,
     isCupTray,
     isMiniatureRackTray,
+    isTileTray,
     getGlobalSettings,
     getProjectName,
     updateProjectName,
@@ -67,13 +70,15 @@
     type LayeredBoxSection,
     type LayeredBoxSectionType,
     type CounterTray,
-    type Tray
+    type Tray,
+    type TileTray
   } from '$lib/stores/project.svelte';
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
   import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
+  import type { TileTrayParams } from '$lib/models/tileTray';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
   import { layoutEditorState } from '$lib/stores/layoutEditor.svelte';
@@ -500,6 +505,12 @@
     }
   }
 
+  function handleTileTrayParamsChange(newParams: TileTrayParams) {
+    if (selectedTray && isTileTray(selectedTray)) {
+      updateTileTrayParams(selectedTray.id, newParams);
+    }
+  }
+
   // Get tray stats for display
   function getTrayStats(tray: Tray): {
     stacks: number;
@@ -537,6 +548,9 @@
       stacks = 1;
       counters = tray.params.cardCount;
       isCards = true;
+    } else if (isTileTray(tray)) {
+      stacks = 1;
+      counters = tray.params.count;
     }
 
     const project = getProject();
@@ -599,6 +613,8 @@
             ? `${stats.stacks} cups`
             : isMiniatureRackTray(selectedTray)
               ? `${stats.stacks} slots`
+              : isTileTray(selectedTray)
+                ? `${stats.counters} tiles`
             : `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}
         </span>
       {/if}
@@ -1415,6 +1431,7 @@
             onUpdateCardWellParams={handleCardWellParamsChange}
             onUpdateCupParams={handleCupParamsChange}
             onUpdateMiniatureRackParams={handleMiniatureRackParamsChange}
+            onUpdateTileTrayParams={handleTileTrayParamsChange}
             hideList={true}
           />
         {:else}

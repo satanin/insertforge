@@ -22,6 +22,7 @@ import {
   DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
   type MiniatureRackParams
 } from '$lib/models/miniatureRack';
+import { defaultTileTrayParams, type TileTrayParams } from '$lib/models/tileTray';
 import {
   DEFAULT_EMPTY_BOX_BODY_HEIGHT,
   DEFAULT_EMPTY_BOX_DEPTH,
@@ -56,6 +57,7 @@ import type {
   LayeredBoxSectionType,
   LidParams,
   MiniatureRackTray,
+  TileTray,
   ManualBoxPlacement,
   ManualBoardPlacement,
   ManualLooseTrayPlacement,
@@ -72,6 +74,7 @@ import {
   isCounterTray,
   isCupTray,
   isMiniatureRackTray,
+  isTileTray,
   isLooseTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
@@ -85,6 +88,7 @@ export {
   isCounterTray,
   isCupTray,
   isMiniatureRackTray,
+  isTileTray,
   isLooseTray
 };
 export type {
@@ -108,6 +112,7 @@ export type {
   ManualBoardPlacement,
   ManualLooseTrayPlacement,
   ManualTrayPlacement,
+  TileTray,
   Project,
   Tray
 };
@@ -155,6 +160,44 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
     width: 15.9,
     length: 15.9,
     thickness: DEFAULT_COUNTER_THICKNESS,
+    cornerRadius: 1.5
+  },
+  {
+    id: 'tile-square',
+    name: 'Tile Square',
+    category: 'tile',
+    baseShape: 'square',
+    width: 30,
+    length: 30,
+    thickness: 2
+  },
+  {
+    id: 'tile-hex',
+    name: 'Tile Hex',
+    category: 'tile',
+    baseShape: 'hex',
+    width: 30,
+    length: 30,
+    thickness: 2,
+    pointyTop: false
+  },
+  {
+    id: 'tile-circle',
+    name: 'Tile Circle',
+    category: 'tile',
+    baseShape: 'circle',
+    width: 30,
+    length: 30,
+    thickness: 2
+  },
+  {
+    id: 'tile-triangle',
+    name: 'Tile Triangle',
+    category: 'tile',
+    baseShape: 'triangle',
+    width: 30,
+    length: 30,
+    thickness: 2,
     cornerRadius: 1.5
   }
 ];
@@ -421,6 +464,24 @@ function createDefaultMiniatureRack(name: string, color: string): MiniatureRackT
     rotationOverride: 'auto',
     showEmboss: true,
     params
+  };
+}
+
+function createDefaultTileTray(name: string, color: string, counterShapes?: CounterShape[]): TileTray {
+  const tileShapeId =
+    counterShapes?.find((shape) => (shape.category ?? 'counter') === 'tile')?.id ?? 'tile-square';
+
+  return {
+    id: generateId(),
+    type: 'tile',
+    name,
+    color,
+    rotationOverride: 'auto',
+    autoHeight: false,
+    params: {
+      ...defaultTileTrayParams,
+      tileShapeId
+    }
   };
 }
 
@@ -2649,6 +2710,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 // Tray type for addTray function
 export type TrayType =
   | 'miniatureRack'
+  | 'tile'
   | 'counter'
   | 'cardDraw'
   | 'cardDivider'
@@ -2670,6 +2732,8 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   let tray: Tray;
   if (trayType === 'miniatureRack') {
     tray = createDefaultMiniatureRack(`Miniature Rack ${trayNumber}`, color);
+  } else if (trayType === 'tile') {
+    tray = createDefaultTileTray(`Tile Tray ${trayNumber}`, color, project.counterShapes);
   } else if (trayType === 'cardDraw' || trayType === 'card') {
     tray = createDefaultCardDrawTray(`Loose Card ${trayNumber}`, color, project.cardSizes);
   } else if (trayType === 'cardDivider') {
@@ -2967,18 +3031,26 @@ export function deleteCounterShape(id: string): void {
     for (const layer of project.layers) {
       for (const box of layer.boxes) {
         for (const tray of box.trays) {
-          if (isCounterTray(tray)) {
-            tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(([shapeId]) => shapeId !== id);
-            tray.params.edgeLoadedStacks = tray.params.edgeLoadedStacks.filter(([shapeId]) => shapeId !== id);
-          }
-        }
-      }
-      for (const tray of layer.looseTrays) {
         if (isCounterTray(tray)) {
           tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(([shapeId]) => shapeId !== id);
           tray.params.edgeLoadedStacks = tray.params.edgeLoadedStacks.filter(([shapeId]) => shapeId !== id);
+        } else if (isTileTray(tray) && tray.params.tileShapeId === id) {
+          const fallbackTileId =
+            project.counterShapes.find((shape) => (shape.category ?? 'counter') === 'tile')?.id ?? project.counterShapes[0]?.id ?? id;
+          tray.params.tileShapeId = fallbackTileId;
         }
       }
+    }
+    for (const tray of layer.looseTrays) {
+      if (isCounterTray(tray)) {
+        tray.params.topLoadedStacks = tray.params.topLoadedStacks.filter(([shapeId]) => shapeId !== id);
+        tray.params.edgeLoadedStacks = tray.params.edgeLoadedStacks.filter(([shapeId]) => shapeId !== id);
+      } else if (isTileTray(tray) && tray.params.tileShapeId === id) {
+        const fallbackTileId =
+          project.counterShapes.find((shape) => (shape.category ?? 'counter') === 'tile')?.id ?? project.counterShapes[0]?.id ?? id;
+        tray.params.tileShapeId = fallbackTileId;
+      }
+    }
     }
     autosave();
   }
@@ -3210,6 +3282,17 @@ export function updateMiniatureRackParams(trayId: string, params: MiniatureRackP
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isMiniatureRackTray(looseTray)) {
+      looseTray.params = params;
+      autosave();
+      return;
+    }
+  }
+}
+
+export function updateTileTrayParams(trayId: string, params: TileTrayParams): void {
+  for (const layer of project.layers) {
+    const looseTray = layer.looseTrays.find((t) => t.id === trayId);
+    if (looseTray && isTileTray(looseTray)) {
       looseTray.params = params;
       autosave();
       return;

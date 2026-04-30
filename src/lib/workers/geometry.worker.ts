@@ -24,6 +24,7 @@ import {
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
+import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
 import {
   arrangeLayerContents,
   getLayeredBoxExteriorDimensions,
@@ -35,7 +36,7 @@ import {
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray, isMiniatureRackTray, isTileTray } from '$lib/types/project';
 import { sanitizeExportName } from '$lib/utils/exportNames';
 import { cleanGeometryForExport } from '$lib/utils/exportGeometryCleanup';
 import threemfSerializer from '@jscad/3mf-serializer';
@@ -504,14 +505,19 @@ function createTrayGeometry(
   if (isMiniatureRackTray(tray)) {
     return createMiniatureRack(tray.params, tray.name, maxHeight, showEmboss);
   }
+  if (isTileTray(tray)) {
+    return createTileTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);
+  }
   // Default to counter tray
   return createCounterTray(tray.params, counterShapes, tray.name, maxHeight, spacerHeight, showEmboss);
 }
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
+  const autoHeightEnabled = isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
+
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
-    tray.autoHeight === false
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray) || isTileTray(tray)) &&
+    !autoHeightEnabled
   ) {
     return naturalHeight;
   }
@@ -519,9 +525,11 @@ function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: 
 }
 
 function getTraySpacerHeight(tray: Tray, adjustedSpacerHeight: number): number {
+  const autoHeightEnabled = isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
+
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
-    tray.autoHeight === false
+    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray) || isTileTray(tray)) &&
+    !autoHeightEnabled
   ) {
     return 0;
   }
@@ -551,6 +559,43 @@ function getTrayPositions(
   }
   if (isMiniatureRackTray(tray)) {
     return getMiniatureRackPreviewPositions(tray.params);
+  }
+  if (isTileTray(tray)) {
+    const tileStacks = getTileTrayPreviewPositions(tray.params, counterShapes, maxHeight, spacerHeight);
+    return tileStacks.map((stack) => ({
+        shape:
+          stack.customBaseShape === 'square' ||
+          stack.customBaseShape === 'circle' ||
+          stack.customBaseShape === 'hex' ||
+          stack.customBaseShape === 'triangle'
+            ? stack.customBaseShape
+            : ('custom' as const),
+        customShapeName: stack.shapeName,
+        customBaseShape: stack.customBaseShape,
+        x: stack.x,
+        y: stack.y,
+        z: stack.z,
+        width: stack.width,
+        length: stack.length,
+        thickness: stack.thickness,
+        count: stack.count,
+        hexPointyTop: stack.hexPointyTop,
+        color: '#78b8d8',
+        ...(stack.orientation === 'horizontal' && stack.customBaseShape === 'triangle'
+          ? {
+              rowAssignment: 'back' as const
+            }
+          : {}),
+        ...(stack.orientation === 'vertical'
+          ? {
+              isEdgeLoaded: true,
+              edgeOrientation: 'crosswise' as const,
+              slotWidth: stack.slotWidth,
+              slotDepth: stack.slotDepth
+            }
+          : {})
+      })
+    );
   }
   if (isCardWellTray(tray)) {
     // Convert card well positions to CounterStack format for visualization

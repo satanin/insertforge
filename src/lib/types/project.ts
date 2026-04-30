@@ -4,10 +4,11 @@ import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
 import type { CupTrayParams } from '$lib/models/cupTray';
 import type { MiniatureRackParams } from '$lib/models/miniatureRack';
+import type { TileTrayParams } from '$lib/models/tileTray';
 
 // Base shape types for counter shapes
 export type CounterBaseShape = 'rectangle' | 'square' | 'circle' | 'hex' | 'triangle';
-export type CounterShapeCategory = 'counter' | 'playerBoard';
+export type CounterShapeCategory = 'counter' | 'playerBoard' | 'tile';
 
 // Counter shape definition (global, referenced by ID)
 export interface CounterShape {
@@ -123,11 +124,16 @@ export interface MiniatureRackTray extends BaseTray {
   params: MiniatureRackParams;
 }
 
+export interface TileTray extends BaseTray {
+  type: 'tile';
+  params: TileTrayParams;
+}
+
 // Legacy alias for backwards compatibility
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | MiniatureRackTray;
+export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | MiniatureRackTray | TileTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {
@@ -152,6 +158,10 @@ export function isCardWellTray(tray: Tray): tray is CardWellTray {
 
 export function isMiniatureRackTray(tray: Tray): tray is MiniatureRackTray {
   return tray.type === 'miniatureRack';
+}
+
+export function isTileTray(tray: Tray): tray is TileTray {
+  return tray.type === 'tile';
 }
 
 // Legacy alias - also matches old 'card' type for migration

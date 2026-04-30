@@ -24,6 +24,7 @@
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
   import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
+  import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
   import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
   import {
     arrangeLayerContents,
@@ -73,6 +74,7 @@
     isCardDividerTray,
     isCupTray,
     isMiniatureRackTray,
+    isTileTray,
     findTrayLocation,
     saveManualLayout,
     clearManualLayout
@@ -1758,6 +1760,43 @@
               showEmboss
             );
             selectedTrayCounters = getCardDrawPositions(placement.tray.params, cardSizes, maxHeight, spacerHeight);
+          } else if (isTileTray(placement.tray)) {
+            jscadGeom = createTileTray(placement.tray.params, counterShapes, placement.tray.name, maxHeight, spacerHeight, showEmboss);
+            selectedTrayCounters = getTileTrayPreviewPositions(placement.tray.params, counterShapes, maxHeight, spacerHeight).map((stack) =>
+              ({
+                shape:
+                  stack.customBaseShape === 'square' ||
+                  stack.customBaseShape === 'circle' ||
+                  stack.customBaseShape === 'hex' ||
+                  stack.customBaseShape === 'triangle'
+                    ? stack.customBaseShape
+                    : ('custom' as const),
+                customShapeName: stack.shapeName,
+                customBaseShape: stack.customBaseShape,
+                x: stack.x,
+                y: stack.y,
+                z: stack.z,
+                width: stack.width,
+                length: stack.length,
+                thickness: stack.thickness,
+                count: stack.count,
+                hexPointyTop: stack.hexPointyTop,
+                color: '#78b8d8',
+                ...(stack.orientation === 'horizontal' && stack.customBaseShape === 'triangle'
+                  ? {
+                      rowAssignment: 'back' as const
+                    }
+                  : {}),
+                ...(stack.orientation === 'vertical'
+                  ? {
+                      isEdgeLoaded: true,
+                      edgeOrientation: 'crosswise' as const,
+                      slotWidth: stack.slotWidth,
+                      slotDepth: stack.slotDepth
+                    }
+                  : {})
+              })
+            );
           } else {
             // Fallback - shouldn't happen
             continue;
@@ -1869,6 +1908,43 @@
         } else if (isMiniatureRackTray(looseTray)) {
           jscadGeom = createMiniatureRack(looseTray.params, looseTray.name, maxHeight, showEmboss);
           selectedTrayCounters = getMiniatureRackPreviewPositions(looseTray.params);
+        } else if (isTileTray(looseTray)) {
+          jscadGeom = createTileTray(looseTray.params, counterShapes, looseTray.name, maxHeight, spacerHeight, showEmboss);
+          selectedTrayCounters = getTileTrayPreviewPositions(looseTray.params, counterShapes, maxHeight, spacerHeight).map((stack) =>
+            ({
+              shape:
+                stack.customBaseShape === 'square' ||
+                stack.customBaseShape === 'circle' ||
+                stack.customBaseShape === 'hex' ||
+                stack.customBaseShape === 'triangle'
+                  ? stack.customBaseShape
+                  : ('custom' as const),
+              customShapeName: stack.shapeName,
+              customBaseShape: stack.customBaseShape,
+              x: stack.x,
+              y: stack.y,
+              z: stack.z,
+              width: stack.width,
+              length: stack.length,
+              thickness: stack.thickness,
+              count: stack.count,
+              hexPointyTop: stack.hexPointyTop,
+              color: '#78b8d8',
+              ...(stack.orientation === 'horizontal' && stack.customBaseShape === 'triangle'
+                ? {
+                    rowAssignment: 'back' as const
+                  }
+                : {}),
+              ...(stack.orientation === 'vertical'
+                ? {
+                    isEdgeLoaded: true,
+                    edgeOrientation: 'crosswise' as const,
+                    slotWidth: stack.slotWidth,
+                    slotDepth: stack.slotDepth
+                  }
+                : {})
+            })
+          );
         } else {
           continue;
         }

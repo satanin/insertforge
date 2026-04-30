@@ -1,5 +1,5 @@
 import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray } from '$lib/types/project';
+import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray, isTileTray } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -10,6 +10,7 @@ import type { CounterTrayParams } from './counterTray';
 import { getCupTrayDimensions } from './cupTray';
 import { createHoneycombUnion, defaultHoneycombParams } from './honeycomb';
 import { getMiniatureRackDimensions } from './miniatureRack';
+import { getTileTrayDimensions } from './tileTray';
 
 const { cylinder, cuboid } = jscad.primitives;
 const { subtract } = jscad.booleans;
@@ -76,6 +77,9 @@ export function getTrayDimensionsForTray(
   }
   if (isMiniatureRackTray(tray)) {
     return getMiniatureRackDimensions(tray.params);
+  }
+  if (isTileTray(tray)) {
+    return getTileTrayDimensions(tray.params, counterShapes);
   }
   // Default to counter tray
   return getCounterTrayDimensions(tray.params, counterShapes);

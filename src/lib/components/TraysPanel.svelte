@@ -22,12 +22,14 @@
     isCardWellTray,
     isCupTray,
     isMiniatureRackTray,
+    isTileTray,
     type CounterTray,
     type CardDrawTray,
     type CardDividerTray,
     type CardWellTray,
     type CupTray,
-    type MiniatureRackTray
+    type MiniatureRackTray,
+    type TileTray
   } from '$lib/types/project';
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
@@ -35,6 +37,7 @@
   import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import type { MiniatureRackParams } from '$lib/models/miniatureRack';
+  import type { TileTrayParams } from '$lib/models/tileTray';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
   import { getRequiredTrayHeightForLayer, getTrayDimensionsForTray, arrangeTrays } from '$lib/models/box';
@@ -55,6 +58,7 @@
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
   import MiniatureRackTrayEditor from './panels/MiniatureRackTrayEditor.svelte';
+  import TileTrayEditor from './panels/TileTrayEditor.svelte';
 
   interface Props {
     selectedBox: Box | null;
@@ -70,6 +74,7 @@
     onUpdateCardWellParams?: (params: CardWellTrayParams) => void;
     onUpdateCupParams?: (params: CupTrayParams) => void;
     onUpdateMiniatureRackParams?: (params: MiniatureRackParams) => void;
+    onUpdateTileTrayParams?: (params: TileTrayParams) => void;
     hideList?: boolean;
   }
 
@@ -87,6 +92,7 @@
     onUpdateCardWellParams,
     onUpdateCupParams,
     onUpdateMiniatureRackParams,
+    onUpdateTileTrayParams,
     hideList = false
   }: Props = $props();
 
@@ -101,7 +107,7 @@
   let moveDestinations = $derived.by(() => {
     const project = getProject();
     const options: { value: string; label: string; group?: string }[] = [];
-    const boxMovesAllowed = !selectedTray || !isMiniatureRackTray(selectedTray);
+    const boxMovesAllowed = !selectedTray || (!isMiniatureRackTray(selectedTray) && !isTileTray(selectedTray));
 
     for (const layer of project.layers) {
       // Add boxes in this layer
@@ -203,7 +209,8 @@
         isCardDividerTray(selectedTray) ||
         isCardTray(selectedTray) ||
         isCardWellTray(selectedTray) ||
-        isCupTray(selectedTray)) &&
+        isCupTray(selectedTray) ||
+        isTileTray(selectedTray)) &&
       selectedTray.autoHeight === false
         ? placement.dimensions.height
         : maxTrayHeight > placement.dimensions.height
@@ -224,6 +231,7 @@
     isCardDivider: boolean;
     isCardWell: boolean;
     isCupTray: boolean;
+    isTileTray: boolean;
   } {
     if (isCupTray(tray)) {
       const cupTotal = countCups(tray.params.layout);
@@ -233,7 +241,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: true
+        isCupTray: true,
+        isTileTray: false
       };
     }
     if (isMiniatureRackTray(tray)) {
@@ -243,7 +252,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCardWellTray(tray)) {
@@ -255,7 +265,8 @@
         isCardTray: false,
         isCardDivider: false,
         isCardWell: true,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCardDividerTray(tray)) {
@@ -266,7 +277,8 @@
         isCardTray: false,
         isCardDivider: true,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
       };
     }
     if (isCardTray(tray)) {
@@ -276,7 +288,19 @@
         isCardTray: true,
         isCardDivider: false,
         isCardWell: false,
-        isCupTray: false
+        isCupTray: false,
+        isTileTray: false
+      };
+    }
+    if (isTileTray(tray)) {
+      return {
+        stacks: 1,
+        counters: tray.params.count,
+        isCardTray: false,
+        isCardDivider: false,
+        isCardWell: false,
+        isCupTray: false,
+        isTileTray: true
       };
     }
     // Counter tray
@@ -288,7 +312,8 @@
       isCardTray: false,
       isCardDivider: false,
       isCardWell: false,
-      isCupTray: false
+      isCupTray: false,
+      isTileTray: false
     };
   }
 
@@ -334,6 +359,8 @@
                 ? stats.counters + ' cards in ' + stats.stacks + ' stacks'
                 : stats.isCardWell
                   ? stats.counters + ' cards in ' + stats.stacks + ' cells'
+                  : stats.isTileTray
+                    ? stats.counters + ' tiles'
                   : stats.isCupTray
                     ? stats.stacks + ' cups'
                     : isMiniatureRackTray(tray)
@@ -346,9 +373,11 @@
                 {letter}: {stats.isCardTray
                   ? stats.counters + ' cards'
                   : stats.isCardDivider
-                    ? stats.counters + ' cards/' + stats.stacks + 's'
+                  ? stats.counters + ' cards/' + stats.stacks + 's'
                     : stats.isCardWell
                       ? stats.counters + ' cards/' + stats.stacks + 'c'
+                      : stats.isTileTray
+                        ? stats.counters + ' tiles'
                       : stats.isCupTray
                         ? stats.stacks + ' cups'
                         : isMiniatureRackTray(tray)
@@ -406,10 +435,12 @@
             />
           {/snippet}
         </FormControl>
-        {#if isMiniatureRackTray(selectedTray)}
+        {#if isMiniatureRackTray(selectedTray) || isTileTray(selectedTray)}
           <Spacer size="0.5rem" />
           <Text size="0.875rem" color="fgMuted">
-            Miniature racks are loose-only for now and cannot be moved into boxes.
+            {isMiniatureRackTray(selectedTray)
+              ? 'Miniature racks are loose-only for now and cannot be moved into boxes.'
+              : 'Tile trays are loose-only for now and cannot be moved into boxes.'}
           </Text>
         {/if}
 
@@ -507,6 +538,14 @@
         <MiniatureRackTrayEditor
           tray={selectedTray as MiniatureRackTray}
           onUpdateParams={onUpdateMiniatureRackParams}
+          actualHeight={maxTrayHeight}
+          displayDimensions={selectedTrayDimensions}
+        />
+      {:else if isTileTray(selectedTray) && onUpdateTileTrayParams}
+        <TileTrayEditor
+          tray={selectedTray as TileTray}
+          onUpdateParams={onUpdateTileTrayParams}
+          {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
         />

@@ -118,7 +118,7 @@
         position.y={posY}
         position.z={posZ}
         rotation.x={Math.PI / 2 + previewEdgeTilt}
-        rotation.y={hexPointyTop ? Math.PI / 6 : 0}
+        rotation.y={hexPointyTop ? 0 : Math.PI / 6}
       >
         <T.CylinderGeometry args={[width / 2, width / 2, thickness, 6]} />
         <T.MeshStandardMaterial {color} roughness={COUNTER_MATERIAL.roughness} metalness={COUNTER_MATERIAL.metalness} />

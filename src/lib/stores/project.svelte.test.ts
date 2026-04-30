@@ -5,6 +5,7 @@ import { DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
 import type { LayeredBox, LayeredBoxSection, Project } from '$lib/types/project';
 
 import {
+  addLooseTray,
   clearLayeredBoxLayerLayout,
   getGlobalSettings,
   getProject,
@@ -64,7 +65,7 @@ function createLayeredBoxFixture(): LayeredBox {
 function createProjectFixture(): Project {
   return {
     schemaVersion: 3,
-    appVersion: '1.1.15',
+    appVersion: '1.1.23',
     name: 'Test Project',
     layers: [
       {
@@ -202,7 +203,7 @@ describe('project store schema version', () => {
 
     expect(getProject().version).toBeUndefined();
     expect(getProject().schemaVersion).toBe(3);
-    expect(getProject().appVersion).toBe('1.1.15');
+    expect(getProject().appVersion).toBe('1.1.23');
   });
 });
 
@@ -224,6 +225,19 @@ describe('project store global settings', () => {
   });
 });
 
+describe('tile tray defaults', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('creates tile trays with auto-height disabled by default', () => {
+    const tray = addLooseTray(undefined, 'tile');
+
+    expect(tray?.type).toBe('tile');
+    expect(tray?.autoHeight).toBe(false);
+  });
+});
+
 describe('box placeholder dimensions', () => {
   beforeEach(() => {
     resetProject();
@@ -232,7 +246,7 @@ describe('box placeholder dimensions', () => {
   it('clears empty-box placeholder dimensions when moving the first tray into it', () => {
     importProject({
       schemaVersion: 3,
-      appVersion: '1.1.15',
+      appVersion: '1.1.23',
       name: 'Test Project',
       layers: [
         {
