@@ -181,255 +181,262 @@
   <!-- Box Settings -->
   {#if selectedBox}
     <div class="panelForm">
-      <div class="panelFormSection">
-        <FormControl label="Name" name="boxName">
-          {#snippet input({ inputProps })}
-            <Input
-              {...inputProps}
-              type="text"
-              value={selectedBox.name}
-              onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
-            />
-          {/snippet}
-        </FormControl>
+      <div class="panelFormSection boxForm">
+        <section class="boxSection">
+          <div class="sectionHeader">
+            <h4 class="sectionTitle">Details</h4>
+          </div>
+          <Spacer size="0.5rem" />
+          <FormControl label="Name" name="boxName">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="text"
+                value={selectedBox.name}
+                onchange={(e) => onUpdateBox({ name: (e.target as HTMLInputElement).value })}
+              />
+            {/snippet}
+          </FormControl>
+          <Spacer size="1rem" />
+          <FormControl label="Layer" name="moveToLayer">
+            {#snippet input({ inputProps })}
+              <Select
+                {...inputProps}
+                selected={currentLayerId ? [currentLayerId] : []}
+                options={layerOptions}
+                onSelectedChange={(selected) => {
+                  if (selected[0]) {
+                    handleLayerChange(selected[0]);
+                  }
+                }}
+              />
+            {/snippet}
+          </FormControl>
+        </section>
 
-        <Spacer size="0.75rem" />
+        <Hr class="boxDivider" />
 
-        <!-- Move to Layer -->
-        <FormControl label="Layer" name="moveToLayer">
-          {#snippet input({ inputProps })}
-            <Select
-              {...inputProps}
-              selected={currentLayerId ? [currentLayerId] : []}
-              options={layerOptions}
-              onSelectedChange={(selected) => {
-                if (selected[0]) {
-                  handleLayerChange(selected[0]);
-                }
-              }}
-            />
-          {/snippet}
-        </FormControl>
-
-        <Spacer size="0.75rem" />
-
-        {#if onDuplicateBox}
+        <section class="boxSection">
+          <div class="sectionHeader">
+            <h4 class="sectionTitle">Options</h4>
+          </div>
+          <Spacer size="0.5rem" />
+          <div class="formGrid">
+            <FormControl label="Tolerance" name="tolerance">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={selectedBox.tolerance}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Wall" name="wallThickness">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  value={selectedBox.wallThickness}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  value={selectedBox.floorThickness}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min={minimums.minWidth}
+                  value={selectedBox.customWidth ?? ''}
+                  onchange={(e) => {
+                    const v = (e.target as HTMLInputElement).value.trim();
+                    onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
+                  }}
+                  placeholder="Auto"
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Depth (min: {minimums.minDepth.toFixed(1)})" name="customDepth">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min={minimums.minDepth}
+                  value={selectedBox.customDepth ?? ''}
+                  onchange={(e) => {
+                    const v = (e.target as HTMLInputElement).value.trim();
+                    onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
+                  }}
+                  placeholder="Auto"
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl
+              label="Total Height (min: {minTotalHeight.toFixed(1)})"
+              name="customBoxHeight"
+              class="formGrid__spanTwo"
+            >
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min={minTotalHeight}
+                  value={displayTotalHeight ?? ''}
+                  onchange={(e) => {
+                    const v = (e.target as HTMLInputElement).value.trim();
+                    // Convert total height to box-only height by subtracting lid
+                    const boxHeight = v ? parseFloat(v) - lidHeight : undefined;
+                    onUpdateBox({ customBoxHeight: boxHeight });
+                  }}
+                  placeholder="Auto"
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+          </div>
+          <Spacer size="1rem" />
+          <InputCheckbox
+            label="Auto-adjust height to layer"
+            checked={selectedBox.autoHeight ?? true}
+            onchange={(e) => onUpdateBox({ autoHeight: e.currentTarget.checked })}
+          />
+          <Spacer size="1rem" />
           <div class="buttonRow">
-            <button class="secondaryButton" type="button" onclick={() => selectedBox && onDuplicateBox(selectedBox.id)}>
-              Duplicate box
+            <button class="secondaryButton boxActionButton boxActionButton--danger" onclick={() => onAdaptToGap?.()}>
+              Adapt to gap
             </button>
           </div>
-          <Spacer size="0.75rem" />
-        {/if}
+          <Text color="var(--fgMuted)" size="0.875rem">
+            {adaptToGapHelpText}
+          </Text>
+          <Spacer size="1rem" />
+          <div class="sectionHeader">
+            <h4 class="sectionTitle sectionTitle--featured">Box Size</h4>
+            {#if boxDimensions}
+              <span class="dimensionsInfo">
+                {boxDimensions.width.toFixed(1)} × {boxDimensions.depth.toFixed(1)} × {boxDimensions.height.toFixed(1)} mm
+              </span>
+            {/if}
+          </div>
+        </section>
 
-        <div class="formGrid">
-          <FormControl label="Tolerance" name="tolerance">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.1"
-                min="0"
-                value={selectedBox.tolerance}
-                onchange={(e) =>
-                  onUpdateBox({
-                    tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
-                  })}
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-          <FormControl label="Wall" name="wallThickness">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.5"
-                min="1"
-                value={selectedBox.wallThickness}
-                onchange={(e) =>
-                  onUpdateBox({
-                    wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-                  })}
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-          <FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.5"
-                min="1"
-                value={selectedBox.floorThickness}
-                onchange={(e) =>
-                  onUpdateBox({
-                    floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-                  })}
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-        </div>
-      </div>
+        <Hr class="boxDivider" />
 
-      <Hr />
-
-      <div class="panelFormSection">
-        <!-- Box Size -->
-        <div class="sectionHeader">
-          <h4 class="sectionTitle">Box Size</h4>
-          {#if boxDimensions}
-            <span class="dimensionsInfo">
-              {boxDimensions.width.toFixed(1)} × {boxDimensions.depth.toFixed(1)} × {boxDimensions.height.toFixed(1)} mm
-            </span>
-          {/if}
-        </div>
-        <Spacer size="0.5rem" />
-        <div class="buttonRow">
-          <button class="secondaryButton" onclick={() => onAdaptToGap?.()}>
-            Adapt to gap
-          </button>
-        </div>
-        <Text color="var(--fgMuted)" size="0.875rem">
-          {adaptToGapHelpText}
-        </Text>
-        <Spacer size="0.5rem" />
-        <InputCheckbox
-          label="Auto-adjust height to layer"
-          checked={selectedBox.autoHeight ?? true}
-          onchange={(e) => onUpdateBox({ autoHeight: e.currentTarget.checked })}
-        />
-        <Spacer size="0.5rem" />
-
-        <div class="formGrid">
-          <FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.5"
-                min={minimums.minWidth}
-                value={selectedBox.customWidth ?? ''}
-                onchange={(e) => {
-                  const v = (e.target as HTMLInputElement).value.trim();
-                  onUpdateBox({ customWidth: v ? parseFloat(v) : undefined });
-                }}
-                placeholder="Auto"
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-          <FormControl label="Depth (min: {minimums.minDepth.toFixed(1)})" name="customDepth">
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.5"
-                min={minimums.minDepth}
-                value={selectedBox.customDepth ?? ''}
-                onchange={(e) => {
-                  const v = (e.target as HTMLInputElement).value.trim();
-                  onUpdateBox({ customDepth: v ? parseFloat(v) : undefined });
-                }}
-                placeholder="Auto"
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-          <FormControl
-            label="Total Height (min: {minTotalHeight.toFixed(1)})"
-            name="customBoxHeight"
-            class="formGrid__spanTwo"
-          >
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                step="0.5"
-                min={minTotalHeight}
-                value={displayTotalHeight ?? ''}
-                onchange={(e) => {
-                  const v = (e.target as HTMLInputElement).value.trim();
-                  // Convert total height to box-only height by subtracting lid
-                  const boxHeight = v ? parseFloat(v) - lidHeight : undefined;
-                  onUpdateBox({ customBoxHeight: boxHeight });
-                }}
-                placeholder="Auto"
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-        </div>
-      </div>
-
-      <Hr />
-
-      <div class="panelFormSection">
-        <div class="sectionHeader">
-          <h4 class="sectionTitle">Print options</h4>
-        </div>
-        <Spacer size="0.5rem" />
-        <InputCheckbox
-          checked={selectedBox.fillSolidEmpty ?? false}
-          onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
-          label="Fill empty space solid"
-        />
-        <Spacer size="0.5rem" />
-        <InputCheckbox
-          checked={selectedBox.lidParams?.honeycombEnabled ?? false}
-          onchange={(e) => {
-            const enabled = (e.target as HTMLInputElement).checked;
-            onUpdateBox({
-              lidParams: {
-                ...selectedBox.lidParams,
-                honeycombEnabled: enabled,
-                // Turn off emboss when honeycomb is enabled
-                showName: enabled ? false : (selectedBox.lidParams?.showName ?? true)
-              }
-            });
-          }}
-          label="Honeycomb for lid and box bottom"
-        />
-        <Spacer size="0.5rem" />
-        <span class={selectedBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+        <section class="boxSection">
+          <div class="sectionHeader">
+            <h4 class="sectionTitle">Print options</h4>
+          </div>
+          <Spacer size="0.5rem" />
           <InputCheckbox
-            checked={!selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
-            disabled={selectedBox.lidParams?.honeycombEnabled ?? false}
-            onchange={(e) =>
+            checked={selectedBox.fillSolidEmpty ?? false}
+            onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
+            label="Fill empty space solid"
+          />
+          <Spacer size="0.5rem" />
+          <InputCheckbox
+            checked={selectedBox.lidParams?.honeycombEnabled ?? false}
+            onchange={(e) => {
+              const enabled = (e.target as HTMLInputElement).checked;
               onUpdateBox({
                 lidParams: {
                   ...selectedBox.lidParams,
-                  showName: (e.target as HTMLInputElement).checked
+                  honeycombEnabled: enabled,
+                  // Turn off emboss when honeycomb is enabled
+                  showName: enabled ? false : (selectedBox.lidParams?.showName ?? true)
                 }
-              })}
-            label="Show name on lid top"
+              });
+            }}
+            label="Honeycomb for lid and box bottom"
           />
-        </span>
-        {#if !selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
           <Spacer size="0.5rem" />
-          <FormControl label="Text mode" name="lidTextMode">
-            {#snippet input()}
-              <Select
-                selected={[selectedBox.lidParams?.textMode ?? 'emboss']}
-                options={lidTextModeOptions}
-                onSelectedChange={(selected) =>
-                  onUpdateBox({
-                    lidParams: {
-                      ...selectedBox.lidParams,
-                      textMode: (selected[0] as 'emboss' | 'inlay') ?? 'emboss'
-                    }
-                  })}
-              />
-            {/snippet}
-          </FormControl>
-        {/if}
-        {#if selectedBox.lidParams?.honeycombEnabled}
-          <Spacer size="0.5rem" />
-          <Text color="var(--fgMuted)" size="0.875rem">
-            Lid text is disabled when honeycomb pattern is enabled
-          </Text>
+          <span class={selectedBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+            <InputCheckbox
+              checked={!selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
+              disabled={selectedBox.lidParams?.honeycombEnabled ?? false}
+              onchange={(e) =>
+                onUpdateBox({
+                  lidParams: {
+                    ...selectedBox.lidParams,
+                    showName: (e.target as HTMLInputElement).checked
+                  }
+                })}
+              label="Show name on lid top"
+            />
+          </span>
+          {#if !selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
+            <Spacer size="0.5rem" />
+            <FormControl label="Text mode" name="lidTextMode">
+              {#snippet input()}
+                <Select
+                  selected={[selectedBox.lidParams?.textMode ?? 'emboss']}
+                  options={lidTextModeOptions}
+                  onSelectedChange={(selected) =>
+                    onUpdateBox({
+                      lidParams: {
+                        ...selectedBox.lidParams,
+                        textMode: (selected[0] as 'emboss' | 'inlay') ?? 'emboss'
+                      }
+                    })}
+                />
+              {/snippet}
+            </FormControl>
+          {/if}
+          {#if selectedBox.lidParams?.honeycombEnabled}
+            <Spacer size="0.5rem" />
+            <Text color="var(--fgMuted)" size="0.875rem">
+              Lid text is disabled when honeycomb pattern is enabled
+            </Text>
+          {/if}
+        </section>
+
+        {#if onDuplicateBox}
+          <Hr class="boxDivider" />
+
+          <section class="boxSection">
+            <div class="buttonRow">
+              <button
+                class="secondaryButton boxActionButton boxActionButton--info"
+                type="button"
+                onclick={() => selectedBox && onDuplicateBox(selectedBox.id)}
+              >
+                Duplicate box
+              </button>
+            </div>
+          </section>
         {/if}
       </div>
     </div>
@@ -510,6 +517,24 @@
     padding: 0 0.75rem;
   }
 
+  .boxForm {
+    padding-top: 0.75rem;
+  }
+
+  .boxSection {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.boxDivider) {
+    display: block;
+    height: 1px;
+    min-height: 1px;
+    margin: 2rem 0 1.55rem;
+    border: 0;
+    background: var(--contrastMedium);
+  }
+
   .formGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -540,6 +565,12 @@
     margin-bottom: 0;
   }
 
+  .sectionTitle--featured {
+    color: var(--fg);
+    font-size: 0.875rem;
+    letter-spacing: 0.025em;
+  }
+
   .dimensionsInfo {
     font-size: 0.75rem;
     color: var(--fgMuted);
@@ -555,14 +586,50 @@
     border: var(--borderThin);
     border-radius: var(--radius-2);
     background: var(--contrastLow);
-    color: #000;
+    color: var(--fg);
     cursor: pointer;
     padding: 0.4rem 0.75rem;
     font: inherit;
+    min-width: 0;
+    flex: 1 1 8.5rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 
   .secondaryButton:hover {
     background: var(--contrastMedium);
+  }
+
+  .boxActionButton {
+    justify-content: center;
+    background: var(--contrastLow);
+    border-color: var(--contrastMedium);
+    font-weight: 600;
+  }
+
+  .boxActionButton:hover {
+    background: var(--contrastMedium);
+  }
+
+  .boxActionButton--danger {
+    border-color: #a63b2d;
+    background: #c9503c;
+    color: #fff;
+  }
+
+  .boxActionButton--danger:hover {
+    background: #a63b2d;
+  }
+
+  .boxActionButton--info {
+    border-color: #1d4ed8;
+    background: #2563eb;
+    color: #fff;
+  }
+
+  .boxActionButton--info:hover {
+    background: #1d4ed8;
   }
 
   .emptyState {

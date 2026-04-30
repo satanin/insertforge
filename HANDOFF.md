@@ -27,6 +27,7 @@ pnpm run check
 - Regla nueva para iteraciones:
   - cada fix o nueva funcionalidad debe intentar anadir o actualizar tests en la misma iteracion para cubrir la regresion o el flujo nuevo
   - empezar por tests pequenos y de alto valor antes que por cobertura amplia
+  - para mejoras visuales/UX pequenas, agrupar el bump de version por conjunto coherente de cambios, no necesariamente por cada ajuste o micro-fix dentro de la misma iteracion
 
 ## Nota de ramas
 
