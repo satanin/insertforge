@@ -1,4 +1,5 @@
 import defaultProjectJson from '$lib/data/defaultProject.json';
+import { APP_VERSION } from '$lib/appInfo';
 import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
@@ -1159,6 +1160,31 @@ function createDefaultProject(): Project {
     boards: layer.boards ?? []
   }));
   return project;
+}
+
+function createBlankProject(): Project {
+  const bottomLayer = createDefaultLayer('Bottom layer');
+
+  return {
+    schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    name: DEFAULT_PROJECT_NAME,
+    layers: [bottomLayer],
+    counterShapes: DEFAULT_COUNTER_SHAPES.map((shape) => ({ ...shape })),
+    cardSizes: DEFAULT_CARD_SIZES.map((size) => ({ ...size })),
+    selectedLayerId: bottomLayer.id,
+    selectedBoxId: null,
+    selectedTrayId: null,
+    selectedBoardId: null,
+    selectedLayeredBoxId: null,
+    selectedLayeredBoxLayerId: null,
+    selectedLayeredBoxSectionId: null,
+    globalSettings: {
+      gameContainerWidth: 150,
+      gameContainerDepth: 200,
+      gameContainerHeight: null
+    }
+  };
 }
 
 // Reactive state
@@ -3327,6 +3353,11 @@ export function updateTileTrayParams(trayId: string, params: TileTrayParams): vo
 // Reset project
 export function resetProject(): void {
   project = createDefaultProject();
+  autosave();
+}
+
+export function resetProjectToBlank(): void {
+  project = createBlankProject();
   autosave();
 }
 

@@ -14,6 +14,7 @@ import {
   importProject,
   moveTray,
   resetProject,
+  resetProjectToBlank,
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
   selectLayeredBoxSection,
@@ -223,6 +224,39 @@ describe('project store global settings', () => {
     updateGlobalSettings({ gameContainerHeight: null });
 
     expect(getGlobalSettings().gameContainerHeight).toBeNull();
+  });
+});
+
+describe('project store blank reset', () => {
+  beforeEach(() => {
+    resetProject();
+  });
+
+  it('clears items and restores project-level defaults for a new project', () => {
+    updateProjectName('Long Campaign Insert');
+    updateGlobalSettings({ gameContainerWidth: 300, gameContainerDepth: 220, gameContainerHeight: 80 });
+    resetProjectToBlank();
+
+    const project = getProject();
+
+    expect(project.name).toBe('InsertForge Project');
+    expect(project.layers).toHaveLength(1);
+    expect(project.layers[0].name).toBe('Bottom layer');
+    expect(project.layers[0].boxes).toEqual([]);
+    expect(project.layers[0].layeredBoxes).toEqual([]);
+    expect(project.layers[0].looseTrays).toEqual([]);
+    expect(project.layers[0].boards).toEqual([]);
+    expect(project.selectedLayerId).toBe(project.layers[0].id);
+    expect(project.selectedBoxId).toBeNull();
+    expect(project.selectedTrayId).toBeNull();
+    expect(project.globalSettings).toEqual({
+      gameContainerWidth: 150,
+      gameContainerDepth: 200,
+      gameContainerHeight: null
+    });
+    expect(project.counterShapes.length).toBeGreaterThan(0);
+    expect(project.cardSizes.length).toBeGreaterThan(0);
+    expect(project.appVersion).toBe(APP_VERSION);
   });
 });
 

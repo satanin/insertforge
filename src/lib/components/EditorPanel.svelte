@@ -108,6 +108,7 @@
     gameContainerHeight?: number;
     onForceRegenerate?: () => void;
     onSelectionChange?: (type: SelectionType) => void;
+    onResetProject?: () => void;
   }
 
   let {
@@ -117,7 +118,8 @@
     gameContainerDepth = 256,
     gameContainerHeight = 70,
     onForceRegenerate,
-    onSelectionChange
+    onSelectionChange,
+    onResetProject
   }: Props = $props();
 
   // Layout editor dimensions
@@ -648,6 +650,7 @@
           effectiveGameContainerHeight={gameContainerHeight}
           onProjectNameChange={handleProjectNameChange}
           onGlobalSettingsChange={handleGlobalSettingsChange}
+          {onResetProject}
         />
       {:else if selectionType === 'layer'}
         {#if selectedLayer}

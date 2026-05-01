@@ -63,7 +63,7 @@
     getProject,
     getGlobalSettings,
     importProject,
-    resetProject,
+    resetProjectToBlank,
     getTrayLetterById,
     getAllBoxes,
     getAllLayeredBoxes,
@@ -2436,10 +2436,41 @@
     }
   });
 
+  function clearGeneratedGeometry() {
+    selectedTrayGeometry = null;
+    selectedTrayCounters = [];
+    allTrayGeometries = [];
+    allBoxGeometries = [];
+    allLooseTrayGeometries = [];
+    boxGeometry = null;
+    lidGeometry = null;
+    error = '';
+    isDirty = false;
+    lastGeneratedHash = '';
+    generationProgress = null;
+    generating = false;
+  }
+
+  function handleResetProjectToBlank() {
+    const confirmed = confirm(
+      'Reset project and start from scratch?\n\nThis will permanently clear all layers, boxes, trays, boards, and reset the project name and game container dimensions.\n\nConsider exporting your current project JSON before resetting.'
+    );
+
+    if (!confirmed) return;
+
+    resetProjectToBlank();
+    clearGeneratedGeometry();
+    selectionType = 'dimensions';
+    viewModeOverride = null;
+    addToast({
+      title: 'Project reset',
+      body: 'The project is now blank. Use Add layer to start a new insert.',
+      type: 'success'
+    });
+  }
+
   function handleReset() {
-    if (confirm('Reset project to defaults? This will delete all boxes and trays.')) {
-      resetProject();
-    }
+    handleResetProjectToBlank();
   }
 
   // Layout Editor handlers - use $derived.by() to properly track reactive reads from store
@@ -3079,6 +3110,7 @@
           {gameContainerHeight}
           onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
+          onResetProject={handleResetProjectToBlank}
         />
       </div>
     </Pane>
@@ -3392,6 +3424,7 @@
           {gameContainerHeight}
           onSelectionChange={handleSelectionChange}
           onForceRegenerate={() => regenerate(true)}
+          onResetProject={handleResetProjectToBlank}
         />
       </Pane>
     {/if}

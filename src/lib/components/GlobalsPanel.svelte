@@ -41,6 +41,7 @@
       gameContainerDepth?: number;
       gameContainerHeight?: number | null;
     }) => void;
+    onResetProject?: () => void;
   }
 
   let {
@@ -48,7 +49,8 @@
     globalSettings,
     effectiveGameContainerHeight,
     onProjectNameChange,
-    onGlobalSettingsChange
+    onGlobalSettingsChange,
+    onResetProject
   }: Props = $props();
 
   // Track which counter is expanded (null = none)
@@ -417,6 +419,21 @@
         calculations. Leave height empty to use the current stacked layer height automatically.
       </Text>
     </section>
+
+    {#if onResetProject}
+      <Hr />
+
+      <section class="section dangerSection">
+        <h3 class="sectionTitle">Reset Project</h3>
+        <Text size="0.875rem" color="var(--fgMuted)">
+          Clear all layers, boxes, trays, boards, and reset the project name and game container dimensions.
+        </Text>
+        <Spacer size="0.75rem" />
+        <Button class="resetProjectButton" variant="danger" onclick={onResetProject}>
+          Reset project
+        </Button>
+      </section>
+    {/if}
   {:else if activeTab === 'counters'}
     <section class="section">
     <h3 class="sectionTitle">Counters</h3>
@@ -1233,6 +1250,23 @@
     font-size: 0.75rem;
     line-height: 1.4;
     color: var(--fgMuted);
+  }
+
+  .dangerSection {
+    padding-bottom: 0.25rem;
+  }
+
+  :global(.resetProjectButton) {
+    width: 100%;
+    justify-content: center;
+    border-color: #a63b2d !important;
+    background: #c9503c !important;
+    color: #fff !important;
+    font-weight: 700;
+  }
+
+  :global(.resetProjectButton:hover) {
+    background: #a63b2d !important;
   }
 
   .customShapesList {
