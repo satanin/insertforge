@@ -307,6 +307,9 @@ interface GenerateMessage {
   };
   selectedBoxId: string;
   selectedTrayId: string;
+  selectedLayerId?: string;
+  scope?: 'selected' | 'layer' | 'all';
+  selectedView?: 'tray' | 'assembly';
 }
 
 interface ExportStlMessage {
@@ -779,7 +782,7 @@ function findTrayById(layers: Layer[], trayId: string): Tray | undefined {
  * Generate all geometries for the project
  */
 function handleGenerate(msg: GenerateMessage): void {
-  const { id, project, selectedBoxId, selectedTrayId } = msg;
+  const { id, project, selectedBoxId, selectedTrayId, selectedLayerId, scope = 'all', selectedView = 'assembly' } = msg;
   const timings: { name: string; ms: number }[] = [];
   const time = (name: string, fn: () => void) => {
     const start = performance.now();
@@ -805,7 +808,19 @@ function handleGenerate(msg: GenerateMessage): void {
     const layerHeights = new Map<string, number>();
     const boxPlacementHeights = new Map<string, number>();
     const looseTrayPlacementHeights = new Map<string, number>();
-    for (const layer of project.layers) {
+    const layersForHeight =
+      scope === 'all'
+        ? project.layers
+        : project.layers.filter(
+            (layer) =>
+              (scope === 'layer' && selectedLayerId && layer.id === selectedLayerId) ||
+              (selectedBoxId && layer.boxes.some((entry) => entry.id === selectedBoxId)) ||
+              (selectedTrayId &&
+                (layer.looseTrays.some((entry) => entry.id === selectedTrayId) ||
+                  layer.boxes.some((entry) => entry.trays.some((tray) => tray.id === selectedTrayId))))
+          );
+
+    for (const layer of layersForHeight) {
       const arrangement = arrangeLayerContents(layer, {
         gameContainerWidth,
         gameContainerDepth,
@@ -894,46 +909,76 @@ function handleGenerate(msg: GenerateMessage): void {
         cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
         selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
         selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
+        cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
+
+        if (scope === 'selected' && selectedView === 'tray') {
+          const selectedPlacement = placements.find((placement) => placement.tray.id === tray.id);
+          if (selectedPlacement) {
+            allTrayGeometries = [
+              {
+                trayId: tray.id,
+                name: tray.name,
+                color: tray.color,
+                geometry: selectedTrayGeometry,
+                placement: {
+                  ...selectedPlacement,
+                  dimensions: {
+                    ...selectedPlacement.dimensions,
+                    height: selectedTargetHeight
+                  }
+                },
+                counterStacks: selectedTrayCounters,
+                trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, tray.id))
+              }
+            ];
+          }
+        }
       }
 
-      // Generate all trays for selected box
-      cachedAllTrays = [];
-      allTrayGeometries = placements.map((placement) => {
-        const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
-        const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, maxHeight);
-        const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
-        let jscadGeom!: Geom3;
-        time(`createTray (${placement.tray.name})`, () => {
-          jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
+      if (scope !== 'selected' || selectedView !== 'tray') {
+        // Generate all trays for selected box
+        cachedAllTrays = [];
+        allTrayGeometries = placements.map((placement) => {
+          const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
+          const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, maxHeight);
+          const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
+          let jscadGeom!: Geom3;
+          time(`createTray (${placement.tray.name})`, () => {
+            jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
+          });
+
+          cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
+
+          return {
+            trayId: placement.tray.id,
+            name: placement.tray.name,
+            color: placement.tray.color,
+            geometry: jscadToArrays(jscadGeom),
+            placement: {
+              ...placement,
+              dimensions: {
+                ...placement.dimensions,
+                height: trayTargetHeight
+              }
+            },
+            counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
+            trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
+          };
         });
 
-        cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
-
-        return {
-          trayId: placement.tray.id,
-          name: placement.tray.name,
-          color: placement.tray.color,
-          geometry: jscadToArrays(jscadGeom),
-          placement: {
-            ...placement,
-            dimensions: {
-              ...placement.dimensions,
-              height: trayTargetHeight
-            }
-          },
-          counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
-          trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
-        };
-      });
-
-      // Generate box and lid - pass layer height so box exterior matches layer
-      time(`createBoxWithLidGrooves (${box.name})`, () => {
-        cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedBoxTargetLayerHeight);
-      });
-      time(`createLid (${box.name})`, () => {
-        cachedLid = createLid(box, cardSizes, counterShapes);
-      });
-      cachedBoxName = box.name;
+        // Generate box and lid - pass layer height so box exterior matches layer
+        time(`createBoxWithLidGrooves (${box.name})`, () => {
+          cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedBoxTargetLayerHeight);
+        });
+        time(`createLid (${box.name})`, () => {
+          cachedLid = createLid(box, cardSizes, counterShapes);
+        });
+        cachedBoxName = box.name;
+      } else {
+        cachedBox = null;
+        cachedLid = null;
+        cachedBoxName = '';
+      }
 
       boxGeometry = cachedBox ? jscadToArrays(cachedBox) : null;
       lidGeometry = cachedLid ? jscadToArrays(cachedLid) : null;
@@ -987,12 +1032,52 @@ function handleGenerate(msg: GenerateMessage): void {
       cachedBoxName = '';
     }
 
-    // Get all boxes from all layers
-    const allBoxes = getAllBoxes(project.layers);
-    const allLayeredBoxes = getAllLayeredBoxes(project.layers);
+    if (scope === 'selected') {
+      const transferableSet = new Set<ArrayBuffer>();
+
+      transferableSet.add(selectedTrayGeometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(selectedTrayGeometry.normals.buffer as ArrayBuffer);
+
+      for (const tray of allTrayGeometries) {
+        transferableSet.add(tray.geometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(tray.geometry.normals.buffer as ArrayBuffer);
+      }
+
+      if (boxGeometry) {
+        transferableSet.add(boxGeometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(boxGeometry.normals.buffer as ArrayBuffer);
+      }
+
+      if (lidGeometry) {
+        transferableSet.add(lidGeometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(lidGeometry.normals.buffer as ArrayBuffer);
+      }
+
+      const result: GenerateResult = {
+        type: 'generate-result',
+        id,
+        selectedTrayGeometry,
+        selectedTrayCounters,
+        allTrayGeometries,
+        boxGeometry,
+        lidGeometry,
+        allBoxGeometries: [],
+        allLooseTrayGeometries: []
+      };
+
+      self.postMessage(result, { transfer: Array.from(transferableSet) });
+      return;
+    }
+
+    const generationLayers =
+      scope === 'layer' && selectedLayerId ? project.layers.filter((layer) => layer.id === selectedLayerId) : project.layers;
+
+    // Get all boxes from the requested render scope
+    const allBoxes = getAllBoxes(generationLayers);
+    const allLayeredBoxes = getAllLayeredBoxes(generationLayers);
 
     // Count all loose trays for progress tracking
-    const allLooseTrays = project.layers.flatMap((layer) => layer.looseTrays);
+    const allLooseTrays = generationLayers.flatMap((layer) => layer.looseTrays);
     const totalOperations = allBoxes.length + allLayeredBoxes.length + allLooseTrays.length;
     let currentOperation = 0;
 
@@ -1196,7 +1281,7 @@ function handleGenerate(msg: GenerateMessage): void {
     cachedAllLooseTrays = [];
     const allLooseTrayGeometries: LooseTrayGeometryResult[] = [];
 
-    for (const layer of project.layers) {
+    for (const layer of generationLayers) {
       // Get the unified layer height - loose trays match box exterior height
       const layerHeight = layerHeights.get(layer.id) ?? 0;
 

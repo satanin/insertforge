@@ -94,6 +94,9 @@ interface GenerationProgressMessage {
   currentItem: string;
 }
 
+export type GenerationScope = 'selected' | 'layer' | 'all';
+export type SelectedGenerationView = 'tray' | 'assembly';
+
 export interface GenerationProgress {
   current: number;
   total: number;
@@ -241,7 +244,10 @@ export class GeometryWorkerManager {
     project: Project,
     selectedBoxId: string,
     selectedTrayId: string,
-    onProgress?: (progress: GenerationProgress) => void
+    onProgress?: (progress: GenerationProgress) => void,
+    scope: GenerationScope = 'all',
+    selectedView: SelectedGenerationView = 'assembly',
+    selectedLayerId = ''
   ): Promise<GenerationResult> {
     if (!this.worker) {
       await this.init();
@@ -314,7 +320,10 @@ export class GeometryWorkerManager {
         id,
         project: plainProject,
         selectedBoxId,
-        selectedTrayId
+        selectedTrayId,
+        scope,
+        selectedView,
+        selectedLayerId
       });
     });
   }
