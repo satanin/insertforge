@@ -407,15 +407,23 @@
   <!-- Tray Settings -->
   {#if selectedTray}
     <div class="panelForm">
-      {#if isCounterTray(selectedTray) || isCardDividerTray(selectedTray)}
-        <div class="trayEditorTabs" role="tablist" aria-label={isCounterTray(selectedTray) ? 'Counter tray sections' : 'Card divider sections'}>
+      {#if isCounterTray(selectedTray) || isCardDividerTray(selectedTray) || isMiniatureRackTray(selectedTray)}
+        <div
+          class="trayEditorTabs"
+          role="tablist"
+          aria-label={isCounterTray(selectedTray)
+            ? 'Counter tray sections'
+            : isCardDividerTray(selectedTray)
+              ? 'Card divider sections'
+              : 'Miniature rack sections'}
+        >
           <button
             class:active={activeStackedTrayTab === 'tray'}
             role="tab"
             aria-selected={activeStackedTrayTab === 'tray'}
             onclick={() => (activeStackedTrayTab = 'tray')}
           >
-            Tray
+            {isMiniatureRackTray(selectedTray) ? 'Rack' : 'Tray'}
           </button>
           <button
             class:active={activeStackedTrayTab === 'contents'}
@@ -423,12 +431,12 @@
             aria-selected={activeStackedTrayTab === 'contents'}
             onclick={() => (activeStackedTrayTab = 'contents')}
           >
-            {isCounterTray(selectedTray) ? 'Counters' : 'Card Stacks'}
+            {isCounterTray(selectedTray) ? 'Counters' : isCardDividerTray(selectedTray) ? 'Card Stacks' : 'Slots'}
           </button>
         </div>
       {/if}
 
-      {#if (!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray)) || activeStackedTrayTab === 'tray'}
+      {#if (!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray) && !isMiniatureRackTray(selectedTray)) || activeStackedTrayTab === 'tray'}
         <div class="panelFormSection trayForm">
           <section class="traySection">
             <div class="sectionHeader">
@@ -567,6 +575,7 @@
           onUpdateParams={onUpdateMiniatureRackParams}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
+          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'slots'}
         />
       {:else if isTileTray(selectedTray) && onUpdateTileTrayParams}
         <TileTrayEditor
@@ -578,7 +587,7 @@
         />
       {/if}
 
-      {#if onDuplicateTray && ((!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray)) || activeStackedTrayTab === 'tray')}
+      {#if onDuplicateTray && ((!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray) && !isMiniatureRackTray(selectedTray)) || activeStackedTrayTab === 'tray')}
         <Hr class="trayDivider" />
 
         <section class="panelFormSection traySection">

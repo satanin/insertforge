@@ -21,9 +21,10 @@
     onUpdateParams: (params: MiniatureRackParams) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
+    renderMode?: 'all' | 'settings' | 'slots';
   }
 
-  let { tray, onUpdateParams, actualHeight, displayDimensions }: Props = $props();
+  let { tray, onUpdateParams, actualHeight, displayDimensions, renderMode = 'all' }: Props = $props();
 
   let dimensions = $derived.by(() => {
     if (displayDimensions) return displayDimensions;
@@ -56,10 +57,11 @@
   }
 </script>
 
+{#if renderMode === 'all' || renderMode === 'settings'}
 <div class="panelFormSection">
   <section class="section">
     <div class="sectionHeader">
-      <h3 class="sectionTitle">Rack Settings</h3>
+      <h3 class="sectionTitle sectionTitle--featured">Rack Settings</h3>
       <span class="dimensionsInfo">
         {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
       </span>
@@ -200,8 +202,14 @@
       Rack Base Depth controls how far the lower shelf extends forward. The minimum depth scales with rack height to keep the rack stable.
     </Text>
   </section>
+</div>
+{/if}
 
+{#if renderMode === 'all' || renderMode === 'slots'}
+<div class="panelFormSection">
+  {#if renderMode === 'all'}
   <Spacer size="0.5rem" />
+  {/if}
 
   <section class="section">
     <h3 class="sectionTitle">Slots</h3>
@@ -318,6 +326,7 @@
     </div>
   </section>
 </div>
+{/if}
 
 <style>
   .panelFormSection {
@@ -346,6 +355,12 @@
 
   .sectionHeader .sectionTitle {
     margin-bottom: 0;
+  }
+
+  :global(.sectionTitle--featured) {
+    color: var(--fg);
+    font-size: 0.875rem;
+    letter-spacing: 0.025em;
   }
 
   .dimensionsInfo {
