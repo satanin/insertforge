@@ -364,6 +364,7 @@
   let selectionType = $state<SelectionType>('dimensions');
   let viewModeOverride = $state<ViewMode | null>(null);
   let viewMode = $derived(viewModeOverride ?? getViewModeForSelection(selectionType));
+  let renderedViewMode = $state<ViewMode>('all-no-lid');
   let isEditorCollapsed = $state(false);
   let editorPane = $state<PaneAPI>();
   let mobileNavPane = $state<PaneAPI>();
@@ -383,12 +384,12 @@
     const counterShapes = project.counterShapes || [];
     const cardSizes = project.cardSizes || [];
     const geometries: LayeredBoxGeometryData[] = [];
-    const shouldRenderAllLayeredBoxes = viewMode === 'all-no-lid';
+    const shouldRenderAllLayeredBoxes = renderedViewMode === 'all-no-lid';
     const selectedLayeredBoxId = project.selectedLayeredBoxId ?? null;
     const selectedLayerId = project.selectedLayerId ?? null;
 
     for (const layer of project.layers) {
-      if (!shouldRenderAllLayeredBoxes && viewMode === 'layer' && selectedLayerId && layer.id !== selectedLayerId) {
+      if (!shouldRenderAllLayeredBoxes && renderedViewMode === 'layer' && selectedLayerId && layer.id !== selectedLayerId) {
         continue;
       }
 
@@ -402,7 +403,7 @@
           continue;
         }
 
-        if (!shouldRenderAllLayeredBoxes && viewMode !== 'layer') {
+        if (!shouldRenderAllLayeredBoxes && renderedViewMode !== 'layer') {
           continue;
         }
 
@@ -608,6 +609,14 @@
   let exporting3mf = $state(false);
   let captureTrayLetter = $state<string | null>(null); // Override during PDF export
   let debugExporting = $state(false);
+  let viewPreparing = $state(false);
+  let sceneGenerating = $derived.by(() => {
+    if (!generating) return false;
+    if (renderedViewMode === 'all-no-lid' && renderedGeometryScope === 'all') return false;
+    if (renderedViewMode === 'layer' && renderedGeometryScope === 'layer') return false;
+    return true;
+  });
+  let isViewPending = $derived(viewPreparing || (generating && renderedViewMode !== viewMode));
 
   // Debug mode URL params for Playwright capture
   interface DebugParams {
@@ -909,7 +918,7 @@
 
   // Compute layer arrangement when in layer view
   let layerArrangement = $derived.by(() => {
-    if (viewMode !== 'layer' || !selectedLayer) return null;
+    if (renderedViewMode !== 'layer' || !selectedLayer) return null;
     const project = getProject();
     return arrangeLayerContents(selectedLayer, {
       gameContainerWidth,
@@ -921,7 +930,7 @@
 
   // Compute arrangements for ALL layers (for stacked view in dimensions mode)
   let allLayerArrangements = $derived.by(() => {
-    if (viewMode !== 'all-no-lid') return [];
+    if (renderedViewMode !== 'all-no-lid') return [];
     const project = getProject();
     return project.layers.map((layer) => ({
       layer: { id: layer.id, name: layer.name },
@@ -986,7 +995,7 @@
     // In layout edit mode, only show trays (no box/lid since layout isn't finalized)
     const inEditMode = isLayoutEditMode;
 
-    switch (viewMode) {
+    switch (renderedViewMode) {
       case 'tray':
         result.tray = selectedTrayGeometry;
         break;
@@ -1100,7 +1109,14 @@
   });
 
   // Handle selection type changes - update view mode accordingly
-  function handleSelectionChange(type: SelectionType) {
+  async function handleSelectionChange(type: SelectionType) {
+    const nextViewMode = getViewModeForSelection(type);
+    const willChangeRenderedView = nextViewMode !== renderedViewMode || type !== selectionType;
+    if (willChangeRenderedView) {
+      viewPreparing = true;
+      await nextAnimationFrame();
+    }
+
     selectionType = type;
     viewModeOverride = null;
   }
@@ -1210,6 +1226,15 @@
   async function refreshExportGeometryCache() {
     const project = getProject();
     return geometryWorker.generate(project, '', '', () => {});
+  }
+
+  function nextAnimationFrame() {
+    return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  function logGeometryTiming(scope: string, phase: string, start: number) {
+    if (!import.meta.env.DEV) return;
+    console.debug(`[Geometry Timing] ${scope} ${phase}: ${(performance.now() - start).toFixed(0)}ms`);
   }
 
   function getLayerForBox(project: Project, boxId: string) {
@@ -1340,6 +1365,36 @@
     }
   }
 
+  function markRenderedViewReady() {
+    renderedViewMode = viewMode;
+    viewPreparing = false;
+  }
+
+  async function useCachedGenerationResult(
+    result: GenerationResult,
+    selectedBox: Box | null,
+    selectedTray: Tray | null,
+    updateGlobalCache: boolean,
+    scope: string
+  ) {
+    if (renderedViewMode !== viewMode) {
+      generating = true;
+      generationProgress = null;
+      error = '';
+      const applyStart = performance.now();
+      await nextAnimationFrame();
+      useGenerationResult(result, selectedBox, selectedTray, updateGlobalCache);
+      markRenderedViewReady();
+      logGeometryTiming(scope, 'cached apply', applyStart);
+      generating = false;
+      generationProgress = null;
+      return;
+    }
+
+    useGenerationResult(result, selectedBox, selectedTray, updateGlobalCache);
+    markRenderedViewReady();
+  }
+
   async function regenerate(force = false) {
     if (!browser) return;
 
@@ -1423,7 +1478,7 @@
     if (generationScope === 'selected' && selectedCacheKey && !force) {
       const cachedSelectedGeometry = selectedGeometryCache.get(selectedCacheKey);
       if (cachedSelectedGeometry) {
-        useGenerationResult(cachedSelectedGeometry, selectedBox, selectedTray, false);
+        await useCachedGenerationResult(cachedSelectedGeometry, selectedBox, selectedTray, false, 'selected');
         lastSelectedGeneratedKey = selectedCacheKey;
         isDirty = false;
         console.debug('[Geometry Cache] Hit for selected geometry');
@@ -1434,7 +1489,7 @@
     if (generationScope === 'layer' && layerCacheKey && !force) {
       const cachedLayerGeometry = layerGeometryCache.get(layerCacheKey);
       if (cachedLayerGeometry) {
-        useGenerationResult(cachedLayerGeometry, selectedBox, selectedTray, true);
+        await useCachedGenerationResult(cachedLayerGeometry, selectedBox, selectedTray, true, 'layer');
         renderedGeometryScope = 'layer';
         isDirty = false;
         console.debug('[Geometry Cache] Hit for layer geometry');
@@ -1443,7 +1498,7 @@
     }
 
     if (generationScope === 'all' && cacheValid && !force && globalGeometryCache?.hash === hashAtGenerationStart) {
-      useGenerationResult(globalGeometryCache.result, selectedBox, selectedTray, true);
+      await useCachedGenerationResult(globalGeometryCache.result, selectedBox, selectedTray, true, 'all');
       renderedGeometryScope = 'all';
       isDirty = false;
       console.debug('[Geometry Cache] Hit for global geometry');
@@ -1563,6 +1618,8 @@
     generating = true;
     generationProgress = null;
     error = '';
+    const generationStart = performance.now();
+    await nextAnimationFrame();
 
     // Clear stale geometry when forcing regeneration (structural changes)
     // This prevents showing old geometry from deleted/moved boxes/trays
@@ -1586,6 +1643,7 @@
     try {
       // Use web worker for geometry generation (handles both boxed and loose trays)
       // Pass empty string for boxId if it's a loose tray - worker handles this case
+      const workerStart = performance.now();
       const result = await geometryWorker.generate(
         project,
         generationScope === 'layer' ? '' : (generationBox?.id ?? ''),
@@ -1597,8 +1655,14 @@
         selectedView,
         selectedLayerId
       );
+      logGeometryTiming(generationScope, 'worker', workerStart);
 
+      const applyStart = performance.now();
+      await nextAnimationFrame();
       useGenerationResult(result, selectedBox, selectedTray, generationScope === 'all' || generationScope === 'layer');
+      markRenderedViewReady();
+      logGeometryTiming(generationScope, 'apply', applyStart);
+      logGeometryTiming(generationScope, 'total', generationStart);
       if (generationScope === 'layer') {
         renderedGeometryScope = 'layer';
       }
@@ -1626,6 +1690,7 @@
       if (!wasSuperseded) {
         generating = false;
         generationProgress = null;
+        viewPreparing = false;
         // Use the hash captured at generation start, not current
         // This prevents marking cache as valid if params changed during generation
         if (generationScope === 'all') {
@@ -2692,6 +2757,8 @@
     lastGeneratedHash = '';
     lastSelectedGeneratedKey = '';
     renderedGeometryScope = '';
+    renderedViewMode = viewMode;
+    viewPreparing = false;
     globalGeometryCache = null;
     selectedGeometryCache.clear();
     layerGeometryCache.clear();
@@ -3148,7 +3215,7 @@
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
-              {generating}
+              generating={sceneGenerating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
               cameraPosition={debugParams.cameraPosition}
@@ -3160,11 +3227,11 @@
           {/await}
         {/if}
 
-        {#if generating && !debugParams.hideUI}
+        {#if (generating || viewPreparing) && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingProgress">
-              <span class="generatingProgress__label">Generating</span>
+              <span class="generatingProgress__label">{isViewPending ? 'Preparing view' : 'Generating'}</span>
               <span class="generatingProgress__name">{generationProgress?.currentItem ?? 'geometry...'}</span>
               {#if generationProgress}
                 <span class="generatingProgress__count">({generationProgress.current}/{generationProgress.total})</span>
@@ -3424,7 +3491,7 @@
               showAllLayers={visibleGeometries.showAllLayers}
               allLayerArrangements={visibleGeometries.allLayerArrangements}
               {allLayersExplosionAmount}
-              {generating}
+              generating={sceneGenerating}
               debugMode={debugParams.debugMode}
               cameraPreset={debugParams.cameraPreset}
               cameraPosition={debugParams.cameraPosition}
@@ -3436,11 +3503,11 @@
           {/await}
         {/if}
 
-        {#if generating && !debugParams.hideUI}
+        {#if (generating || viewPreparing) && !debugParams.hideUI}
           <div class="generatingOverlay">
             <Loader />
             <div class="generatingProgress">
-              <span class="generatingProgress__label">Generating</span>
+              <span class="generatingProgress__label">{isViewPending ? 'Preparing view' : 'Generating'}</span>
               <span class="generatingProgress__name">{generationProgress?.currentItem ?? 'geometry...'}</span>
               {#if generationProgress}
                 <span class="generatingProgress__count">({generationProgress.current}/{generationProgress.total})</span>
