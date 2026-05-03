@@ -5,6 +5,19 @@ import { defaultCardDrawTrayParams } from '$lib/models/cardTray';
 import { createDefaultCardWellTrayParams } from '$lib/models/cardWellTray';
 import { defaultCupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
+import {
+  DEFAULT_MINIATURE_RACK_BASE_DEPTH,
+  DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
+  DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
+  DEFAULT_MINIATURE_RACK_HEIGHT,
+  DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
+  DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
+  DEFAULT_MINIATURE_RACK_RIM_HEIGHT,
+  DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
+  DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
+  createDefaultMiniatureRackSlot
+} from '$lib/models/miniatureRack';
+import { defaultTileTrayParams } from '$lib/models/tileTray';
 import { DEFAULT_CARD_SIZE_IDS, DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
 import type { Box, CardSize, CounterShape, Layer, LayeredBox, LayeredBoxSection } from '$lib/types/project';
 
@@ -359,6 +372,102 @@ describe('layered box layout model', () => {
           autoHeight: false,
           params: {
             ...defaultCupTrayParams
+          }
+        }
+      ],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 100
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    expect(arrangement.looseTrays[0].baseHeight).toBe(100);
+    expect(arrangement.layerHeight).toBeCloseTo(100 + arrangement.looseTrays[0].dimensions.height);
+    expect(arrangement.looseTrays[0].dimensions.height).toBeLessThan(100);
+  });
+
+  it('keeps miniature rack placement at natural height when auto height is disabled', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [
+        {
+          id: 'tray-1',
+          type: 'miniatureRack',
+          name: 'Miniature Rack 1',
+          color: '#c9503c',
+          rotationOverride: 'auto',
+          autoHeight: false,
+          params: {
+            rackHeight: DEFAULT_MINIATURE_RACK_HEIGHT,
+            rackBaseDepth: DEFAULT_MINIATURE_RACK_BASE_DEPTH,
+            wallThickness: DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
+            sideWallThickness: DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
+            railWallThickness: DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
+            railLipInset: DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
+            rimHeight: DEFAULT_MINIATURE_RACK_RIM_HEIGHT,
+            baseWidthTolerance: DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
+            baseHeightTolerance: DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
+            slots: [createDefaultMiniatureRackSlot(1)]
+          }
+        }
+      ],
+      boards: [
+        {
+          id: 'board-1',
+          name: 'Tall Item',
+          color: '#6b7f95',
+          width: 100,
+          depth: 80,
+          height: 100
+        }
+      ]
+    };
+
+    const arrangement = arrangeLayerContents(layer, {
+      gameContainerWidth: 256,
+      gameContainerDepth: 256,
+      cardSizes,
+      counterShapes
+    });
+
+    expect(arrangement.looseTrays[0].baseHeight).toBe(100);
+    expect(arrangement.layerHeight).toBeCloseTo(100 + DEFAULT_MINIATURE_RACK_HEIGHT);
+    expect(arrangement.looseTrays[0].dimensions.height).toBe(DEFAULT_MINIATURE_RACK_HEIGHT);
+  });
+
+  it('keeps tile tray placement at natural height when auto height is disabled', () => {
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Layer 1',
+      boxes: [],
+      layeredBoxes: [],
+      looseTrays: [
+        {
+          id: 'tray-1',
+          type: 'tile',
+          name: 'Tile Tray 1',
+          color: '#c9503c',
+          rotationOverride: 'auto',
+          autoHeight: false,
+          params: {
+            ...defaultTileTrayParams,
+            tileShapeId: DEFAULT_SHAPE_IDS.square
           }
         }
       ],

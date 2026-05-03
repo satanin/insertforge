@@ -516,10 +516,16 @@ function createTrayGeometry(
 }
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
-  const autoHeightEnabled = isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
+  const autoHeightEnabled = isTrayAutoHeightEnabled(tray);
 
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray) || isTileTray(tray)) &&
+    (isCounterTray(tray) ||
+      isCardDividerTray(tray) ||
+      isCardTray(tray) ||
+      isCardWellTray(tray) ||
+      isCupTray(tray) ||
+      isMiniatureRackTray(tray) ||
+      isTileTray(tray)) &&
     !autoHeightEnabled
   ) {
     return naturalHeight;
@@ -528,15 +534,25 @@ function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: 
 }
 
 function getTraySpacerHeight(tray: Tray, adjustedSpacerHeight: number): number {
-  const autoHeightEnabled = isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
+  const autoHeightEnabled = isTrayAutoHeightEnabled(tray);
 
   if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray) || isTileTray(tray)) &&
+    (isCounterTray(tray) ||
+      isCardDividerTray(tray) ||
+      isCardTray(tray) ||
+      isCardWellTray(tray) ||
+      isCupTray(tray) ||
+      isMiniatureRackTray(tray) ||
+      isTileTray(tray)) &&
     !autoHeightEnabled
   ) {
     return 0;
   }
   return adjustedSpacerHeight;
+}
+
+function isTrayAutoHeightEnabled(tray: Tray): boolean {
+  return isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
 }
 
 function getBoxTargetLayerHeight(box: Box, layerHeight: number): number {

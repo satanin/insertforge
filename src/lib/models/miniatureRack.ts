@@ -9,18 +9,22 @@ export interface MiniatureRackSlot {
   label?: string;
   baseWidth: number;
   baseHeight: number;
+  baseVerticalSize?: number | null;
+  miniatureHeight: number;
+  miniatureCount: number;
   lipAngle?: number;
   slotSpacingLeft: number;
   slotSpacingRight: number;
 }
 
 export interface MiniatureRackParams {
-  rackHeight: number;
+  rackHeight: number | null;
   rackBaseDepth: number;
   wallThickness: number;
   sideWallThickness: number;
   railWallThickness: number;
   railLipInset: number;
+  rimHeight: number;
   baseWidthTolerance: number;
   baseHeightTolerance: number;
   slots: MiniatureRackSlot[];
@@ -43,9 +47,11 @@ import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
+export const DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT = 45;
 export const DEFAULT_MINIATURE_RACK_SPACING = 6;
 export const DEFAULT_MINIATURE_RACK_LIP_ANGLE = 45;
 export const DEFAULT_MINIATURE_RACK_HEIGHT = 60;
+export const DEFAULT_MINIATURE_RACK_RIM_HEIGHT = 3;
 export const DEFAULT_MINIATURE_RACK_WALL_THICKNESS = 2;
 export const DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS = 2;
 export const DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS = 1.5;
@@ -53,12 +59,16 @@ export const DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET = 1.5;
 export const DEFAULT_MINIATURE_RACK_BASE_DEPTH = 50;
 export const DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE = 1.8;
 export const DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE = 1;
+export const MAX_MINIATURES_IN_SLOT = 10;
 const MIN_SLOT_BASE_WIDTH = 10;
 const MIN_SLOT_BASE_HEIGHT = 1;
+const MIN_SLOT_MINIATURE_HEIGHT = 1;
+const MIN_MINIATURES_IN_SLOT = 1;
 const MIN_SLOT_LIP_ANGLE = 0;
 const MAX_SLOT_LIP_ANGLE = 80;
 const MIN_SLOT_SPACING = 0;
 const MIN_RACK_HEIGHT = 20;
+const MIN_RIM_HEIGHT = 0;
 const MIN_WALL_THICKNESS = 1;
 const MIN_SIDE_WALL_THICKNESS = 1;
 const MIN_RAIL_WALL_THICKNESS = 1;
@@ -74,16 +84,92 @@ function clampRange(value: number, minimum: number, maximum: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(value, minimum), maximum) : minimum;
 }
 
-export function getMiniatureRackMinimumBaseDepth(height: number): number {
-  return Math.max(MIN_BASE_DEPTH_ABSOLUTE, height * 0.35);
+export function getMiniatureRackMinimumBaseDepth(
+  height: number,
+  miniatureHeight: number = 0,
+  wallThickness: number = DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
+  frontMargin: number = DEFAULT_MINIATURE_RACK_RIM_HEIGHT
+): number {
+  return Math.max(MIN_BASE_DEPTH_ABSOLUTE, height * 0.35, wallThickness + miniatureHeight + frontMargin);
+}
+
+function clampIntegerRange(value: number, minimum: number, maximum: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(Math.floor(value), minimum), maximum) : minimum;
+}
+
+function getSlotBaseVerticalSize(slot: MiniatureRackSlot): number {
+  const legacySlotHeight = (slot as MiniatureRackSlot & { slotHeight?: number | null }).slotHeight;
+  return clampPositive(slot.baseVerticalSize ?? legacySlotHeight ?? slot.baseWidth, MIN_SLOT_BASE_WIDTH);
+}
+
+function getSlotStackHeight(slot: MiniatureRackSlot): number {
+  return (
+    getSlotBaseVerticalSize(slot) *
+    clampIntegerRange(slot.miniatureCount ?? MIN_MINIATURES_IN_SLOT, MIN_MINIATURES_IN_SLOT, MAX_MINIATURES_IN_SLOT)
+  );
+}
+
+export function getMiniatureRackMaxMiniatureHeight(params: MiniatureRackParams): number {
+  return params.slots.length > 0
+    ? Math.max(
+        ...params.slots.map((slot) =>
+          clampPositive(slot.miniatureHeight ?? DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT, MIN_SLOT_MINIATURE_HEIGHT)
+        )
+      )
+    : DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT;
+}
+
+export function getMiniatureRackResolvedHeight(params: MiniatureRackParams): number {
+  if (typeof params.rackHeight === 'number' && Number.isFinite(params.rackHeight)) {
+    return clampPositive(params.rackHeight, MIN_RACK_HEIGHT);
+  }
+  const tallestSlot =
+    params.slots.length > 0 ? Math.max(...params.slots.map((slot) => getSlotStackHeight(slot))) : DEFAULT_MINIATURE_RACK_HEIGHT;
+  const wallThickness = clampPositive(params.wallThickness, MIN_WALL_THICKNESS);
+  const rimHeight = clampPositive(params.rimHeight ?? DEFAULT_MINIATURE_RACK_RIM_HEIGHT, MIN_RIM_HEIGHT);
+  return clampPositive(wallThickness + tallestSlot + rimHeight, MIN_RACK_HEIGHT);
 }
 
 export function normalizeMiniatureRackParams(params: MiniatureRackParams): MiniatureRackParams {
-  const rackHeight = clampPositive(params.rackHeight, MIN_RACK_HEIGHT);
+  const slots =
+    params.slots.length > 0
+      ? params.slots.map((slot) => ({
+          ...slot,
+          baseWidth: clampPositive(slot.baseWidth, MIN_SLOT_BASE_WIDTH),
+          baseHeight: clampPositive(slot.baseHeight, MIN_SLOT_BASE_HEIGHT),
+          baseVerticalSize:
+            (slot.baseVerticalSize ?? (slot as MiniatureRackSlot & { slotHeight?: number | null }).slotHeight) == null
+              ? null
+              : clampPositive(
+                  slot.baseVerticalSize ?? (slot as MiniatureRackSlot & { slotHeight?: number | null }).slotHeight ?? slot.baseWidth,
+                  MIN_SLOT_BASE_WIDTH
+                ),
+          miniatureHeight: clampPositive(
+            slot.miniatureHeight ?? DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT,
+            MIN_SLOT_MINIATURE_HEIGHT
+          ),
+          miniatureCount: clampIntegerRange(
+            slot.miniatureCount ?? MIN_MINIATURES_IN_SLOT,
+            MIN_MINIATURES_IN_SLOT,
+            MAX_MINIATURES_IN_SLOT
+          ),
+          lipAngle: clampRange(slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE, MIN_SLOT_LIP_ANGLE, MAX_SLOT_LIP_ANGLE),
+          slotSpacingLeft: clampPositive(slot.slotSpacingLeft, MIN_SLOT_SPACING),
+          slotSpacingRight: clampPositive(slot.slotSpacingRight, MIN_SLOT_SPACING)
+        }))
+      : [createDefaultMiniatureRackSlot(1)];
+  const rackHeight = params.rackHeight === null ? null : clampPositive(params.rackHeight, MIN_RACK_HEIGHT);
+  const wallThickness = clampPositive(params.wallThickness, MIN_WALL_THICKNESS);
+  const rimHeight = clampPositive(
+    Number.isFinite(params.rimHeight) ? params.rimHeight : DEFAULT_MINIATURE_RACK_RIM_HEIGHT,
+    MIN_RIM_HEIGHT
+  );
+  const resolvedRackHeight = getMiniatureRackResolvedHeight({ ...params, rackHeight, slots });
+  const maxMiniatureHeight = getMiniatureRackMaxMiniatureHeight({ ...params, rackHeight, slots });
   return {
     rackHeight,
-    rackBaseDepth: clampPositive(params.rackBaseDepth, getMiniatureRackMinimumBaseDepth(rackHeight)),
-    wallThickness: clampPositive(params.wallThickness, MIN_WALL_THICKNESS),
+    rackBaseDepth: clampPositive(params.rackBaseDepth, getMiniatureRackMinimumBaseDepth(resolvedRackHeight, maxMiniatureHeight, wallThickness, rimHeight)),
+    wallThickness,
     sideWallThickness: clampPositive(params.sideWallThickness, MIN_SIDE_WALL_THICKNESS),
     railWallThickness: clampPositive(
       Number.isFinite(params.railWallThickness)
@@ -95,6 +181,7 @@ export function normalizeMiniatureRackParams(params: MiniatureRackParams): Minia
       Number.isFinite(params.railLipInset) ? params.railLipInset : DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
       MIN_RAIL_LIP_INSET
     ),
+    rimHeight,
     baseWidthTolerance: clampPositive(
       Number.isFinite(params.baseWidthTolerance)
         ? params.baseWidthTolerance
@@ -107,27 +194,7 @@ export function normalizeMiniatureRackParams(params: MiniatureRackParams): Minia
         : DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
       MIN_BASE_TOLERANCE
     ),
-    slots:
-      params.slots.length > 0
-        ? params.slots.map((slot) => ({
-            ...slot,
-            baseWidth: clampPositive(slot.baseWidth, MIN_SLOT_BASE_WIDTH),
-            baseHeight: clampPositive(slot.baseHeight, MIN_SLOT_BASE_HEIGHT),
-            lipAngle: clampRange(slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE, MIN_SLOT_LIP_ANGLE, MAX_SLOT_LIP_ANGLE),
-            slotSpacingLeft: clampPositive(slot.slotSpacingLeft, MIN_SLOT_SPACING),
-            slotSpacingRight: clampPositive(slot.slotSpacingRight, MIN_SLOT_SPACING)
-          }))
-        : [
-            {
-              id: 'slot-1',
-              label: 'S1',
-              baseWidth: DEFAULT_MINIATURE_RACK_SLOT_WIDTH,
-              baseHeight: DEFAULT_MINIATURE_RACK_SLOT_HEIGHT,
-              lipAngle: DEFAULT_MINIATURE_RACK_LIP_ANGLE,
-              slotSpacingLeft: DEFAULT_MINIATURE_RACK_SPACING,
-              slotSpacingRight: DEFAULT_MINIATURE_RACK_SPACING
-            }
-          ]
+    slots
   };
 }
 
@@ -136,7 +203,8 @@ export function getMiniatureRackDimensions(
   targetHeight?: number
 ): MiniatureRackDimensions {
   const normalized = normalizeMiniatureRackParams(params);
-  const height = clampPositive(targetHeight ?? normalized.rackHeight, normalized.rackHeight);
+  const resolvedHeight = getMiniatureRackResolvedHeight(normalized);
+  const height = clampPositive(targetHeight ?? resolvedHeight, resolvedHeight);
   const width =
     normalized.sideWallThickness * 2 +
     normalized.slots.reduce(
@@ -153,7 +221,15 @@ export function getMiniatureRackDimensions(
 
   return {
     width,
-    depth: Math.max(normalized.rackBaseDepth, getMiniatureRackMinimumBaseDepth(height)),
+    depth: Math.max(
+      normalized.rackBaseDepth,
+      getMiniatureRackMinimumBaseDepth(
+        height,
+        getMiniatureRackMaxMiniatureHeight(normalized),
+        normalized.wallThickness,
+        normalized.rimHeight
+      )
+    ),
     height
   };
 }
@@ -164,6 +240,9 @@ export function createDefaultMiniatureRackSlot(index: number): MiniatureRackSlot
     label: `S${index}`,
     baseWidth: DEFAULT_MINIATURE_RACK_SLOT_WIDTH,
     baseHeight: DEFAULT_MINIATURE_RACK_SLOT_HEIGHT,
+    baseVerticalSize: null,
+    miniatureHeight: DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT,
+    miniatureCount: MIN_MINIATURES_IN_SLOT,
     lipAngle: DEFAULT_MINIATURE_RACK_LIP_ANGLE,
     slotSpacingLeft: DEFAULT_MINIATURE_RACK_SPACING,
     slotSpacingRight: DEFAULT_MINIATURE_RACK_SPACING
@@ -504,15 +583,15 @@ export function getMiniatureRackPreviewPositions(params: MiniatureRackParams): C
       Math.max(railDepth - lipThickness, normalized.baseHeightTolerance)
     );
     const previewYOffset = normalized.wallThickness + (lipRearGap - slot.baseHeight) / 2;
-    const usableHeight = Math.max(dimensions.height - normalized.wallThickness, slot.baseWidth);
-    const previewCount = Math.max(1, Math.floor(usableHeight / slot.baseWidth));
+    const baseVerticalSize = getSlotBaseVerticalSize(slot);
+    const previewCount = clampIntegerRange(slot.miniatureCount, MIN_MINIATURES_IN_SLOT, MAX_MINIATURES_IN_SLOT);
 
     for (let index = 0; index < previewCount; index += 1) {
       previewStacks.push({
         shape: 'circle',
         x: slotInnerStartX + (effectiveBaseWidth - slot.baseWidth) / 2,
         y: previewYOffset,
-        z: normalized.wallThickness + index * slot.baseWidth,
+        z: normalized.wallThickness + index * baseVerticalSize,
         width: slot.baseWidth,
         length: slot.baseWidth,
         thickness: slot.baseHeight,

@@ -161,6 +161,10 @@
     }
   }
 
+  function isTrayAutoHeightEnabled(tray: Tray): boolean {
+    return isTileTray(tray) ? tray.autoHeight === true : tray.autoHeight !== false;
+  }
+
   // Find the layer containing the selected box
   const selectedBoxLayer = $derived.by(() => {
     if (!selectedBox) return null;
@@ -212,8 +216,9 @@
         isCardTray(selectedTray) ||
         isCardWellTray(selectedTray) ||
         isCupTray(selectedTray) ||
+        isMiniatureRackTray(selectedTray) ||
         isTileTray(selectedTray)) &&
-      selectedTray.autoHeight === false
+      !isTrayAutoHeightEnabled(selectedTray)
         ? placement.dimensions.height
         : maxTrayHeight > placement.dimensions.height
           ? maxTrayHeight
@@ -573,6 +578,7 @@
         <MiniatureRackTrayEditor
           tray={selectedTray as MiniatureRackTray}
           onUpdateParams={onUpdateMiniatureRackParams}
+          {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
           renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'slots'}

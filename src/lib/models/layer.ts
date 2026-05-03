@@ -16,7 +16,15 @@ import type {
   ManualLooseTrayPlacement,
   Tray
 } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray } from '$lib/types/project';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCounterTray,
+  isCupTray,
+  isMiniatureRackTray,
+  isTileTray
+} from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem, type PackingResult } from '$lib/utils/binPacking';
 import { getBoxExteriorDimensions, getBoxVisibleAssembledHeight, getTrayDimensionsForTray } from './box';
 
@@ -360,11 +368,11 @@ export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes:
 }
 
 function isLooseTrayAutoHeightEnabled(tray: Tray): boolean {
-  if (
-    (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray)) &&
-    tray.autoHeight === false
-  ) {
-    return false;
+  if (isTileTray(tray)) {
+    return tray.autoHeight === true;
+  }
+  if (isCounterTray(tray) || isCardDividerTray(tray) || isCardTray(tray) || isCardWellTray(tray) || isCupTray(tray) || isMiniatureRackTray(tray)) {
+    return tray.autoHeight !== false;
   }
   return true;
 }

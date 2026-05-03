@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FormControl, Input, Link, Spacer, Text, IconButton, Icon } from '@tableslayer/ui';
+  import { FormControl, Input, InputCheckbox, Link, Spacer, Text, IconButton, Icon, Select } from '@tableslayer/ui';
   import { IconX } from '@tabler/icons-svelte';
 
   import {
@@ -7,10 +7,15 @@
     DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
     createDefaultMiniatureRackSlot,
     DEFAULT_MINIATURE_RACK_LIP_ANGLE,
+    DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT,
     DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
     DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS,
+    DEFAULT_MINIATURE_RACK_RIM_HEIGHT,
+    MAX_MINIATURES_IN_SLOT,
     getMiniatureRackDimensions,
+    getMiniatureRackMaxMiniatureHeight,
     getMiniatureRackMinimumBaseDepth,
+    getMiniatureRackResolvedHeight,
     type MiniatureRackParams,
     type MiniatureRackSlot
   } from '$lib/models/miniatureRack';
@@ -19,19 +24,29 @@
   interface Props {
     tray: MiniatureRackTray;
     onUpdateParams: (params: MiniatureRackParams) => void;
+    onUpdateTray?: (updates: Partial<MiniatureRackTray>) => void;
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
     renderMode?: 'all' | 'settings' | 'slots';
   }
 
-  let { tray, onUpdateParams, actualHeight, displayDimensions, renderMode = 'all' }: Props = $props();
+  let { tray, onUpdateParams, onUpdateTray, actualHeight, displayDimensions, renderMode = 'all' }: Props = $props();
 
   let dimensions = $derived.by(() => {
     if (displayDimensions) return displayDimensions;
     return getMiniatureRackDimensions(tray.params, actualHeight);
   });
 
-  let minimumBaseDepth = $derived(getMiniatureRackMinimumBaseDepth(tray.params.rackHeight));
+  let resolvedRackHeight = $derived(getMiniatureRackResolvedHeight(tray.params));
+  let maxMiniatureHeight = $derived(getMiniatureRackMaxMiniatureHeight(tray.params));
+  let minimumBaseDepth = $derived(
+    getMiniatureRackMinimumBaseDepth(
+      resolvedRackHeight,
+      maxMiniatureHeight,
+      tray.params.wallThickness,
+      tray.params.rimHeight ?? DEFAULT_MINIATURE_RACK_RIM_HEIGHT
+    )
+  );
 
   function updateParams(updates: Partial<MiniatureRackParams>) {
     onUpdateParams({ ...tray.params, ...updates });
@@ -55,6 +70,13 @@
       slots: tray.params.slots.filter((slot) => slot.id !== slotId)
     });
   }
+
+  function parseOptionalNumber(value: string): number | null {
+    const trimmed = value.trim();
+    if (trimmed === '') return null;
+    const parsed = parseFloat(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 </script>
 
 {#if renderMode === 'all' || renderMode === 'settings'}
@@ -73,10 +95,23 @@
           <Input
             {...inputProps}
             type="number"
-            min="20"
             step="0.5"
-            value={tray.params.rackHeight}
-            onchange={(e) => updateParams({ rackHeight: parseFloat(e.currentTarget.value) || 20 })}
+            placeholder="Auto"
+            value={tray.params.rackHeight ?? ''}
+            onchange={(e) => updateParams({ rackHeight: parseOptionalNumber(e.currentTarget.value) })}
+          />
+        {/snippet}
+        {#snippet end()}{tray.params.rackHeight === null ? 'Auto' : 'mm'}{/snippet}
+      </FormControl>
+      <FormControl label="Top Margin" name="rackRimHeight">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            min="0"
+            step="0.5"
+            value={tray.params.rimHeight ?? DEFAULT_MINIATURE_RACK_RIM_HEIGHT}
+            onchange={(e) => updateParams({ rimHeight: parseFloat(e.currentTarget.value) || 0 })}
           />
         {/snippet}
         {#snippet end()}mm{/snippet}
@@ -198,8 +233,16 @@
       </FormControl>
     </div>
     <Spacer size="0.5rem" />
+    {#if onUpdateTray}
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+      <Spacer size="0.5rem" />
+    {/if}
     <Text size="0.875rem" color="fgMuted">
-      Rack Base Depth controls how far the lower shelf extends forward. The minimum depth scales with rack height to keep the rack stable.
+      Rack Base Depth controls how far the lower shelf extends forward. Its minimum follows the tallest mini height so the rack keeps enough support.
     </Text>
   </section>
 </div>
@@ -218,7 +261,23 @@
       {#each tray.params.slots as slot, index (slot.id)}
         <div class="slotCard">
           <div class="slotHeader">
-            <span class="slotTitle">Slot {index + 1}</span>
+            <div class="slotHeaderMain">
+              <span class="slotTitle">Slot {index + 1}</span>
+              <div class="slotCountControl">
+                <span class="slotCountLabel">Miniatures</span>
+                <Select
+                  selected={[String(slot.miniatureCount ?? 1)]}
+                  options={Array.from({ length: MAX_MINIATURES_IN_SLOT }, (_, optionIndex) => {
+                    const count = optionIndex + 1;
+                    return { value: String(count), label: String(count) };
+                  })}
+                  onSelectedChange={(selected) => {
+                    const count = parseInt(selected[0] ?? '1');
+                    updateSlot(slot.id, { miniatureCount: Number.isFinite(count) ? count : 1 });
+                  }}
+                />
+              </div>
+            </div>
             <IconButton
               variant="ghost"
               title="Remove slot"
@@ -277,7 +336,7 @@
               {/snippet}
               {#snippet end()}mm{/snippet}
             </FormControl>
-            <FormControl label="Base Height" name={`slotBaseHeight-${slot.id}`}>
+            <FormControl label="Base Thickness" name={`slotBaseHeight-${slot.id}`}>
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
@@ -289,6 +348,35 @@
                 />
               {/snippet}
               {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Mini Height" name={`slotMiniatureHeight-${slot.id}`}>
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={slot.miniatureHeight ?? DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT}
+                  onchange={(e) =>
+                    updateSlot(slot.id, {
+                      miniatureHeight: parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Base Vertical Size" name={`slotBaseVerticalSize-${slot.id}`}>
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  placeholder="Same as width"
+                  value={slot.baseVerticalSize ?? ''}
+                  onchange={(e) => updateSlot(slot.id, { baseVerticalSize: parseOptionalNumber(e.currentTarget.value) })}
+                />
+              {/snippet}
+              {#snippet end()}{slot.baseVerticalSize == null ? 'Auto' : 'mm'}{/snippet}
             </FormControl>
             <FormControl label="Slot Spacing Left" name={`slotSpacingLeft-${slot.id}`}>
               {#snippet input({ inputProps })}
@@ -390,13 +478,40 @@
 
   .slotHeader {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .slotHeaderMain {
+    display: grid;
+    gap: 0.6rem;
+    flex: 1;
+    min-width: 0;
   }
 
   .slotTitle {
-    font-size: 0.875rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--fg);
+  }
+
+  .slotCountControl {
+    display: inline-grid;
+    grid-template-columns: auto 4.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    width: max-content;
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    padding: 0.45rem 0.6rem;
+    background: var(--bg);
+  }
+
+  .slotCountLabel {
+    font-size: 0.8125rem;
     font-weight: 600;
+    color: var(--fg);
   }
 </style>
