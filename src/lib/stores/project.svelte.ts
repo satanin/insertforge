@@ -249,6 +249,27 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+function getDefaultCardSizeId(cardSizes: CardSize[] = project.cardSizes): string {
+  const defaultCardSizeId = project.defaultCardSizeId;
+  if (defaultCardSizeId && cardSizes.some((size) => size.id === defaultCardSizeId)) {
+    return defaultCardSizeId;
+  }
+  return cardSizes[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+}
+
+export function getProjectDefaultCardSizeId(): string {
+  return getDefaultCardSizeId();
+}
+
+function rememberDefaultCardSizeId(cardSizeId: string | undefined): void {
+  if (!cardSizeId || !project.cardSizes.some((size) => size.id === cardSizeId)) return;
+  project.defaultCardSizeId = cardSizeId;
+}
+
+function getChangedCardSizeId(nextIds: string[], previousIds: string[]): string | undefined {
+  return nextIds.find((id, index) => id && id !== previousIds[index]);
+}
+
 /**
  * Generate a tray letter based on cumulative index across all layers.
  * A-Z for first 26, then AA, BB, CC... for 26+
@@ -405,8 +426,7 @@ function createDefaultPlayerBoardParams(counterShapes?: CounterShape[]): Counter
 }
 
 function createDefaultCardDrawTray(name: string, color: string, cardSizes?: CardSize[]): CardDrawTray {
-  // Use the first available card size, falling back to default ID
-  const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+  const cardSizeId = getDefaultCardSizeId(cardSizes);
   return {
     id: generateId(),
     type: 'cardDraw',
@@ -418,8 +438,7 @@ function createDefaultCardDrawTray(name: string, color: string, cardSizes?: Card
 }
 
 function createDefaultCardDividerTray(name: string, color: string, cardSizes?: CardSize[]): CardDividerTray {
-  // Use the first available card size, falling back to default ID
-  const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+  const cardSizeId = getDefaultCardSizeId(cardSizes);
   return {
     id: generateId(),
     type: 'cardDivider',
@@ -449,8 +468,7 @@ function createDefaultCupTray(name: string, color: string): CupTray {
 
 function createDefaultCardWellTray(name: string, color: string, cardSizes?: CardSize[]): CardWellTray {
   const params = createDefaultCardWellTrayParams();
-  // Use the first available card size for the initial stack
-  const cardSizeId = cardSizes?.[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+  const cardSizeId = getDefaultCardSizeId(cardSizes);
   if (params.stacks.length > 0) {
     params.stacks[0].cardSizeId = cardSizeId;
   }
@@ -2168,6 +2186,25 @@ export function updateLayeredBoxSection(
       Object.assign(section, previous);
       return false;
     }
+    if (updates.cardDrawParams && updates.cardDrawParams.cardSizeId !== previous.cardDrawParams?.cardSizeId) {
+      rememberDefaultCardSizeId(updates.cardDrawParams.cardSizeId);
+    }
+    if (updates.cardDividerParams) {
+      rememberDefaultCardSizeId(
+        getChangedCardSizeId(
+          updates.cardDividerParams.stacks.map((stack) => stack.cardSizeId),
+          previous.cardDividerParams?.stacks.map((stack) => stack.cardSizeId) ?? []
+        )
+      );
+    }
+    if (updates.cardWellParams) {
+      rememberDefaultCardSizeId(
+        getChangedCardSizeId(
+          updates.cardWellParams.stacks.map((stack) => stack.cardSizeId),
+          previous.cardWellParams?.stacks.map((stack) => stack.cardSizeId) ?? []
+        )
+      );
+    }
     autosave();
     return true;
   }
@@ -3134,6 +3171,9 @@ export function deleteCardSize(id: string): void {
   const index = project.cardSizes.findIndex((s) => s.id === id);
   if (index >= 0) {
     project.cardSizes.splice(index, 1);
+    if (project.defaultCardSizeId === id) {
+      project.defaultCardSizeId = project.cardSizes[0]?.id;
+    }
     // Note: We don't auto-delete card trays using this size - let them show an error
     autosave();
   }
@@ -3242,6 +3282,9 @@ export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayPar
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardDrawTray(tray)) {
+        if (params.cardSizeId !== tray.params.cardSizeId) {
+          rememberDefaultCardSizeId(params.cardSizeId);
+        }
         tray.params = params;
         autosave();
         return;
@@ -3249,6 +3292,9 @@ export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayPar
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardDrawTray(looseTray)) {
+      if (params.cardSizeId !== looseTray.params.cardSizeId) {
+        rememberDefaultCardSizeId(params.cardSizeId);
+      }
       looseTray.params = params;
       autosave();
       return;
@@ -3266,6 +3312,12 @@ export function updateCardDividerTrayParams(trayId: string, params: CardDividerT
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardDividerTray(tray)) {
+        rememberDefaultCardSizeId(
+          getChangedCardSizeId(
+            sanitizedParams.stacks.map((stack) => stack.cardSizeId),
+            tray.params.stacks.map((stack) => stack.cardSizeId)
+          )
+        );
         tray.params = sanitizedParams;
         autosave();
         return;
@@ -3273,6 +3325,12 @@ export function updateCardDividerTrayParams(trayId: string, params: CardDividerT
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardDividerTray(looseTray)) {
+      rememberDefaultCardSizeId(
+        getChangedCardSizeId(
+          sanitizedParams.stacks.map((stack) => stack.cardSizeId),
+          looseTray.params.stacks.map((stack) => stack.cardSizeId)
+        )
+      );
       looseTray.params = sanitizedParams;
       autosave();
       return;
@@ -3306,6 +3364,12 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);
       if (tray && isCardWellTray(tray)) {
+        rememberDefaultCardSizeId(
+          getChangedCardSizeId(
+            params.stacks.map((stack) => stack.cardSizeId),
+            tray.params.stacks.map((stack) => stack.cardSizeId)
+          )
+        );
         tray.params = params;
         autosave();
         return;
@@ -3313,6 +3377,12 @@ export function updateCardWellTrayParams(trayId: string, params: CardWellTrayPar
     }
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray && isCardWellTray(looseTray)) {
+      rememberDefaultCardSizeId(
+        getChangedCardSizeId(
+          params.stacks.map((stack) => stack.cardSizeId),
+          looseTray.params.stacks.map((stack) => stack.cardSizeId)
+        )
+      );
       looseTray.params = params;
       autosave();
       return;

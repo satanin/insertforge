@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { APP_VERSION } from '$lib/appInfo';
 import { defaultLidParams } from '$lib/models/lid';
-import { DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
-import type { LayeredBox, LayeredBoxSection, Project } from '$lib/types/project';
+import { DEFAULT_CARD_SIZE_IDS, DEFAULT_SHAPE_IDS, defaultParams } from '$lib/models/counterTray';
+import type { CardDividerTray, CardDrawTray, LayeredBox, LayeredBoxSection, Project } from '$lib/types/project';
 
 import {
+  addBox,
   addLooseTray,
+  addTray,
   clearLayeredBoxLayerLayout,
   getGlobalSettings,
   getProject,
+  getProjectDefaultCardSizeId,
   getProjectName,
   importProject,
   moveTray,
@@ -18,6 +21,8 @@ import {
   saveLayeredBoxLayerLayout,
   selectLayeredBoxLayer,
   selectLayeredBoxSection,
+  updateCardDividerTrayParams,
+  updateCardDrawTrayParams,
   updateLayeredBoxSection,
   updateGlobalSettings,
   updateProjectName
@@ -257,6 +262,44 @@ describe('project store blank reset', () => {
     expect(project.counterShapes.length).toBeGreaterThan(0);
     expect(project.cardSizes.length).toBeGreaterThan(0);
     expect(project.appVersion).toBe(APP_VERSION);
+  });
+});
+
+describe('project store card size defaults', () => {
+  beforeEach(() => {
+    resetProjectToBlank();
+  });
+
+  it('uses the last selected card size for the next card draw tray', () => {
+    const firstTray = addLooseTray(undefined, 'cardDraw') as CardDrawTray;
+
+    updateCardDrawTrayParams(firstTray.id, {
+      ...firstTray.params,
+      cardSizeId: DEFAULT_CARD_SIZE_IDS.miniAmericanPremium
+    });
+
+    const box = addBox(undefined, 'counter');
+    const nextTray = addTray(box.id, 'cardDraw') as CardDrawTray;
+
+    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.miniAmericanPremium);
+    expect(nextTray.params.cardSizeId).toBe(DEFAULT_CARD_SIZE_IDS.miniAmericanPremium);
+  });
+
+  it('uses the last selected card size for new card divider trays', () => {
+    const firstTray = addLooseTray(undefined, 'cardDivider') as CardDividerTray;
+
+    updateCardDividerTrayParams(firstTray.id, {
+      ...firstTray.params,
+      stacks: firstTray.params.stacks.map((stack, index) => ({
+        ...stack,
+        cardSizeId: index === 0 ? DEFAULT_CARD_SIZE_IDS.tarotPremium : stack.cardSizeId
+      }))
+    });
+
+    const nextTray = addLooseTray(undefined, 'cardDivider') as CardDividerTray;
+
+    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.tarotPremium);
+    expect(nextTray.params.stacks.every((stack) => stack.cardSizeId === DEFAULT_CARD_SIZE_IDS.tarotPremium)).toBe(true);
   });
 });
 

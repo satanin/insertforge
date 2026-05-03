@@ -4,7 +4,7 @@
   import type { CardWellTray } from '$lib/types/project';
   import { type CardWellTrayParams, getCardWellTrayDimensions, syncStacksWithLayout } from '$lib/models/cardWellTray';
   import { getAllCellIds, type CardWellLayout } from '$lib/types/cardWellLayout';
-  import { getCardSizes } from '$lib/stores/project.svelte';
+  import { getCardSizes, getProjectDefaultCardSizeId } from '$lib/stores/project.svelte';
   import CardWellLayoutEditor from './CardWellLayoutEditor.svelte';
 
   interface Props {
@@ -22,7 +22,7 @@
   let cellIds = $derived(getAllCellIds(tray.params.layout));
 
   // Get default card size ID for new stacks
-  let defaultCardSizeId = $derived(getCardSizes()[0]?.id ?? '');
+  let defaultCardSizeId = $derived(getProjectDefaultCardSizeId());
 
   // Compute dimensions
   let dimensions = $derived.by(() => {

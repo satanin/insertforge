@@ -9,8 +9,7 @@
     validateCardDividerHeight,
     MIN_CARD_DIVIDER_ANGLE_DEGREES
   } from '$lib/models/cardDividerTray';
-  import { getCardSizes } from '$lib/stores/project.svelte';
-  import { DEFAULT_CARD_SIZE_IDS } from '$lib/models/counterTray';
+  import { getCardSizes, getProjectDefaultCardSizeId } from '$lib/stores/project.svelte';
 
   interface Props {
     tray: CardDividerTray;
@@ -107,7 +106,7 @@
   }
 
   function addStack() {
-    const cardSizeId = getCardSizes()[0]?.id ?? DEFAULT_CARD_SIZE_IDS.standard;
+    const cardSizeId = getProjectDefaultCardSizeId();
     onUpdateParams({
       ...tray.params,
       stacks: [...tray.params.stacks, { cardSizeId, count: 30, label: undefined }]

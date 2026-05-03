@@ -280,6 +280,7 @@ export interface Project {
   layers: Layer[];
   counterShapes: CounterShape[];
   cardSizes: CardSize[];
+  defaultCardSizeId?: string;
   selectedLayerId: string | null;
   selectedBoxId: string | null;
   selectedLayeredBoxId?: string | null;
