@@ -331,6 +331,9 @@ interface Export3mfMessage {
 
 type WorkerMessage = GenerateMessage | ExportStlMessage | ExportAllStlsMessage | Export3mfMessage;
 
+const SUPERSEDED_GENERATION_ERROR = 'Superseded by newer request';
+let latestGenerateId = 0;
+
 // Geometry data to transfer back (raw arrays for BufferGeometry reconstruction)
 interface GeometryData {
   positions: Float32Array;
@@ -794,10 +797,27 @@ function findTrayById(layers: Layer[], trayId: string): Tray | undefined {
   return undefined;
 }
 
+function postSupersededGenerateResult(id: number): void {
+  self.postMessage({
+    type: 'generate-result',
+    id,
+    error: SUPERSEDED_GENERATION_ERROR
+  } as GenerateResult);
+}
+
+async function yieldToPendingGenerateMessages(id: number): Promise<boolean> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  if (id !== latestGenerateId) {
+    postSupersededGenerateResult(id);
+    return true;
+  }
+  return false;
+}
+
 /**
  * Generate all geometries for the project
  */
-function handleGenerate(msg: GenerateMessage): void {
+async function handleGenerate(msg: GenerateMessage): Promise<void> {
   const { id, project, selectedBoxId, selectedTrayId, selectedLayerId, scope = 'all', selectedView = 'assembly' } = msg;
   const timings: { name: string; ms: number }[] = [];
   const time = (name: string, fn: () => void) => {
@@ -808,6 +828,11 @@ function handleGenerate(msg: GenerateMessage): void {
   };
 
   try {
+    if (id !== latestGenerateId) {
+      postSupersededGenerateResult(id);
+      return;
+    }
+
     cachedProjectName = sanitizeExportName(project.name ?? '', 'insertforge');
     const box = selectedBoxId ? findBoxById(project.layers, selectedBoxId) : undefined;
     const tray = selectedTrayId ? findTrayById(project.layers, selectedTrayId) : undefined;
@@ -837,6 +862,7 @@ function handleGenerate(msg: GenerateMessage): void {
           );
 
     for (const layer of layersForHeight) {
+      if (await yieldToPendingGenerateMessages(id)) return;
       const arrangement = arrangeLayerContents(layer, {
         gameContainerWidth,
         gameContainerDepth,
@@ -954,7 +980,9 @@ function handleGenerate(msg: GenerateMessage): void {
       if (scope !== 'selected' || selectedView !== 'tray') {
         // Generate all trays for selected box
         cachedAllTrays = [];
-        allTrayGeometries = placements.map((placement) => {
+        allTrayGeometries = [];
+        for (const placement of placements) {
+          if (await yieldToPendingGenerateMessages(id)) return;
           const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
           const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, maxHeight);
           const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
@@ -965,7 +993,7 @@ function handleGenerate(msg: GenerateMessage): void {
 
           cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
-          return {
+          allTrayGeometries.push({
             trayId: placement.tray.id,
             name: placement.tray.name,
             color: placement.tray.color,
@@ -979,13 +1007,15 @@ function handleGenerate(msg: GenerateMessage): void {
             },
             counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
             trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
-          };
-        });
+          });
+        }
 
         // Generate box and lid - pass layer height so box exterior matches layer
+        if (await yieldToPendingGenerateMessages(id)) return;
         time(`createBoxWithLidGrooves (${box.name})`, () => {
           cachedBox = createBoxWithLidGrooves(box, cardSizes, counterShapes, selectedBoxTargetLayerHeight);
         });
+        if (await yieldToPendingGenerateMessages(id)) return;
         time(`createLid (${box.name})`, () => {
           cachedLid = createLid(box, cardSizes, counterShapes);
         });
@@ -1102,6 +1132,7 @@ function handleGenerate(msg: GenerateMessage): void {
     const allBoxGeometries: BoxGeometryResult[] = [];
 
     for (const projectBox of allBoxes) {
+      if (await yieldToPendingGenerateMessages(id)) return;
       // Send progress update
       currentOperation++;
       self.postMessage({
@@ -1162,7 +1193,9 @@ function handleGenerate(msg: GenerateMessage): void {
       // Cache JSCAD geometries for this box's trays
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
 
-      const trayGeoms: TrayGeometryResult[] = boxPlacements.map((placement) => {
+      const trayGeoms: TrayGeometryResult[] = [];
+      for (const placement of boxPlacements) {
+        if (await yieldToPendingGenerateMessages(id)) return;
         const spacer = boxSpacerInfo.find((s) => s.trayId === placement.tray.id);
         const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, boxMaxHeight);
         const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
@@ -1171,7 +1204,7 @@ function handleGenerate(msg: GenerateMessage): void {
         // Cache for STL export
         cachedTraysForBox.push({ jscadGeom, name: placement.tray.name });
 
-        return {
+        trayGeoms.push({
           trayId: placement.tray.id,
           name: placement.tray.name,
           color: placement.tray.color,
@@ -1185,8 +1218,8 @@ function handleGenerate(msg: GenerateMessage): void {
           },
           counterStacks: getTrayPositions(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight),
           trayLetter: getTrayLetter(getCumulativeTrayIndexForTray(project.layers, placement.tray.id))
-        };
-      });
+        });
+      }
 
       // Cache this box's JSCAD geometries for export
       cachedAllBoxes.push({
@@ -1214,6 +1247,7 @@ function handleGenerate(msg: GenerateMessage): void {
     }
 
     for (const layeredBox of allLayeredBoxes) {
+      if (await yieldToPendingGenerateMessages(id)) return;
       currentOperation++;
       self.postMessage({
         type: 'generation-progress',
@@ -1248,6 +1282,7 @@ function handleGenerate(msg: GenerateMessage): void {
       );
 
       for (const placement of layout.sections) {
+        if (await yieldToPendingGenerateMessages(id)) return;
         const tray = createTrayFromLayeredBoxSection(placement.section);
         if (!tray) continue;
         const jscadGeom =
@@ -1262,6 +1297,7 @@ function handleGenerate(msg: GenerateMessage): void {
       }
 
       for (const internalLayer of layout.internalLayers) {
+        if (await yieldToPendingGenerateMessages(id)) return;
         if (!fillSolidLayerIds.has(internalLayer.id)) continue;
         const layerSections = layout.sections.filter((section) => section.internalLayerId === internalLayer.id);
         if (layerSections.length === 0) continue;
@@ -1298,10 +1334,12 @@ function handleGenerate(msg: GenerateMessage): void {
     const allLooseTrayGeometries: LooseTrayGeometryResult[] = [];
 
     for (const layer of generationLayers) {
+      if (await yieldToPendingGenerateMessages(id)) return;
       // Get the unified layer height - loose trays match box exterior height
       const layerHeight = layerHeights.get(layer.id) ?? 0;
 
       for (const looseTray of layer.looseTrays) {
+        if (await yieldToPendingGenerateMessages(id)) return;
         // Send progress update
         currentOperation++;
         self.postMessage({
@@ -1847,7 +1885,14 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
   switch (msg.type) {
     case 'generate':
-      handleGenerate(msg);
+      latestGenerateId = msg.id;
+      handleGenerate(msg).catch((e) => {
+        self.postMessage({
+          type: 'generate-result',
+          id: msg.id,
+          error: e instanceof Error ? e.message : 'Unknown error'
+        } as GenerateResult);
+      });
       break;
     case 'export-stl':
       handleExportStl(msg);

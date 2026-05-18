@@ -49,6 +49,12 @@
     type LooseTrayGeometryData
   } from '$lib/utils/geometryWorker';
   import { getGeometryGenerationScopeForViewMode } from '$lib/utils/geometryRenderScope';
+  import {
+    layerGeometryFingerprint,
+    projectGeometryFingerprint,
+    selectedGeometryFingerprint,
+    structureFingerprint
+  } from '$lib/utils/geometryFingerprint';
   import { BlobWriter, ZipWriter } from '@zip.js/zip.js';
   import { exportPdfReference, exportPdfWithScreenshots, type TrayScreenshot } from '$lib/utils/pdfGenerator';
   import type { CaptureOptions } from '$lib/utils/screenshotCapture';
@@ -587,10 +593,12 @@
   let isDirty = $state(false);
   let lastGeneratedHash = $state('');
   let lastSelectedGeneratedKey = $state('');
+  let lastLayerGeneratedKey = $state('');
   let renderedGeometryScope = $state<'layer' | 'all' | ''>('');
   let globalGeometryCache: { hash: string; result: GenerationResult } | null = null;
   const selectedGeometryCache = new Map<string, GenerationResult>();
   const layerGeometryCache = new Map<string, GenerationResult>();
+  let pendingRegenerateTimeout: ReturnType<typeof setTimeout> | null = null;
   let jsonFileInput = $state<HTMLInputElement | null>(null);
   let explosionAmount = $state(50);
   let allLayersExplosionAmount = $state(50); // Default to current behavior (20mm separation)
@@ -612,6 +620,7 @@
   let viewPreparing = $state(false);
   let sceneGenerating = $derived.by(() => {
     if (!generating) return false;
+    if (renderedViewMode === viewMode) return false;
     if (renderedViewMode === 'all-no-lid' && renderedGeometryScope === 'all') return false;
     if (renderedViewMode === 'layer' && renderedGeometryScope === 'layer') return false;
     return true;
@@ -1237,56 +1246,6 @@
     console.debug(`[Geometry Timing] ${scope} ${phase}: ${(performance.now() - start).toFixed(0)}ms`);
   }
 
-  function getLayerForBox(project: Project, boxId: string) {
-    return project.layers.find((layer) => layer.boxes.some((box) => box.id === boxId)) ?? null;
-  }
-
-  function getLayerForLooseTray(project: Project, trayId: string) {
-    return project.layers.find((layer) => layer.looseTrays.some((tray) => tray.id === trayId)) ?? null;
-  }
-
-  function getLayerGeometryFingerprint(project: Project, layerId: string | null) {
-    const layer = layerId ? project.layers.find((entry) => entry.id === layerId) : null;
-    if (!layer) return null;
-
-    return {
-      id: layer.id,
-      manualLayout: layer.manualLayout ?? null,
-      boxes: layer.boxes.map((box) => ({
-        id: box.id,
-        name: box.name,
-        tolerance: box.tolerance,
-        wallThickness: box.wallThickness,
-        floorThickness: box.floorThickness,
-        lidParams: box.lidParams,
-        customWidth: box.customWidth,
-        customDepth: box.customDepth,
-        customBoxHeight: box.customBoxHeight,
-        autoHeight: box.autoHeight,
-        fillSolidEmpty: box.fillSolidEmpty,
-        manualLayout: box.manualLayout ?? null,
-        trays: box.trays.map((tray) => ({
-          id: tray.id,
-          name: tray.name,
-          params: tray.params,
-          rotationOverride: tray.rotationOverride,
-          showEmboss: tray.showEmboss,
-          showStackLabels: isCardDividerTray(tray) ? tray.showStackLabels : undefined,
-          autoHeight: tray.autoHeight
-        }))
-      })),
-      looseTrays: layer.looseTrays.map((tray) => ({
-        id: tray.id,
-        name: tray.name,
-        params: tray.params,
-        showEmboss: tray.showEmboss,
-        autoHeight: tray.autoHeight
-      })),
-      boards: layer.boards,
-      layeredBoxes: layer.layeredBoxes
-    };
-  }
-
   function getSelectedGeometryCacheKey(
     project: Project,
     generationBox: Box | null,
@@ -1295,60 +1254,29 @@
     selectedEmptyBox: boolean,
     selectedView: 'tray' | 'assembly'
   ) {
-    if (selectedEmptyBox && generationBox) {
-      const layer = getLayerForBox(project, generationBox.id);
-      return JSON.stringify({
-        scope: 'selected-empty-box',
-        selectedView,
-        boxId: generationBox.id,
-        cardSizes: project.cardSizes ?? [],
-        counterShapes: project.counterShapes ?? [],
-        globalSettings: project.globalSettings ?? null,
-        layer: getLayerGeometryFingerprint(project, layer?.id ?? null)
-      });
-    }
-
-    if (generationTray && isLoose) {
-      const layer = getLayerForLooseTray(project, generationTray.id);
-      return JSON.stringify({
-        scope: 'selected-loose-tray',
-        selectedView,
-        trayId: generationTray.id,
-        cardSizes: project.cardSizes ?? [],
-        counterShapes: project.counterShapes ?? [],
-        globalSettings: project.globalSettings ?? null,
-        layer: getLayerGeometryFingerprint(project, layer?.id ?? null)
-      });
-    }
-
-    if (generationTray && generationBox) {
-      const layer = getLayerForBox(project, generationBox.id);
-      return JSON.stringify({
-        scope: 'selected-boxed-tray',
-        selectedView,
-        boxId: generationBox.id,
-        trayId: generationTray.id,
-        cardSizes: project.cardSizes ?? [],
-        counterShapes: project.counterShapes ?? [],
-        globalSettings: project.globalSettings ?? null,
-        layer: getLayerGeometryFingerprint(project, layer?.id ?? null)
-      });
-    }
-
-    return '';
+    return selectedGeometryFingerprint(project, generationBox, generationTray, isLoose, selectedEmptyBox, selectedView);
   }
 
   function getLayerGeometryCacheKey(project: Project, layerId: string | null) {
-    if (!layerId) return '';
+    return layerGeometryFingerprint(project, layerId);
+  }
 
-    return JSON.stringify({
-      scope: 'layer',
-      layerId,
-      cardSizes: project.cardSizes ?? [],
-      counterShapes: project.counterShapes ?? [],
-      globalSettings: project.globalSettings ?? null,
-      layer: getLayerGeometryFingerprint(project, layerId)
-    });
+  function scheduleRegenerate(force = false, delayMs = 250) {
+    if (!browser) return;
+    if (pendingRegenerateTimeout) {
+      clearTimeout(pendingRegenerateTimeout);
+      pendingRegenerateTimeout = null;
+    }
+
+    if (force || delayMs <= 0) {
+      regenerate(force);
+      return;
+    }
+
+    pendingRegenerateTimeout = setTimeout(() => {
+      pendingRegenerateTimeout = null;
+      regenerate(false);
+    }, delayMs);
   }
 
   function useGenerationResult(result: GenerationResult, selectedBox: Box | null, selectedTray: Tray | null, updateGlobalCache: boolean) {
@@ -1461,8 +1389,6 @@
       return;
     }
 
-    // Capture hash at START of generation to handle params changing during async work
-    const hashAtGenerationStart = currentStateHash;
     const generationScope = getGeometryGenerationScopeForViewMode(viewMode);
     const selectedView = viewMode === 'tray' ? 'tray' : 'assembly';
     const selectedLayerId = project.selectedLayerId ?? '';
@@ -1471,9 +1397,12 @@
         ? getSelectedGeometryCacheKey(project, generationBox ?? null, generationTray ?? null, isLoose, selectedEmptyBox, selectedView)
         : '';
     const layerCacheKey = generationScope === 'layer' ? getLayerGeometryCacheKey(project, selectedLayerId) : '';
+    // Capture the scoped fingerprint at START of generation to handle params changing during async work.
+    const hashAtGenerationStart =
+      generationScope === 'all' ? currentStateHash : generationScope === 'layer' ? layerCacheKey : selectedCacheKey;
 
     // Check if cache is still valid (hash matches what was used to generate it)
-    const cacheValid = lastGeneratedHash && hashAtGenerationStart === lastGeneratedHash;
+    const cacheValid = generationScope === 'all' && lastGeneratedHash && hashAtGenerationStart === lastGeneratedHash;
 
     if (generationScope === 'selected' && selectedCacheKey && !force) {
       const cachedSelectedGeometry = selectedGeometryCache.get(selectedCacheKey);
@@ -1491,6 +1420,7 @@
       if (cachedLayerGeometry) {
         await useCachedGenerationResult(cachedLayerGeometry, selectedBox, selectedTray, true, 'layer');
         renderedGeometryScope = 'layer';
+        lastLayerGeneratedKey = layerCacheKey;
         isDirty = false;
         console.debug('[Geometry Cache] Hit for layer geometry');
         return;
@@ -1636,6 +1566,7 @@
       }
       if (generationScope === 'layer' && layerCacheKey) {
         layerGeometryCache.delete(layerCacheKey);
+        lastLayerGeneratedKey = '';
       }
     }
 
@@ -1675,6 +1606,7 @@
       }
       if (generationScope === 'layer' && layerCacheKey) {
         layerGeometryCache.set(layerCacheKey, result);
+        lastLayerGeneratedKey = layerCacheKey;
       }
     } catch (e) {
       // Ignore "superseded" errors - these are expected when a newer request replaces an older one
@@ -1696,8 +1628,21 @@
         if (generationScope === 'all') {
           lastGeneratedHash = hashAtGenerationStart;
         }
+        const currentScopedHash =
+          generationScope === 'all'
+            ? currentStateHash
+            : generationScope === 'layer'
+              ? getLayerGeometryCacheKey(getProject(), selectedLayerId)
+              : getSelectedGeometryCacheKey(
+                  getProject(),
+                  generationBox ?? null,
+                  generationTray ?? null,
+                  isLoose,
+                  selectedEmptyBox,
+                  selectedView
+                );
         // Only clear dirty if params haven't changed since generation started
-        if (currentStateHash === hashAtGenerationStart) {
+        if (currentScopedHash === hashAtGenerationStart) {
           isDirty = false;
         }
 
@@ -2542,86 +2487,31 @@
     input.value = '';
   }
 
-  // Create a hash of current state to detect changes (includes all boxes for multi-box view)
-  // Includes names because they are embossed on geometry
+  // Create a full-project geometry fingerprint for the expensive full render/export scope.
   let currentStateHash = $derived.by(() => {
+    const start = import.meta.env.DEV ? performance.now() : 0;
     const project = getProject();
-    return JSON.stringify({
-      globalSettings: project.globalSettings ?? null,
-      cardSizes: project.cardSizes ?? [],
-      counterShapes: project.counterShapes ?? [],
-      layers: project.layers.map((layer) => ({
-        id: layer.id,
-        manualLayout: layer.manualLayout ?? null,
-        boards: layer.boards,
-        boxes: layer.boxes.map((box) => ({
-          id: box.id,
-          name: box.name,
-          tolerance: box.tolerance,
-          wallThickness: box.wallThickness,
-          floorThickness: box.floorThickness,
-          lidParams: box.lidParams,
-          customWidth: box.customWidth,
-          customDepth: box.customDepth,
-          customBoxHeight: box.customBoxHeight,
-          autoHeight: box.autoHeight,
-          fillSolidEmpty: box.fillSolidEmpty,
-          manualLayout: box.manualLayout ?? null,
-          trays: box.trays.map((t) => ({
-            id: t.id,
-            name: t.name,
-            params: t.params,
-            rotationOverride: t.rotationOverride,
-            showEmboss: t.showEmboss,
-            showStackLabels: isCardDividerTray(t) ? t.showStackLabels : undefined,
-            autoHeight: t.autoHeight
-          }))
-        })),
-        looseTrays: layer.looseTrays.map((t) => ({
-          id: t.id,
-          name: t.name,
-          params: t.params,
-          showEmboss: t.showEmboss,
-          autoHeight: t.autoHeight
-        })),
-        layeredBoxes: (layer.layeredBoxes ?? []).map((box) => ({
-          id: box.id,
-          name: box.name,
-          tolerance: box.tolerance,
-          wallThickness: box.wallThickness,
-          floorThickness: box.floorThickness,
-          customWidth: box.customWidth,
-          customDepth: box.customDepth,
-          customBoxHeight: box.customBoxHeight,
-          lidParams: box.lidParams,
-          layers: box.layers.map((internalLayer) => ({
-            id: internalLayer.id,
-            name: internalLayer.name,
-            fillSolidEmpty: internalLayer.fillSolidEmpty,
-            edgeReliefEnabled: internalLayer.edgeReliefEnabled,
-            sections: internalLayer.sections.map((section) => ({
-              id: section.id,
-              type: section.type,
-              name: section.name,
-              color: section.color,
-              counterParams: section.counterParams,
-              cardDrawParams: section.cardDrawParams,
-              cardDividerParams: section.cardDividerParams,
-              cardWellParams: section.cardWellParams,
-              cupParams: section.cupParams
-            })),
-            manualLayout: internalLayer.manualLayout ?? null
-          }))
-        }))
-      }))
-    });
+    const fingerprint = projectGeometryFingerprint(project);
+    logGeometryTiming('all', 'fingerprint', start);
+    return fingerprint;
   });
 
   // Track dirty state when params change after generation
   $effect(() => {
-    if (viewMode === 'all-no-lid' || viewMode === 'layer') {
+    if (viewMode === 'all-no-lid') {
       if (currentStateHash && lastGeneratedHash && currentStateHash !== lastGeneratedHash) {
         isDirty = true;
+        scheduleRegenerate(false);
+      }
+      return;
+    }
+
+    if (viewMode === 'layer') {
+      const project = getProject();
+      const layerKey = getLayerGeometryCacheKey(project, project.selectedLayerId ?? null);
+      if (layerKey && lastLayerGeneratedKey && layerKey !== lastLayerGeneratedKey) {
+        isDirty = true;
+        scheduleRegenerate(false);
       }
       return;
     }
@@ -2642,6 +2532,7 @@
 
     if (selectedKey && lastSelectedGeneratedKey && selectedKey !== lastSelectedGeneratedKey) {
       isDirty = true;
+      scheduleRegenerate(false);
     }
   });
 
@@ -2662,27 +2553,7 @@
   // Track true structural changes (layers/boxes/trays added, deleted, or moved)
   let structureHash = $derived.by(() => {
     const project = getProject();
-    return JSON.stringify({
-      layerIds: project.layers.map((l) => l.id),
-      // Include full layer->box->tray mapping to detect moves
-      layerMapping: project.layers.map((l) => ({
-        layerId: l.id,
-        boxes: l.boxes.map((b) => ({
-          boxId: b.id,
-          trayIds: b.trays.map((t) => t.id)
-        })),
-        looseTrayIds: l.looseTrays.map((t) => t.id),
-        boardIds: l.boards.map((b) => b.id),
-        layeredBoxes: l.layeredBoxes.map((b) => ({
-          layeredBoxId: b.id,
-          layers: b.layers.map((entry) => ({
-            layerId: entry.id,
-            sectionIds: entry.sections.map((section) => section.id),
-            manualLayoutTrayIds: entry.manualLayout?.map((placement) => placement.trayId) ?? []
-          }))
-        }))
-      }))
-    });
+    return structureFingerprint(project);
   });
 
   // Generate on mount (forced) and when structure changes (selection, add/delete)
@@ -2730,15 +2601,15 @@
         if (!hasInitialized) {
           hasInitialized = true;
           console.debug('[Geometry Trigger] Initial load - forcing regeneration');
-          regenerate(true); // Force on initial load
+          scheduleRegenerate(true, 0); // Force on initial load
         } else if (structureChanged) {
           // Force regeneration only for true structural changes (add/delete/move)
           console.debug('[Geometry Trigger] Structure changed - forcing regeneration');
-          regenerate(true);
+          scheduleRegenerate(true, 0);
         } else if (selectionChanged || renderViewChanged) {
           // Selection/view-only changes should use the cache when available.
           console.debug('[Geometry Trigger] Selection or view changed - using cache');
-          regenerate(false);
+          scheduleRegenerate(false, 0);
         }
       }
     }
@@ -2756,12 +2627,17 @@
     isDirty = false;
     lastGeneratedHash = '';
     lastSelectedGeneratedKey = '';
+    lastLayerGeneratedKey = '';
     renderedGeometryScope = '';
     renderedViewMode = viewMode;
     viewPreparing = false;
     globalGeometryCache = null;
     selectedGeometryCache.clear();
     layerGeometryCache.clear();
+    if (pendingRegenerateTimeout) {
+      clearTimeout(pendingRegenerateTimeout);
+      pendingRegenerateTimeout = null;
+    }
     generationProgress = null;
     generating = false;
   }
@@ -3132,6 +3008,10 @@
 
   // Cleanup worker on component destroy
   onDestroy(() => {
+    if (pendingRegenerateTimeout) {
+      clearTimeout(pendingRegenerateTimeout);
+      pendingRegenerateTimeout = null;
+    }
     geometryWorker.terminate();
   });
 </script>

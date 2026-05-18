@@ -201,6 +201,24 @@
   // Layer content offset (center on game container)
   let layerOffsetX = $derived(-gameContainerWidth / 2);
   let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
+  let boxGeometryById = $derived.by(() => new Map(allBoxGeometries.map((geometry) => [geometry.boxId, geometry])));
+  let looseTrayGeometryById = $derived.by(() => new Map(allLooseTrayGeometries.map((geometry) => [geometry.trayId, geometry])));
+  let layeredBoxByProxyBoardId = $derived.by(() => new Map(layeredBoxes.map((geometry) => [geometry.proxyBoardId, geometry])));
+  let trayColorById = $derived.by(() => {
+    const colors = new Map<string, string>();
+    const project = getProject();
+    for (const layer of project.layers) {
+      for (const box of layer.boxes) {
+        for (const tray of box.trays) {
+          colors.set(tray.id, tray.color);
+        }
+      }
+      for (const tray of layer.looseTrays) {
+        colors.set(tray.id, tray.color);
+      }
+    }
+    return colors;
+  });
 
   function getDimensionOverlaySides(centerX: number, centerZ: number, width: number, depth: number) {
     const minX = layerOffsetX;
@@ -221,16 +239,7 @@
 
   // Get live tray color from project store
   function getTrayColor(trayId: string, fallbackColor: string): string {
-    const project = getProject();
-    for (const layer of project.layers) {
-      for (const box of layer.boxes) {
-        const tray = box.trays.find((t) => t.id === trayId);
-        if (tray?.color) return tray.color;
-      }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
-      if (looseTray?.color) return looseTray.color;
-    }
-    return fallbackColor;
+    return trayColorById.get(trayId) ?? fallbackColor;
   }
 
   function getLayeredBoxLayerColor(baseColor: string, index: number): string {
@@ -385,7 +394,7 @@
         gameContainerDepth,
         horizontalExplosion
       );
-      const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id);
+      const layeredBoxGeometry = layeredBoxByProxyBoardId.get(boardPlacement.board.id);
       const height = layeredBoxGeometry
         ? Math.max(layeredBoxGeometry.dimensions.height - layeredBoxGeometry.wallThickness, 0)
         : boardPlacement.dimensions.height;
@@ -634,7 +643,7 @@
 
 <!-- Render boxes with actual geometry -->
 {#each boxPlacements as boxPlacement (boxPlacement.box.id)}
-  {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.box.id)}
+  {@const boxData = boxGeometryById.get(boxPlacement.box.id)}
   {@const boxHeight = boxPlacement.dimensions.height}
   {@const boxBaseHeight = boxPlacement.baseHeight ?? 0}
   {@const isRotated = boxPlacement.rotation === 90 || boxPlacement.rotation === 270}
@@ -746,7 +755,7 @@
   {@const baseX = layerOffsetX + boardPlacement.x + boardPlacement.dimensions.width / 2 + explosion.offsetX}
   {@const baseZ = layerOffsetZ - boardPlacement.y - boardPlacement.dimensions.depth / 2 - explosion.offsetZ}
   {@const overlaySides = getDimensionOverlaySides(baseX, baseZ, boardPlacement.dimensions.width, boardPlacement.dimensions.depth)}
-  {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.board.id)}
+  {@const layeredBoxGeometry = layeredBoxByProxyBoardId.get(boardPlacement.board.id)}
   {@const dimensionHeight =
     layeredBoxGeometry
       ? Math.max(layeredBoxGeometry.dimensions.height - layeredBoxGeometry.wallThickness, 0)
@@ -1062,7 +1071,7 @@
 
 <!-- Render loose trays with actual geometry -->
 {#each looseTrayPlacements as trayPlacement (trayPlacement.tray.id)}
-  {@const looseTrayGeom = allLooseTrayGeometries.find((lt) => lt.trayId === trayPlacement.tray.id)}
+  {@const looseTrayGeom = looseTrayGeometryById.get(trayPlacement.tray.id)}
   {@const trayHeight = trayPlacement.dimensions.height}
   {@const trayBaseHeight = trayPlacement.baseHeight ?? 0}
   {@const trayColor = trayPlacement.tray.color || TRAY_COLORS[0]}

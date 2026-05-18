@@ -103,19 +103,25 @@
   let baseLidCenterZ = $derived(lidGeomBounds ? -(lidGeomBounds.max.y + lidGeomBounds.min.y) / 2 : 0);
   let lidCenterX = $derived(slidesAlongX ? baseLidCenterX : -baseLidCenterX);
   let lidCenterZ = $derived(slidesAlongX ? baseLidCenterZ : -baseLidCenterZ);
-
-  // Get live tray color from project store
-  function getTrayColor(trayId: string, fallbackIndex: number): string {
+  let trayColorById = $derived.by(() => {
+    const colors = new Map<string, string>();
     const project = getProject();
     for (const layer of project.layers) {
       for (const box of layer.boxes) {
-        const tray = box.trays.find((t) => t.id === trayId);
-        if (tray?.color) return tray.color;
+        for (const tray of box.trays) {
+          colors.set(tray.id, tray.color);
+        }
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
-      if (looseTray?.color) return looseTray.color;
+      for (const tray of layer.looseTrays) {
+        colors.set(tray.id, tray.color);
+      }
     }
-    return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
+    return colors;
+  });
+
+  // Get live tray color from project store
+  function getTrayColor(trayId: string, fallbackIndex: number): string {
+    return trayColorById.get(trayId) ?? TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
   }
 </script>
 

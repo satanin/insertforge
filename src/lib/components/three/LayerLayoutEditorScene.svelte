@@ -6,6 +6,7 @@
   import { T } from '@threlte/core';
   import { interactivity, type IntersectionEvent } from '@threlte/extras';
   import * as THREE from 'three';
+  import { onDestroy } from 'svelte';
   import BoxAssembly from './BoxAssembly.svelte';
   import {
     layerLayoutEditorState,
@@ -139,23 +140,52 @@
 
   // Hover state
   let hoveredItemId = $state<string | null>(null);
+  const edgeBoxGeometryCache = new Map<string, THREE.EdgesGeometry>();
+
+  function getEdgeBoxGeometry(width: number, height: number, depth: number): THREE.EdgesGeometry {
+    const key = `${width}:${height}:${depth}`;
+    const cached = edgeBoxGeometryCache.get(key);
+    if (cached) return cached;
+
+    const box = new THREE.BoxGeometry(width, height, depth);
+    const edges = new THREE.EdgesGeometry(box);
+    box.dispose();
+    edgeBoxGeometryCache.set(key, edges);
+    return edges;
+  }
+
+  onDestroy(() => {
+    for (const geometry of edgeBoxGeometryCache.values()) {
+      geometry.dispose();
+    }
+    edgeBoxGeometryCache.clear();
+  });
 
   // Layer content offset (center on game container)
   let layerOffsetX = $derived(-gameContainerWidth / 2);
   let layerOffsetZ = $derived(printBedSize / 2 + gameContainerDepth / 2);
-
-  // Get live tray color from project store
-  function getTrayColor(trayId: string, fallbackColor: string): string {
+  let boxGeometryById = $derived.by(() => new Map(allBoxGeometries.map((geometry) => [geometry.boxId, geometry])));
+  let looseTrayGeometryById = $derived.by(() => new Map(allLooseTrayGeometries.map((geometry) => [geometry.trayId, geometry])));
+  let layeredBoxByProxyBoardId = $derived.by(() => new Map(layeredBoxes.map((geometry) => [geometry.proxyBoardId, geometry])));
+  let trayColorById = $derived.by(() => {
+    const colors = new Map<string, string>();
     const project = getProject();
     for (const layer of project.layers) {
       for (const box of layer.boxes) {
-        const tray = box.trays.find((t) => t.id === trayId);
-        if (tray?.color) return tray.color;
+        for (const tray of box.trays) {
+          colors.set(tray.id, tray.color);
+        }
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
-      if (looseTray?.color) return looseTray.color;
+      for (const tray of layer.looseTrays) {
+        colors.set(tray.id, tray.color);
+      }
     }
-    return fallbackColor;
+    return colors;
+  });
+
+  // Get live tray color from project store
+  function getTrayColor(trayId: string, fallbackColor: string): string {
+    return trayColorById.get(trayId) ?? fallbackColor;
   }
 
   // Build all items for snapping
@@ -296,7 +326,7 @@
 
 <!-- Render boxes at working positions -->
 {#each workingBoxPlacements as boxPlacement (boxPlacement.boxId)}
-  {@const boxData = allBoxGeometries.find((b) => b.boxId === boxPlacement.boxId)}
+  {@const boxData = boxGeometryById.get(boxPlacement.boxId)}
   {@const dims = getEffectiveBoxDimensions(boxPlacement)}
   {@const originalWidth = boxPlacement.originalWidth}
   {@const originalDepth = boxPlacement.originalDepth}
@@ -347,9 +377,7 @@
 
     <!-- Selection wireframe -->
     {#if isSelected}
-      {@const edgesGeom = new THREE.EdgesGeometry(
-        new THREE.BoxGeometry(originalWidth, boxPlacement.height, originalDepth)
-      )}
+      {@const edgesGeom = getEdgeBoxGeometry(originalWidth, boxPlacement.height, originalDepth)}
       <T.LineSegments
         position.y={boxPlacement.height / 2}
         geometry={edgesGeom}
@@ -365,7 +393,7 @@
 
 <!-- Render loose trays at working positions -->
 {#each workingLooseTrayPlacements as trayPlacement (trayPlacement.trayId)}
-  {@const looseTrayGeom = allLooseTrayGeometries.find((lt) => lt.trayId === trayPlacement.trayId)}
+  {@const looseTrayGeom = looseTrayGeometryById.get(trayPlacement.trayId)}
   {@const dims = getEffectiveLooseTrayDimensions(trayPlacement)}
   {@const baseHeight = getEditorLooseTrayBaseHeight(trayPlacement)}
   {@const isRotated = trayPlacement.rotation === 90 || trayPlacement.rotation === 270}
@@ -422,9 +450,7 @@
 
     <!-- Selection wireframe for loose tray (use original dims since group handles rotation) -->
     {#if isSelected}
-      {@const edgesGeom = new THREE.EdgesGeometry(
-        new THREE.BoxGeometry(trayPlacement.originalWidth, trayPlacement.originalDepth, trayPlacement.height)
-      )}
+      {@const edgesGeom = getEdgeBoxGeometry(trayPlacement.originalWidth, trayPlacement.originalDepth, trayPlacement.height)}
       <T.LineSegments
         rotation.x={-Math.PI / 2}
         position.x={trayPlacement.originalWidth / 2}
@@ -448,7 +474,7 @@
   {@const isRotated = boardPlacement.rotation === 90 || boardPlacement.rotation === 270}
   {@const isSelected = selectedItemId === boardPlacement.boardId && selectedItemType === 'board'}
   {@const isHovered = hoveredItemId === boardPlacement.boardId}
-  {@const layeredBoxGeometry = layeredBoxes.find((entry) => entry.proxyBoardId === boardPlacement.boardId)}
+  {@const layeredBoxGeometry = layeredBoxByProxyBoardId.get(boardPlacement.boardId)}
   {@const baseX = layerOffsetX + boardPlacement.x + dims.width / 2}
   {@const baseZ = layerOffsetZ - boardPlacement.y - dims.depth / 2}
 
@@ -506,9 +532,7 @@
     </T.Mesh>
 
     {#if isSelected}
-      {@const edgesGeom = new THREE.EdgesGeometry(
-        new THREE.BoxGeometry(boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth)
-      )}
+      {@const edgesGeom = getEdgeBoxGeometry(boardPlacement.originalWidth, boardPlacement.height, boardPlacement.originalDepth)}
       <T.LineSegments
         position.y={boardPlacement.height / 2}
         geometry={edgesGeom}

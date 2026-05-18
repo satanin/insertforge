@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { T, useThrelte, useTask } from '@threlte/core';
   import { OrbitControls, Grid, Text, interactivity, type IntersectionEvent } from '@threlte/extras';
   import PrintBed from './PrintBed.svelte';
@@ -857,7 +857,14 @@
 
   // Create rounded triangle geometry for counter previews
   // Matches the JSCAD hull-of-circles approach from counterTray.ts
+  const roundedTriangleGeometryCache = new Map<string, BufferGeometry>();
+  const edgeBoxGeometryCache = new Map<string, THREE.EdgesGeometry>();
+
   function createRoundedTriangleGeometry(side: number, thickness: number, cornerRadius: number): BufferGeometry {
+    const key = `${side}:${thickness}:${cornerRadius}`;
+    const cached = roundedTriangleGeometryCache.get(key);
+    if (cached) return cached;
+
     const r = cornerRadius;
     const triHeight = side * (Math.sqrt(3) / 2);
 
@@ -928,8 +935,33 @@
     const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     // Center the geometry along extrusion axis, and adjust Y for asymmetric top inset
     geom.translate(0, r / 2, -thickness / 2);
+    roundedTriangleGeometryCache.set(key, geom);
     return geom;
   }
+
+  function getEdgeBoxGeometry(width: number, depth: number, height: number): THREE.EdgesGeometry {
+    const key = `${width}:${depth}:${height}`;
+    const cached = edgeBoxGeometryCache.get(key);
+    if (cached) return cached;
+
+    const box = new THREE.BoxGeometry(width, depth, height);
+    const edges = new THREE.EdgesGeometry(box);
+    box.dispose();
+    edgeBoxGeometryCache.set(key, edges);
+    return edges;
+  }
+
+  onDestroy(() => {
+    for (const geometry of roundedTriangleGeometryCache.values()) {
+      geometry.dispose();
+    }
+    roundedTriangleGeometryCache.clear();
+
+    for (const geometry of edgeBoxGeometryCache.values()) {
+      geometry.dispose();
+    }
+    edgeBoxGeometryCache.clear();
+  });
 
   // Interior offset from box origin (wall + tolerance)
   let interiorStartOffset = $derived(boxWallThickness + boxTolerance);
@@ -1129,18 +1161,97 @@
     };
   });
 
-  // Get live tray color from project store (for reactive updates)
-  function getTrayColor(trayId: string, fallbackIndex: number): string {
+  const MAX_DETAILED_COUNTER_PREVIEW_ITEMS = 200;
+
+  let previewItemCount = $derived.by(() => {
+    const countStacks = (stacks: Array<CounterStack | CardStack>) =>
+      stacks.reduce((total, stack) => total + Math.max(stack.count, 0), 0);
+
+    if (showAllBoxes || showAllLayers || showLayerView) {
+      const boxStacks = allBoxes.reduce(
+        (total, box) => total + box.trayGeometries.reduce((trayTotal, tray) => trayTotal + countStacks(tray.counterStacks), 0),
+        0
+      );
+      const looseStacks = allLooseTrays.reduce((total, tray) => total + countStacks(tray.counterStacks), 0);
+      return boxStacks + looseStacks;
+    }
+
+    if (showAllTrays) {
+      return allTrays.reduce((total, tray) => total + countStacks(tray.counterStacks), 0);
+    }
+
+    return countStacks(selectedTrayCounters);
+  });
+
+  let effectiveShowCounters = $derived(
+    showCounters &&
+      (!(showAllBoxes || showAllLayers || showLayerView || showAllTrays) ||
+        previewItemCount <= MAX_DETAILED_COUNTER_PREVIEW_ITEMS)
+  );
+
+  function getGeometryVertexCount(geom: BufferGeometry | null): number {
+    return geom?.getAttribute('position')?.count ?? 0;
+  }
+
+  $effect(() => {
+    if (!import.meta.env.DEV) return;
+    const geometries = [
+      geometry,
+      boxGeometry,
+      lidGeometry,
+      lidTextInlayGeometry,
+      ...allTrays.map((tray) => tray.geometry),
+      ...allBoxes.flatMap((box) => [
+        box.boxGeometry,
+        box.lidGeometry,
+        box.lidTextInlayGeometry ?? null,
+        ...box.trayGeometries.map((tray) => tray.geometry)
+      ]),
+      ...allLooseTrays.map((tray) => tray.geometry),
+      ...layeredBoxes.flatMap((box) => [
+        box.shellGeometry,
+        box.lidGeometry,
+        box.lidTextInlayGeometry,
+        ...box.assemblyTrayGeometries.map((tray) => tray.geometry),
+        ...box.internalLayers.map((layer) => layer.geometry),
+        ...box.sections.map((section) => section.geometry)
+      ])
+    ].filter((entry): entry is BufferGeometry => entry !== null);
+
+    const vertices = geometries.reduce((total, geom) => total + getGeometryVertexCount(geom), 0);
+    console.debug('[Scene Metrics]', {
+      viewMode: {
+        showAllBoxes,
+        showAllLayers,
+        showLayerView,
+        showAllTrays
+      },
+      geometries: geometries.length,
+      vertices,
+      previewItemCount,
+      effectiveShowCounters
+    });
+  });
+
+  let trayColorById = $derived.by(() => {
+    const colors = new Map<string, string>();
     const project = getProject();
     for (const layer of project.layers) {
       for (const box of layer.boxes) {
-        const tray = box.trays.find((t) => t.id === trayId);
-        if (tray?.color) return tray.color;
+        for (const tray of box.trays) {
+          colors.set(tray.id, tray.color);
+        }
       }
-      const looseTray = layer.looseTrays.find((t) => t.id === trayId);
-      if (looseTray?.color) return looseTray.color;
+      for (const tray of layer.looseTrays) {
+        colors.set(tray.id, tray.color);
+      }
     }
-    return TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
+    return colors;
+  });
+
+  // Get live tray color from project store (for reactive updates)
+  function getTrayColor(trayId: string, fallbackIndex: number): string {
+    return trayColorById.get(trayId) ?? TRAY_COLORS[fallbackIndex % TRAY_COLORS.length];
   }
 </script>
 
@@ -1242,7 +1353,7 @@
         wallThickness={boxWallThickness}
         tolerance={boxTolerance}
         floorThickness={boxFloorThickness}
-        showCounters={showCounters && !isLayoutEditMode}
+        showCounters={effectiveShowCounters && !isLayoutEditMode}
         showLid={false}
         {triangleCornerRadius}
         {onTrayClick}
@@ -1298,7 +1409,7 @@
         wallThickness={boxWallThickness}
         tolerance={boxTolerance}
         floorThickness={boxFloorThickness}
-        showCounters={showCounters && !isLayoutEditMode}
+        showCounters={effectiveShowCounters && !isLayoutEditMode}
         showLid={true}
         layerName={layer.name}
         layerHeight={arrangement.layerHeight}
@@ -1455,7 +1566,7 @@
       wallThickness={boxWallThickness}
       tolerance={boxTolerance}
       floorThickness={boxFloorThickness}
-      {showCounters}
+      showCounters={effectiveShowCounters}
       showLid={true}
       layerName={viewTitle}
       showLabel={true}
@@ -1555,7 +1666,7 @@
           </T.Mesh>
           <!-- Selection wireframe - uses actual geometry dimensions -->
           {#if isSelected}
-            {@const edgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(geomWidth, geomDepth, geomHeight))}
+            {@const edgesGeom = getEdgeBoxGeometry(geomWidth, geomDepth, geomHeight)}
             <T.LineSegments
               rotation.x={-Math.PI / 2}
               position.x={geomWidth / 2}
@@ -1717,7 +1828,7 @@
 {/if}
 
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
-{#if !generating && showCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
+{#if !generating && effectiveShowCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {#each selectedTrayCounters as stack, stackIdx (stackIdx)}
     {#if !isCounterStack(stack)}
       <!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
@@ -1847,7 +1958,7 @@
 {/if}
 
 <!-- Counter preview for all trays view (single box view) - using T.Group so counters rotate with tray (hidden in edit mode) -->
-{#if !generating && showCounters && !isLayoutEditMode && showAllTrays && !showAllBoxes && allTrays.length > 0}
+{#if !generating && effectiveShowCounters && !isLayoutEditMode && showAllTrays && !showAllBoxes && allTrays.length > 0}
   {@const maxTrayWidth = Math.max(...allTrays.map((t) => t.placement.dimensions.width))}
   {@const maxTrayHeight = Math.max(...allTrays.map((t) => t.placement.dimensions.height))}
   {@const liftPhase = Math.max((explosionAmount - 50) / 50, 0)}
