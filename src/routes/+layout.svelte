@@ -38,7 +38,9 @@
         <Link href={APP_LINKS.satanin} target="_blank" rel="noopener noreferrer" color="fg">satanin</Link>
         <span>-</span>
         <span>based on</span>
-        <Link href={APP_LINKS.counterSlayerApp} target="_blank" rel="noopener noreferrer" color="fg">Counter Slayer</Link>
+        <Link href={APP_LINKS.counterSlayerApp} target="_blank" rel="noopener noreferrer" color="fg">
+          Counter Slayer
+        </Link>
         <span>by</span>
         <Link href={APP_LINKS.daveSnider} target="_blank" rel="noopener noreferrer" color="fg">Dave Snider</Link>
       </div>
@@ -46,6 +48,7 @@
     <div style="display: flex; align-items: center; gap: 0.75rem;">
       <div class="headerLinks">
         <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
+        <Link href={APP_LINKS.license} color="fg">License</Link>
       </div>
       <div class="headerMenu">
         <Popover positioning={{ placement: 'bottom-end' }}>
@@ -57,6 +60,7 @@
           {#snippet content()}
             <div class="headerMenuContent">
               <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
+              <Link href={APP_LINKS.license} color="fg">License</Link>
             </div>
           {/snippet}
         </Popover>
