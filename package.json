@@ -1,7 +1,7 @@
 {
   "name": "insertforge",
   "private": true,
-  "version": "1.1.44",
+  "version": "1.2.12",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

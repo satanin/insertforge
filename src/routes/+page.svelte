@@ -20,6 +20,7 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+  import { createCardStoragePreview, getCardStoragePositions } from '$lib/models/cardStorageTray';
   import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
@@ -2127,6 +2128,9 @@
         } else if (isCupTray(looseTray)) {
           jscadGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, spacerHeight, showEmboss);
           selectedTrayCounters = []; // Cup trays don't have counter positions
+        } else if (looseTray.type === 'cardStorage') {
+          jscadGeom = createCardStoragePreview(looseTray.params, cardSizes, looseTray.color);
+          selectedTrayCounters = getCardStoragePositions(looseTray.params, cardSizes);
         } else if (isMiniatureRackTray(looseTray)) {
           jscadGeom = createMiniatureRack(looseTray.params, looseTray.name, maxHeight, showEmboss);
           selectedTrayCounters = getMiniatureRackPreviewPositions(looseTray.params);

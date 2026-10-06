@@ -20,6 +20,7 @@ Supported tray families currently include:
 - `Counter Tray`
 - `Card Draw Tray`
 - `Card Divider Tray`
+- `Card Storage` as a loose tray with removable dividers and an optional sliding lid
 - `Card Well Tray`
 - `Cup Tray`
 - `Miniature Rack` as a loose-tray-only item for now
@@ -34,6 +35,12 @@ Supported tray families currently include:
 - Use `Adapt to gap` for `Box` and `Layered Box` to grow or shrink into available layer space when valid.
 - Export printable geometry and PDF reference material.
 - Preview counters, cards, and miniature-base occupancy in supported tray types.
+
+## Card Storage
+
+Choose `Add loose tray → Card Storage` for one continuous cavity with removable dividers. Select a card size and size the tray by total card count or fixed exterior length. A maximum total height automatically tilts cards and dividers (up to 60° from upright), with an inclined support at one end.
+
+Dividers can be blank or labelled, with left, centre, right or full-width tabs. An optional sliding lid encloses the tabs. Export the tray, lid, all dividers or one divider from the editor; 3MF keeps text as a separate colour body in the same assembly. Multiple STLs download as a ZIP. Physical fit and print tolerances still need validation.
 
 ## Miniature Rack
 

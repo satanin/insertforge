@@ -281,6 +281,7 @@
         }
       }
       for (const tray of layer.looseTrays) {
+        if (tray.type === 'cardStorage' && tray.params.cardSizeId === cardSizeId) count++;
         if (isCardDrawTray(tray)) {
           if (tray.params.cardSizeId === cardSizeId) {
             count++;

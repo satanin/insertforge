@@ -9,6 +9,8 @@ import {
   addBox,
   addLooseTray,
   addTray,
+  duplicateTray,
+  updateCardStorageParams,
   clearLayeredBoxLayerLayout,
   getGlobalSettings,
   getProject,
@@ -27,6 +29,49 @@ import {
   updateGlobalSettings,
   updateProjectName
 } from './project.svelte';
+import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
+
+describe('Card Storage persistence and placement', () => {
+  beforeEach(() => resetProject());
+  it('creates only as a loose tray and gives duplicated dividers fresh IDs', () => {
+    const tray = addLooseTray(undefined, 'cardStorage');
+    expect(tray?.type).toBe('cardStorage');
+    if (tray?.type !== 'cardStorage') throw new Error('Missing storage');
+    updateCardStorageParams(tray.id, { ...tray.params, maxHeight: 60, lid: true });
+    const copy = duplicateTray(tray.id);
+    if (copy?.type !== 'cardStorage') throw new Error('Missing copy');
+    expect(copy.params.dividers[0].id).not.toBe(tray.params.dividers[0].id);
+    expect(copy.params.maxHeight).toBe(60);
+    expect(copy.params.lid).toBe(true);
+    const box = addBox();
+    expect(addTray(box.id,'cardStorage')).toBeNull();
+    moveTray(tray.id,box.id);
+    expect(box.trays.some(t => t.id === tray.id)).toBe(false);
+  });
+  it('round trips labels, settings and card references without degrading the type', () => {
+    const tray = addLooseTray(undefined, 'cardStorage');
+    if (tray?.type !== 'cardStorage') throw new Error('Missing storage');
+    updateCardStorageParams(tray.id,{ ...tray.params, sizing:'length', exteriorLength:120,
+      dividers:[{id:'label',label:'Acción',tab:'right'}] });
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    const result = restored.layers.flatMap(l => l.looseTrays).find(t => t.id === tray.id);
+    expect(result?.type).toBe('cardStorage');
+    if (result?.type !== 'cardStorage') throw new Error('Wrong restored type');
+    expect(result.params).toEqual({ ...tray.params, sizing:'length', exteriorLength:120,
+      dividers:[{id:'label',label:'Acción',tab:'right'}] });
+    expect(result.autoHeight).toBe(false);
+  });
+  it('upgrades legacy two-millimetre walls when a Card Storage has a sliding lid', () => {
+    const tray = addLooseTray(undefined, 'cardStorage');
+    if (tray?.type !== 'cardStorage') throw new Error('Missing storage');
+    updateCardStorageParams(tray.id, { ...tray.params, lid: true, wallThickness: 2, lidClearance: 0.3 });
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    const result = restored.layers.flatMap((layer) => layer.looseTrays).find((entry) => entry.id === tray.id);
+    expect(result?.type).toBe('cardStorage');
+    if (result?.type !== 'cardStorage') throw new Error('Wrong restored type');
+    expect(result.params.wallThickness).toBe(3);
+  });
+});
 
 function createCounterSection(id: string, name: string): LayeredBoxSection {
   return {

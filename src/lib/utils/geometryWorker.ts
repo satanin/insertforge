@@ -12,6 +12,7 @@ import * as THREE from 'three';
 interface GeometryData {
   positions: Float32Array;
   normals: Float32Array;
+  colors?: Float32Array;
 }
 
 interface TrayGeometryResult {
@@ -159,6 +160,7 @@ function arrayToBufferGeometry(data: GeometryData): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+  if (data.colors) geometry.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
   return geometry;
 }
 

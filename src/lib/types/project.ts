@@ -1,4 +1,5 @@
 import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import type { CardStorageParams } from '$lib/models/cardStorageTray';
 import type { CardDrawTrayParams } from '$lib/models/cardTray';
 import type { CardWellTrayParams } from '$lib/models/cardWellTray';
 import type { CounterTrayParams } from '$lib/models/counterTray';
@@ -133,7 +134,22 @@ export interface TileTray extends BaseTray {
 export type CardTray = CardDrawTray;
 
 // Discriminated union of all tray types
-export type Tray = CounterTray | CardDrawTray | CardDividerTray | CupTray | CardWellTray | MiniatureRackTray | TileTray;
+export interface CardStorageTray extends BaseTray {
+  type: 'cardStorage';
+  params: CardStorageParams;
+}
+export function isCardStorageTray(tray: Tray): tray is CardStorageTray {
+  return tray.type === 'cardStorage';
+}
+export type Tray =
+  | CounterTray
+  | CardDrawTray
+  | CardDividerTray
+  | CupTray
+  | CardWellTray
+  | MiniatureRackTray
+  | TileTray
+  | CardStorageTray;
 
 // Type guards for tray types
 export function isCounterTray(tray: Tray): tray is CounterTray {

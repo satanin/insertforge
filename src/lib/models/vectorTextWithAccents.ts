@@ -63,26 +63,39 @@ function createAccentSegments(
   if (accent === 'acute') {
     const accentWidth = Math.max(height * 0.16, 0.8);
     const accentHeight = Math.max(height * 0.22, 1);
-    return [[[centerX - accentWidth * 0.3, baseY], [centerX + accentWidth * 0.7, baseY + accentHeight]]];
+    return [
+      [
+        [centerX - accentWidth * 0.3, baseY],
+        [centerX + accentWidth * 0.7, baseY + accentHeight]
+      ]
+    ];
   }
 
   if (accent === 'tilde') {
     const waveWidth = Math.max(height * 0.34, 1.6);
     const waveHeight = Math.max(height * 0.08, 0.5);
-    return [[
-      [centerX - waveWidth / 2, baseY + waveHeight * 0.2],
-      [centerX - waveWidth / 6, baseY + waveHeight],
-      [centerX + waveWidth / 6, baseY],
-      [centerX + waveWidth / 2, baseY + waveHeight * 0.8]
-    ]];
+    return [
+      [
+        [centerX - waveWidth / 2, baseY + waveHeight * 0.2],
+        [centerX - waveWidth / 6, baseY + waveHeight],
+        [centerX + waveWidth / 6, baseY],
+        [centerX + waveWidth / 2, baseY + waveHeight * 0.8]
+      ]
+    ];
   }
 
   const dotGap = Math.max(height * 0.08, 0.5);
   const dotWidth = Math.max(height * 0.08, 0.45);
   const dotHeight = Math.max(height * 0.05, 0.35);
   return [
-    [[centerX - dotGap - dotWidth, baseY], [centerX - dotGap, baseY + dotHeight]],
-    [[centerX + dotGap, baseY], [centerX + dotGap + dotWidth, baseY + dotHeight]]
+    [
+      [centerX - dotGap - dotWidth, baseY],
+      [centerX - dotGap, baseY + dotHeight]
+    ],
+    [
+      [centerX + dotGap, baseY],
+      [centerX + dotGap + dotWidth, baseY + dotHeight]
+    ]
   ];
 }
 
@@ -128,15 +141,7 @@ export function vectorTextWithAccents({
 
     const glyphWidth = glyphBounds.maxX - glyphBounds.minX;
     if (accentEntry) {
-      allSegments.push(
-        ...createAccentSegments(
-          accentEntry.accent,
-          cursorX,
-          glyphWidth,
-          glyphBounds.maxY,
-          height
-        )
-      );
+      allSegments.push(...createAccentSegments(accentEntry.accent, cursorX, glyphWidth, glyphBounds.maxY, height));
     }
 
     cursorX += glyphWidth + height * letterSpacing;

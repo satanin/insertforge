@@ -368,6 +368,7 @@ export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes:
 }
 
 function isLooseTrayAutoHeightEnabled(tray: Tray): boolean {
+  if (tray.type === 'cardStorage') return false;
   if (isTileTray(tray)) {
     return tray.autoHeight === true;
   }

@@ -132,7 +132,8 @@
 <!-- Tray mesh with -90° X rotation (JSCAD to Three.js transform) -->
 <T.Mesh {geometry} rotation.x={-Math.PI / 2} onclick={handleClick} ondblclick={handleDoubleClick}>
   <T.MeshStandardMaterial
-    {color}
+    color={geometry.hasAttribute('color') ? '#ffffff' : color}
+    vertexColors={geometry.hasAttribute('color')}
     roughness={0.6}
     metalness={0.1}
     side={THREE.DoubleSide}

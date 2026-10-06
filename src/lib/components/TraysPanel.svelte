@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import {
     Input,
     InputCheckbox,
@@ -34,6 +35,7 @@
   import type { CounterTrayParams } from '$lib/models/counterTray';
   import type { CardDrawTrayParams } from '$lib/models/cardTray';
   import type { CardDividerTrayParams } from '$lib/models/cardDividerTray';
+  import CardStorageEditor from './panels/CardStorageEditor.svelte';
   import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
   import type { MiniatureRackParams } from '$lib/models/miniatureRack';
@@ -109,7 +111,7 @@
   let moveDestinations = $derived.by(() => {
     const project = getProject();
     const options: { value: string; label: string; group?: string }[] = [];
-    const boxMovesAllowed = !selectedTray || (!isMiniatureRackTray(selectedTray) && !isTileTray(selectedTray));
+    const boxMovesAllowed = !selectedTray || (!isMiniatureRackTray(selectedTray) && !isTileTray(selectedTray) && selectedTray.type !== 'cardStorage');
 
     for (const layer of project.layers) {
       // Add boxes in this layer
@@ -310,6 +312,8 @@
         isTileTray: true
       };
     }
+    if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getCardSizes()).capacity,
+      isCardTray: true, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
     // Counter tray
     const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
@@ -518,18 +522,22 @@
 
             <Spacer size="1rem" />
 
+            {#if selectedTray.type !== 'cardStorage'}
             <InputCheckbox
               label="Emboss name on tray bottom"
               checked={selectedTray.showEmboss ?? true}
               onchange={(e) => onUpdateTray({ showEmboss: e.currentTarget.checked })}
             />
+            {/if}
           </section>
         </div>
 
         <Hr class="trayDivider" />
       {/if}
 
-      {#if isCounterTray(selectedTray) && onUpdateCounterParams}
+      {#if selectedTray.type === 'cardStorage'}
+        <CardStorageEditor tray={selectedTray} />
+      {:else if isCounterTray(selectedTray) && onUpdateCounterParams}
         <CounterTrayEditor
           tray={selectedTray as CounterTray}
           {trayLetter}

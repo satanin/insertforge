@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultCardStorageParams } from '$lib/models/cardStorageTray';
 
 import { defaultLidParams } from '$lib/models/lid';
 import { DEFAULT_SHAPE_IDS, defaultParams, type CounterTrayParams } from '$lib/models/counterTray';
@@ -96,6 +97,14 @@ function createProject(): Project {
 }
 
 describe('geometry fingerprints', () => {
+  it('refreshes baked Card Storage colours when the body colour changes', () => {
+    const project = createProject();
+    const tray: Tray = {id:'storage',name:'Storage',type:'cardStorage',color:'#000000',params:{...defaultCardStorageParams}};
+    project.layers[0].looseTrays.push(tray);
+    const before = layerGeometryFingerprint(project,'layer-a');
+    tray.color = '#ffffff';
+    expect(layerGeometryFingerprint(project,'layer-a')).not.toBe(before);
+  });
   it('does not invalidate selected geometry when an unrelated layer changes', () => {
     const project = createProject();
     const selectedBox = project.layers[0].boxes[0];

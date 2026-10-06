@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text, addToast } from '@tableslayer/ui';
   import { IconX, IconPackage, IconRuler, IconStack2, IconRectangle } from '@tabler/icons-svelte';
   import { computePosition, offset, flip, shift } from '@floating-ui/dom';
@@ -399,6 +400,8 @@
         isTileTray: true
       };
     }
+    if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getProject().cardSizes).capacity,
+      isCardTray: true, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
     const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     return {
@@ -1119,6 +1122,16 @@
               </button>
             {/snippet}
             {#snippet content({ contentProps })}
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'cardStorage');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Card Storage</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">One cavity with removable, labelled dividers</Text>
+              </button>
               <button
                 class="trayTypeOption"
                 onclick={() => {

@@ -109,7 +109,6 @@ function createLidNameTextGeometry(
     const extruded = extrudeLinear({ height: textDepth }, expanded);
     textShapes.push(extruded);
   }
-
   if (textShapes.length === 0) return null;
 
   let minX = Infinity;
@@ -191,7 +190,8 @@ export function createBoxWithLidGrooves(
   box: Box,
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = [],
-  targetExteriorHeight?: number
+  targetExteriorHeight?: number,
+  fit: { clearance?: number; slideAlong?: 'x' | 'y' } = {}
 ): Geom3 | null {
   const wall = box.wallThickness;
   const floor = box.floorThickness;
@@ -241,8 +241,9 @@ export function createBoxWithLidGrooves(
   }
 
   // Calculate gaps for fill logic
-  const widthGap = extWidth - minimums.minWidth; // Extra space at east (high X)
-  const depthGap = extDepth - minimums.minDepth; // Extra space at north (high Y)
+  // Empty shells have no tray area to retain with extra walls.
+  const widthGap = box.trays.length ? extWidth - minimums.minWidth : 0;
+  const depthGap = box.trays.length ? extDepth - minimums.minDepth : 0;
 
   // Whether to fill gaps with solid material
   const fillSolid = box.fillSolidEmpty ?? false;
@@ -558,10 +559,10 @@ export function createBoxWithLidGrooves(
     ]
   });
 
-  // For sliding lid, extend the entry wall to full height (no recess on entry side)
-  // Lid slides along the LONGEST dimension for better ergonomics
+  // For sliding lids, extend the entry wall to full height. Callers can
+  // specify the direction; regular Box keeps the longest-side default.
   const snapEnabled = box.lidParams?.snapEnabled ?? true;
-  const slidesAlongX = extWidth > extDepth; // true if box is longer in X
+  const slidesAlongX = fit.slideAlong ? fit.slideAlong === 'x' : extWidth > extDepth;
 
   let recess;
   if (snapEnabled) {
@@ -629,7 +630,7 @@ export function createBoxWithLidGrooves(
 
   if (snapEnabled && snapBumpHeight > 0) {
     // Groove depth must accommodate the rail which bridges clearance gap + extends into groove
-    const clearance = 0.3; // Same as lid cavity clearance
+    const clearance = fit.clearance ?? 0.3; // Same as lid cavity clearance
     const grooveDepth = clearance + snapBumpHeight + 0.1;
     // Groove height uses railEngagement fraction of lip height (wall) for stronger hold
     const lipHeight = wall;
@@ -1083,9 +1084,14 @@ export function createBoxWithLidGrooves(
  *   |___|           |___|
  *       (open here)
  */
-export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: CounterShape[] = []): Geom3 | null {
+export function createLid(
+  box: Box,
+  cardSizes: CardSize[] = [],
+  counterShapes: CounterShape[] = [],
+  fit: { clearance?: number; plateThickness?: number; slideAlong?: 'x' | 'y' } = {}
+): Geom3 | null {
   const wall = box.wallThickness;
-  const clearance = 0.3;
+  const clearance = fit.clearance ?? 0.3;
   const innerWallThickness = wall / 2;
 
   // Snap-lock parameters (with defaults for backwards compatibility)
@@ -1113,8 +1119,10 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     throw new Error(`Lid for "${box.name}": Invalid dimensions.`);
   }
 
-  // Total lid height = 2× wall thickness
-  const lidHeight = wall * 2;
+  // Total printable lid height includes the top plate and the downward lip.
+  // Existing boxes retain their geometry; callers can explicitly size the top plate.
+  const plateThickness = fit.plateThickness ?? wall;
+  const lidHeight = wall + plateThickness;
   const lipHeight = wall; // Walls go down 1× wall thickness
 
   // 1. Solid block (exterior size, full lid height)
@@ -1142,13 +1150,12 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
   let lid = subtract(solid, cavity);
 
   // Honeycomb pattern on top plate only (if enabled)
-  // The "top plate" is the flat printing surface at Z=0 to Z=wall
+  // The top plate is the flat printing surface at Z=0 to Z=plateThickness.
   const honeycombEnabled = box.lidParams?.honeycombEnabled ?? false;
   if (honeycombEnabled) {
     const hexSize = box.lidParams?.honeycombHexSize ?? 5;
     const honeycombWall = box.lidParams?.honeycombWallThickness ?? 1.2;
     const borderOffset = box.lidParams?.honeycombBorderOffset ?? 3;
-    const plateThickness = wall; // Top plate is 1x wall thickness
 
     const honeycombUnion = createHoneycombUnion(extWidth, extDepth, plateThickness, {
       hexSize,
@@ -1161,8 +1168,8 @@ export function createLid(box: Box, cardSizes: CardSize[] = [], counterShapes: C
     }
   }
 
-  // Lid slides along the LONGEST dimension for better ergonomics
-  const slidesAlongX = extWidth > extDepth;
+  // Callers can specify the direction; regular Box keeps the longest-side default.
+  const slidesAlongX = fit.slideAlong ? fit.slideAlong === 'x' : extWidth > extDepth;
 
   // Remove entry lip for sliding entry (if snap enabled)
   if (snapEnabled) {

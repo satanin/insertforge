@@ -1,6 +1,7 @@
 import defaultProjectJson from '$lib/data/defaultProject.json';
 import { APP_VERSION } from '$lib/appInfo';
 import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
+import { defaultCardStorageParams, type CardStorageParams } from '$lib/models/cardStorageTray';
 import { defaultCardDrawTrayParams, type CardDrawTrayParams } from '$lib/models/cardTray';
 import { createDefaultCardWellTrayParams, type CardWellTrayParams } from '$lib/models/cardWellTray';
 import {
@@ -879,6 +880,8 @@ function cloneMiniatureRackParamsWithFreshIds(params: MiniatureRackParams): Mini
 }
 
 function cloneTrayWithFreshIds<T extends Tray>(tray: T, name: string = duplicateName(tray.name)): T {
+  if (tray.type === 'cardStorage') return { ...tray, id: generateId(), name,
+    params: { ...tray.params, dividers: tray.params.dividers.map(d => ({ ...d, id: generateId() })) } } as T;
   if (isCupTray(tray)) {
     return {
       ...tray,
@@ -2444,7 +2447,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
 
-  if (trayType !== 'empty' && trayType !== 'miniatureRack') {
+  if (trayType !== 'empty' && trayType !== 'miniatureRack' && trayType !== 'cardStorage') {
     const color = getNextTrayColor(project.layers);
     let tray: Tray;
     if (trayType === 'cardDraw' || trayType === 'card') {
@@ -2797,6 +2800,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 
 // Tray type for addTray function
 export type TrayType =
+  | 'cardStorage'
   | 'miniatureRack'
   | 'tile'
   | 'counter'
@@ -2818,7 +2822,12 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   const color = getNextTrayColor(project.layers);
 
   let tray: Tray;
-  if (trayType === 'miniatureRack') {
+  if (trayType === 'cardStorage') {
+    tray = { id: generateId(), type: 'cardStorage', name: `Card Storage ${trayNumber}`, color,
+      autoHeight: false, showEmboss: false, rotationOverride: 'auto',
+      params: { ...defaultCardStorageParams, cardSizeId: getDefaultCardSizeId(project.cardSizes),
+        dividers: [{ id: generateId(), label: '', tab: 'left' }] } };
+  } else if (trayType === 'miniatureRack') {
     tray = createDefaultMiniatureRack(`Miniature Rack ${trayNumber}`, color);
   } else if (trayType === 'tile') {
     tray = createDefaultTileTray(`Tile Tray ${trayNumber}`, color, project.counterShapes);
@@ -2873,6 +2882,7 @@ export function deleteLooseTray(trayId: string): void {
 
 // Tray operations (within boxes)
 export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | null {
+  if (trayType === 'cardStorage') return null;
   // Find the box across all layers
   for (const layer of project.layers) {
     const box = layer.boxes.find((b) => b.id === boxId);
@@ -3307,6 +3317,19 @@ export function updateCardDrawTrayParams(trayId: string, params: CardDrawTrayPar
 export const updateCardTrayParams = updateCardDrawTrayParams;
 
 // Update card divider tray params
+export function updateCardStorageParams(trayId: string, params: CardStorageParams): void {
+  for (const layer of project.layers) {
+    const tray = layer.looseTrays.find(t => t.id === trayId);
+    if (tray?.type === 'cardStorage') {
+      rememberDefaultCardSizeId(params.cardSizeId);
+      tray.params = params;
+      tray.autoHeight = false;
+      autosave();
+      return;
+    }
+  }
+}
+
 export function updateCardDividerTrayParams(trayId: string, params: CardDividerTrayParams): void {
   const sanitizedParams = sanitizeCardDividerTrayParams(params, project.cardSizes);
   for (const layer of project.layers) {
@@ -3467,7 +3490,7 @@ export function moveTray(trayId: string, targetBoxId: string | 'new'): void {
   }
 
   if (!sourceTray || !sourceLayer) return;
-  if (isMiniatureRackTray(sourceTray)) return;
+  if (isMiniatureRackTray(sourceTray) || sourceTray.type === 'cardStorage') return;
 
   // Determine target box
   let targetBox: Box;

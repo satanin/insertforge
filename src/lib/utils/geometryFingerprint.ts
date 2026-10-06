@@ -9,6 +9,7 @@ function trayFingerprint(tray: Tray) {
     type: tray.type,
     name: tray.name,
     params: tray.params,
+    color: tray.type === 'cardStorage' ? tray.color : undefined,
     rotationOverride: tray.rotationOverride,
     showEmboss: tray.showEmboss,
     showStackLabels: isCardDividerTray(tray) ? tray.showStackLabels : undefined,

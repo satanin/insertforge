@@ -1756,7 +1756,8 @@
           }}
         >
           <T.MeshStandardMaterial
-            color={getTrayColor(trayData.trayId, i)}
+            color={trayData.geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(trayData.trayId, i)}
+            vertexColors={trayData.geometry.hasAttribute('color')}
             roughness={0.6}
             metalness={0.1}
             side={THREE.DoubleSide}
@@ -1768,7 +1769,8 @@
     <!-- Single selected tray -->
     <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
-        color={getTrayColor(selectedTrayId, 0)}
+        color={geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
+        vertexColors={geometry.hasAttribute('color')}
         roughness={0.6}
         metalness={0.1}
         side={THREE.DoubleSide}

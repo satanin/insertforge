@@ -1,4 +1,5 @@
 import type { Box, CardSize, CounterShape, Tray } from '$lib/types/project';
+import { resolveCardStorage } from './cardStorageTray';
 import { isCardDividerTray, isCardTray, isCardWellTray, isCupTray, isMiniatureRackTray, isTileTray } from '$lib/types/project';
 import { packItems, stackItemsVertically, type PackingItem } from '$lib/utils/binPacking';
 import jscad from '@jscad/modeling';
@@ -63,6 +64,7 @@ export function getTrayDimensionsForTray(
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = []
 ): TrayDimensions {
+  if (tray.type === 'cardStorage') return resolveCardStorage(tray.params, cardSizes);
   if (isCupTray(tray)) {
     return getCupTrayDimensions(tray.params);
   }

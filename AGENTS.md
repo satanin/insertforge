@@ -44,9 +44,11 @@
 ## Current product constraints
 
 - `Miniature Rack` sigue siendo `loose tray` por ahora.
+- `Card Storage` es `loose tray` con piezas dependientes (separadores/tapa); su altura maxima incluye todo el conjunto y no debe crecer por `autoHeight`.
 - `Layered Box` debe seguir alineandose funcional y visualmente con `Box`.
 - Los nuevos objetos externos no deben forzarse dentro de `Layer` si no encajan semanticamente.
 - `HANDOFF.md` debe actuar como lista de trabajo, no como documento largo de diseno.
+- Los exports 3MF de JSCAD deben pasar por `group3mf`, incluso sin grupos: comparte vertices exactamente coincidentes por malla para evitar trazos perdidos en Bambu Studio. Mantener un cuerpo de texto por pieza; no sustituir la prueba real de laminado por un chequeo manifold.
 
 ## Branch notes
 

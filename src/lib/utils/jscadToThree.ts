@@ -9,6 +9,8 @@ export function jscadToBufferGeometry(jscadGeom: Geom3): THREE.BufferGeometry {
 
   const positions: number[] = [];
   const normals: number[] = [];
+  const colors: number[] = [];
+  const hasColors = polygons.some(p => p.color);
 
   for (const polygon of polygons) {
     const vertices = polygon.vertices;
@@ -46,12 +48,17 @@ export function jscadToBufferGeometry(jscadGeom: Geom3): THREE.BufferGeometry {
       normals.push(normal[0], normal[1], normal[2]);
       normals.push(normal[0], normal[1], normal[2]);
       normals.push(normal[0], normal[1], normal[2]);
+      if (hasColors) {
+        const color = polygon.color ?? [1,1,1];
+        for (let v=0;v<3;v++) colors.push(color[0],color[1],color[2]);
+      }
     }
   }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  if (hasColors) geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
   return geometry;
 }

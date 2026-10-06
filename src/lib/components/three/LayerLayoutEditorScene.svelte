@@ -407,7 +407,8 @@
       <!-- Render tray geometry directly with emissive highlighting -->
       <T.Mesh geometry={looseTrayGeom.geometry} rotation.x={-Math.PI / 2}>
         <T.MeshStandardMaterial
-          color={isSelected ? '#ffffff' : getTrayColor(trayPlacement.trayId, trayPlacement.color)}
+          color={isSelected || looseTrayGeom.geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(trayPlacement.trayId, trayPlacement.color)}
+          vertexColors={looseTrayGeom.geometry.hasAttribute('color')}
           roughness={0.6}
           metalness={0.1}
           side={THREE.DoubleSide}

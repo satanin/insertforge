@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
@@ -530,6 +531,10 @@
       stacks = countCups(tray.params.layout);
       counters = stacks;
       isCups = true;
+    } else if (tray.type === 'cardStorage') {
+      stacks = tray.params.dividers.length;
+      counters = resolveCardStorage(tray.params, getProject().cardSizes).capacity;
+      isCards = true;
     } else if (isMiniatureRackTray(tray)) {
       stacks = tray.params.slots.length;
       counters = stacks;
@@ -611,7 +616,9 @@
       {:else if selectionType === 'tray' && selectedTray}
         {@const stats = getTrayStats(selectedTray)}
         <span class="headerStats">
-          {stats.isCups
+          {selectedTray.type === 'cardStorage'
+            ? `${stats.counters} cards · ${stats.stacks} dividers`
+            : stats.isCups
             ? `${stats.stacks} cups`
             : isMiniatureRackTray(selectedTray)
               ? `${stats.stacks} slots`

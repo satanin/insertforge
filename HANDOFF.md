@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.1.43`
+- Version visible actual: `1.2.12`
 
 ## Desarrollo local
 
@@ -261,6 +261,9 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
+- Texto, v1.2.12: usuario confirma que funciona tambien desde la app (2026-10-06), tras validar el separador con Arachne y Classic. Correccion del export 3MF validada; mantener vertices compartidos y un cuerpo de texto por pieza. Impresion fisica pendiente; ver [investigacion y evidencia](docs/plans/card-storage-text-slicer-investigation.md).
+
+- validar fisicamente [Card Storage](docs/plans/card-storage.md): texto, cierre y carga real. v1.2.12 corrige la conectividad del 3MF y conserva el trazo redondeado de 1,2 mm y el inserto de 0,4 mm. Antes de modificar la geometria del texto, leer el [registro de investigacion](docs/plans/card-storage-text-slicer-investigation.md).
 - seguir afinando tolerancias reales de impresion de `Miniature Rack`
 - seguir puliendo geometria del rail/labio de `Miniature Rack`
 - mejoras de gestion de proyecto:

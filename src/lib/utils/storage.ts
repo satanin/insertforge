@@ -7,6 +7,7 @@ import {
   type TopLoadedStackDef
 } from '$lib/models/counterTray';
 import { APP_VERSION } from '$lib/appInfo';
+import { minimumCardStorageLidWallThickness } from '$lib/models/cardStorageTray';
 import { defaultLidParams } from '$lib/models/lid';
 import {
   DEFAULT_CARD_SIZES,
@@ -412,6 +413,21 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'cardStorage') {
+    const storage = tray as Extract<Tray, { type: 'cardStorage' }>;
+    const params = {
+      ...storage.params,
+      cardSizeId: cardSizeIdMapping.get(storage.params.cardSizeId) ?? storage.params.cardSizeId
+    };
+    if (params.lid) {
+      params.wallThickness = Math.max(
+        params.wallThickness,
+        minimumCardStorageLidWallThickness(params.lidClearance)
+      );
+    }
+    return { ...storage, type: 'cardStorage', color, autoHeight: false,
+      params } as Tray;
+  }
   if (trayType === 'miniatureRack') {
     return {
       ...tray,

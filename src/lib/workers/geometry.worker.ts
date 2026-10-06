@@ -14,6 +14,13 @@ import {
   type TrayPlacement
 } from '$lib/models/box';
 import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
+import {
+  createCardStorageParts,
+  createCardStoragePreview,
+  getCardStoragePositions,
+  resolveCardStorage,
+  type CardStoragePart
+} from '$lib/models/cardStorageTray';
 import { createCardDrawTray, getCardDrawPositions } from '$lib/models/cardTray';
 import { createCardWellTray, getCardWellPositions } from '$lib/models/cardWellTray';
 import {
@@ -23,22 +30,36 @@ import {
   type CustomCardSize
 } from '$lib/models/counterTray';
 import { createCupTray } from '$lib/models/cupTray';
-import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
-import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
-import {
-  arrangeLayerContents,
-  getLayeredBoxExteriorDimensions,
-  getLayeredBoxRenderLayout
-} from '$lib/models/layer';
+import { arrangeLayerContents, getLayeredBoxExteriorDimensions, getLayeredBoxRenderLayout } from '$lib/models/layer';
 import {
   createLayeredBoxInternalLayerAssemblyGeometry,
   createLayeredBoxSectionJscadGeometry
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
-import type { Box, CardSize, CounterShape, CupTray, Layer, LayeredBox, LayeredBoxSection, Tray } from '$lib/types/project';
-import { isCardDividerTray, isCardTray, isCardWellTray, isCounterTray, isCupTray, isMiniatureRackTray, isTileTray } from '$lib/types/project';
-import { sanitizeExportName } from '$lib/utils/exportNames';
+import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
+import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
+import type {
+  Box,
+  CardSize,
+  CounterShape,
+  CupTray,
+  Layer,
+  LayeredBox,
+  LayeredBoxSection,
+  Tray
+} from '$lib/types/project';
+import {
+  isCardDividerTray,
+  isCardTray,
+  isCardWellTray,
+  isCounterTray,
+  isCupTray,
+  isMiniatureRackTray,
+  isTileTray
+} from '$lib/types/project';
 import { cleanGeometryForExport } from '$lib/utils/exportGeometryCleanup';
+import { sanitizeExportName } from '$lib/utils/exportNames';
+import { group3mf } from '$lib/utils/group3mf';
 import threemfSerializer from '@jscad/3mf-serializer';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -146,13 +167,10 @@ function createSyntheticLayeredBoxBox(
   counterShapes: CounterShape[]
 ): Box {
   const exteriorWidth =
-    layeredBox.customWidth ??
-    layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+    layeredBox.customWidth ?? layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
   const exteriorDepth =
-    layeredBox.customDepth ??
-    layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
-  const boxBodyHeight =
-    layeredBox.customBoxHeight ?? layout.height + layeredBox.floorThickness + layeredBox.tolerance;
+    layeredBox.customDepth ?? layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
+  const boxBodyHeight = layeredBox.customBoxHeight ?? layout.height + layeredBox.floorThickness + layeredBox.tolerance;
   const interiorWidth = Math.max(exteriorWidth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
   const interiorDepth = Math.max(exteriorDepth - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2, 1);
   const interiorHeight = Math.max(boxBodyHeight - layeredBox.floorThickness, 0.1);
@@ -338,6 +356,7 @@ let latestGenerateId = 0;
 interface GeometryData {
   positions: Float32Array;
   normals: Float32Array;
+  colors?: Float32Array;
 }
 
 function createEmptyGeometryData(): GeometryData {
@@ -429,6 +448,7 @@ interface GenerationProgressMessage {
 
 // Cache the last generated JSCAD geometries for STL export
 let cachedSelectedTray: Geom3 | null = null;
+let cachedStorageExportError = '';
 let cachedBox: Geom3 | null = null;
 let cachedLid: Geom3 | null = null;
 let cachedAllTrays: { jscadGeom: Geom3; name: string }[] = [];
@@ -473,6 +493,8 @@ function getContrastingRgba(hex: string): [number, number, number, number] {
 interface CachedLooseTrayData {
   trayName: string;
   trayGeom: Geom3;
+  parts?: CardStoragePart[];
+  error?: string;
 }
 let cachedAllLooseTrays: CachedLooseTrayData[] = [];
 
@@ -487,6 +509,7 @@ function createTrayGeometry(
   spacerHeight: number
 ): Geom3 {
   const showEmboss = tray.showEmboss ?? true;
+  if (tray.type === 'cardStorage') return createCardStoragePreview(tray.params, cardSizes, tray.color);
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
   }
@@ -519,6 +542,7 @@ function createTrayGeometry(
 }
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
+  if (tray.type === 'cardStorage') return naturalHeight;
   const autoHeightEnabled = isTrayAutoHeightEnabled(tray);
 
   if (
@@ -575,6 +599,7 @@ function getTrayPositions(
   maxHeight: number,
   spacerHeight: number
 ): CounterStack[] {
+  if (tray.type === 'cardStorage') return getCardStoragePositions(tray.params, cardSizes);
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
     return [];
@@ -585,39 +610,38 @@ function getTrayPositions(
   if (isTileTray(tray)) {
     const tileStacks = getTileTrayPreviewPositions(tray.params, counterShapes, maxHeight, spacerHeight);
     return tileStacks.map((stack) => ({
-        shape:
-          stack.customBaseShape === 'square' ||
-          stack.customBaseShape === 'circle' ||
-          stack.customBaseShape === 'hex' ||
-          stack.customBaseShape === 'triangle'
-            ? stack.customBaseShape
-            : ('custom' as const),
-        customShapeName: stack.shapeName,
-        customBaseShape: stack.customBaseShape,
-        x: stack.x,
-        y: stack.y,
-        z: stack.z,
-        width: stack.width,
-        length: stack.length,
-        thickness: stack.thickness,
-        count: stack.count,
-        hexPointyTop: stack.hexPointyTop,
-        color: '#78b8d8',
-        ...(stack.orientation === 'horizontal' && stack.customBaseShape === 'triangle'
-          ? {
-              rowAssignment: 'back' as const
-            }
-          : {}),
-        ...(stack.orientation === 'vertical'
-          ? {
-              isEdgeLoaded: true,
-              edgeOrientation: 'crosswise' as const,
-              slotWidth: stack.slotWidth,
-              slotDepth: stack.slotDepth
-            }
-          : {})
-      })
-    );
+      shape:
+        stack.customBaseShape === 'square' ||
+        stack.customBaseShape === 'circle' ||
+        stack.customBaseShape === 'hex' ||
+        stack.customBaseShape === 'triangle'
+          ? stack.customBaseShape
+          : ('custom' as const),
+      customShapeName: stack.shapeName,
+      customBaseShape: stack.customBaseShape,
+      x: stack.x,
+      y: stack.y,
+      z: stack.z,
+      width: stack.width,
+      length: stack.length,
+      thickness: stack.thickness,
+      count: stack.count,
+      hexPointyTop: stack.hexPointyTop,
+      color: '#78b8d8',
+      ...(stack.orientation === 'horizontal' && stack.customBaseShape === 'triangle'
+        ? {
+            rowAssignment: 'back' as const
+          }
+        : {}),
+      ...(stack.orientation === 'vertical'
+        ? {
+            isEdgeLoaded: true,
+            edgeOrientation: 'crosswise' as const,
+            slotWidth: stack.slotWidth,
+            slotDepth: stack.slotDepth
+          }
+        : {})
+    }));
   }
   if (isCardWellTray(tray)) {
     // Convert card well positions to CounterStack format for visualization
@@ -725,6 +749,8 @@ function jscadToArrays(jscadGeom: Geom3): GeometryData {
 
   const positions: number[] = [];
   const normals: number[] = [];
+  const colors: number[] = [];
+  const hasColors = polygons.some((p) => p.color);
 
   for (const polygon of polygons) {
     const vertices = polygon.vertices;
@@ -760,12 +786,17 @@ function jscadToArrays(jscadGeom: Geom3): GeometryData {
       normals.push(normal[0], normal[1], normal[2]);
       normals.push(normal[0], normal[1], normal[2]);
       normals.push(normal[0], normal[1], normal[2]);
+      if (hasColors) {
+        const color = polygon.color ?? [1, 1, 1];
+        for (let v = 0; v < 3; v++) colors.push(color[0], color[1], color[2]);
+      }
     }
   }
 
   return {
     positions: new Float32Array(positions),
-    normals: new Float32Array(normals)
+    normals: new Float32Array(normals),
+    ...(hasColors ? { colors: new Float32Array(colors) } : {})
   };
 }
 
@@ -840,6 +871,8 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
     // Get card sizes and counter shapes from project level (global)
     const cardSizes = project.cardSizes ?? [];
+    cachedStorageExportError =
+      tray?.type === 'cardStorage' ? resolveCardStorage(tray.params, cardSizes).errors.join(' ') : '';
     const counterShapes = project.counterShapes ?? [];
 
     const gameContainerWidth = project.globalSettings?.gameContainerWidth ?? 256;
@@ -948,9 +981,21 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         const selectedNaturalHeight = getTrayDimensionsForTray(tray, cardSizes, counterShapes).height;
         const selectedTargetHeight = getTrayTargetHeight(tray, selectedNaturalHeight, maxHeight);
         const selectedSpacerHeight = getTraySpacerHeight(tray, selectedSpacer?.floorSpacerHeight ?? 0);
-        cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
+        cachedSelectedTray = createTrayGeometry(
+          tray,
+          cardSizes,
+          counterShapes,
+          selectedTargetHeight,
+          selectedSpacerHeight
+        );
         selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
-        selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, selectedTargetHeight, selectedSpacerHeight);
+        selectedTrayCounters = getTrayPositions(
+          tray,
+          cardSizes,
+          counterShapes,
+          selectedTargetHeight,
+          selectedSpacerHeight
+        );
         cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
 
         if (scope === 'selected' && selectedView === 'tray') {
@@ -1047,7 +1092,12 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
       selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
 
-      cachedAllTrays = [{ jscadGeom: cachedSelectedTray, name: tray.name }];
+      if (tray.type === 'cardStorage') {
+        cachedSelectedTray = cachedStorageExportError
+          ? null
+          : createCardStorageParts(tray.params, cardSizes)[0].geometry;
+      }
+      cachedAllTrays = cachedSelectedTray ? [{ jscadGeom: cachedSelectedTray, name: tray.name }] : [];
       cachedBox = null;
       cachedLid = null;
       cachedBoxName = '';
@@ -1116,7 +1166,9 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
     }
 
     const generationLayers =
-      scope === 'layer' && selectedLayerId ? project.layers.filter((layer) => layer.id === selectedLayerId) : project.layers;
+      scope === 'layer' && selectedLayerId
+        ? project.layers.filter((layer) => layer.id === selectedLayerId)
+        : project.layers;
 
     // Get all boxes from the requested render scope
     const allBoxes = getAllBoxes(generationLayers);
@@ -1188,7 +1240,8 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       // Use the required tray height from layer calculation, not just the box's natural height
       const naturalTrayHeights = boxPlacements.map((p) => p.dimensions.height);
       const maxNaturalTrayHeight = Math.max(...naturalTrayHeights, 0);
-      const boxMaxHeight = boxTargetLayerHeight > 0 ? Math.max(requiredTrayHeight, maxNaturalTrayHeight) : maxNaturalTrayHeight;
+      const boxMaxHeight =
+        boxTargetLayerHeight > 0 ? Math.max(requiredTrayHeight, maxNaturalTrayHeight) : maxNaturalTrayHeight;
 
       // Cache JSCAD geometries for this box's trays
       const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
@@ -1232,7 +1285,9 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       });
 
       const boxHeight =
-        boxTargetLayerHeight > 0 ? boxTargetLayerHeight : getBoxVisibleAssembledHeight(projectBox, cardSizes, counterShapes);
+        boxTargetLayerHeight > 0
+          ? boxTargetLayerHeight
+          : getBoxVisibleAssembledHeight(projectBox, cardSizes, counterShapes);
 
       // Add box dimensions using the effective height used for geometry
       allBoxGeometries.push({
@@ -1363,7 +1418,15 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         // Cache for STL export
         cachedAllLooseTrays.push({
           trayName: looseTray.name,
-          trayGeom: jscadGeom
+          trayGeom: jscadGeom,
+          ...(looseTray.type === 'cardStorage'
+            ? {
+                parts: resolveCardStorage(looseTray.params, cardSizes).valid
+                  ? createCardStorageParts(looseTray.params, cardSizes)
+                  : [],
+                error: resolveCardStorage(looseTray.params, cardSizes).errors.join(' ')
+              }
+            : {})
         });
 
         // Add to result
@@ -1470,6 +1533,8 @@ function handleExportStl(msg: ExportStlMessage): void {
   const { id, target, trayIndex } = msg;
 
   try {
+    if ((target === 'tray' || target === 'all-tray') && cachedStorageExportError)
+      throw new Error(cachedStorageExportError);
     let geom: Geom3 | null = null;
     let filename = 'export.stl';
 
@@ -1646,6 +1711,24 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
     // Export loose trays
     for (const looseTray of cachedAllLooseTrays) {
+      if (looseTray.error) throw new Error(`${looseTray.trayName}: ${looseTray.error}`);
+      if (looseTray.parts) {
+        for (const part of looseTray.parts) {
+          const geom = part.text ? jscad.booleans.union(part.geometry, part.text) : part.geometry;
+          const buffer = await new Blob(
+            stlSerializer.serialize({ binary: true }, cleanGeometryForExport(geom))
+          ).arrayBuffer();
+          files.push({
+            filename: getUniqueFilename(
+              `${sanitizeExportName(looseTray.trayName)}-${sanitizeExportName(part.name)}.stl`,
+              usedFilenames
+            ),
+            data: buffer
+          });
+          transferables.push(buffer);
+        }
+        continue;
+      }
       const cleanedGeom = cleanGeometryForExport(looseTray.trayGeom);
       const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
       const blob = new Blob(stlData, { type: 'application/octet-stream' });
@@ -1735,8 +1818,9 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
       if (boxData.lidTextInlayGeom) {
         const cleanedGeom = cleanGeometryForExport(boxData.lidTextInlayGeom);
-        (cleanedGeom as Geom3 & { color?: [number, number, number, number] }).color =
-          boxData.lidTextInlayColor ?? [0.98, 0.98, 0.98, 1];
+        (cleanedGeom as Geom3 & { color?: [number, number, number, number] }).color = boxData.lidTextInlayColor ?? [
+          0.98, 0.98, 0.98, 1
+        ];
         namedGeometries.push({
           geom: cleanedGeom,
           name: getUniqueName(`${boxPrefix}-lid-text-inlay`),
@@ -1767,6 +1851,19 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
     // Add loose trays
     for (const looseTray of cachedAllLooseTrays) {
+      if (looseTray.error) throw new Error(`${looseTray.trayName}: ${looseTray.error}`);
+      if (looseTray.parts) {
+        for (const part of looseTray.parts) {
+          const name = getUniqueName(`${sanitizeExportName(looseTray.trayName)}-${sanitizeExportName(part.name)}`);
+          namedGeometries.push({ geom: cleanGeometryForExport(part.geometry), name, groupKey: name });
+          if (part.text) {
+            const geom = cleanGeometryForExport(part.text) as Geom3 & { color: [number, number, number, number] };
+            geom.color = [0.98, 0.98, 0.98, 1];
+            namedGeometries.push({ geom, name: getUniqueName(`${name}-text`), groupKey: name });
+          }
+        }
+        continue;
+      }
       const cleanedGeom = cleanGeometryForExport(looseTray.trayGeom);
       const trayName = sanitizeExportName(looseTray.trayName);
       namedGeometries.push({
@@ -1797,6 +1894,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     let rowMaxDepth = 0;
     const maxRowWidth = 300;
     const arrangedGeometries: Geom3[] = [];
+    const componentGroups: number[][] = [];
     const groupedGeometries = new Map<string, { geom: Geom3; name: string }[]>();
     const ungroupedGeometries: { geom: Geom3; name: string }[] = [];
 
@@ -1816,6 +1914,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     ];
 
     for (const { items } of arrangedItems) {
+      componentGroups.push(items.map((_, i) => arrangedGeometries.length + i + 1));
       const boundsList = items.map(({ geom }) => measureBoundingBox(geom));
       const groupMinX = Math.min(...boundsList.map((bounds) => bounds[0][0]));
       const groupMinY = Math.min(...boundsList.map((bounds) => bounds[0][1]));
@@ -1854,9 +1953,12 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
       ...arrangedGeometries
     );
 
-    const blob = new Blob(threemfData, {
-      type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
-    });
+    const blob = await group3mf(
+      new Blob(threemfData, {
+        type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml'
+      }),
+      componentGroups
+    );
     const buffer = await blob.arrayBuffer();
 
     self.postMessage(

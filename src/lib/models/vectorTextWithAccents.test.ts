@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import jscad from '@jscad/modeling';
-
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 describe('vectorTextWithAccents', () => {
