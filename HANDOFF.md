@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.12`
+- Version visible actual: `1.2.13`
 
 ## Desarrollo local
 
@@ -260,6 +260,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.13: enlace de atribucion actualizado a `https://counterslayer.com`; pendiente validacion del usuario desde la app.
 
 - Texto, v1.2.12: usuario confirma que funciona tambien desde la app (2026-10-06), tras validar el separador con Arachne y Classic. Correccion del export 3MF validada; mantener vertices compartidos y un cuerpo de texto por pieza. Impresion fisica pendiente; ver [investigacion y evidencia](docs/plans/card-storage-text-slicer-investigation.md).
 
