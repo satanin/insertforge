@@ -18,6 +18,25 @@ const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
 });
 
 describe('Card Storage', () => {
+  it('excludes the lid from the static body used by the animated detail view', () => {
+    const p = params({ lid: true, lidText: '', dividers: [] });
+    const body = createCardStorageParts(p, cards).find((part) => part.id === 'body')!;
+    const preview = createCardStoragePreview(p, cards, '#3d7a6a', 'bodyOnly');
+    expect(jscad.geometries.geom3.toPolygons(preview)).toHaveLength(
+      jscad.geometries.geom3.toPolygons(body.assembled).length
+    );
+  });
+  it('shows the lid beside the body only in the individual preview', () => {
+    const p = params({ lid: true, lidText: '', dividers: [] });
+    const r = resolveCardStorage(p, cards);
+    const assembled = createCardStoragePreview(p, cards);
+    const beside = createCardStoragePreview(p, cards, '#3d7a6a', 'sideBySide');
+    expect(jscad.measurements.measureBoundingBox(assembled)[1][0]).toBeCloseTo(r.width);
+    expect(jscad.measurements.measureBoundingBox(beside)[1][0]).toBeGreaterThan(r.width + 10);
+    expect(jscad.geometries.geom3.toPolygons(beside)).toHaveLength(jscad.geometries.geom3.toPolygons(assembled).length);
+    const noLid = createCardStoragePreview({ ...p, lid: false }, cards, '#3d7a6a', 'sideBySide');
+    expect(jscad.measurements.measureBoundingBox(noLid)[1][0]).toBeCloseTo(r.width);
+  });
   it.each([70, 80])('keeps the lid entry on the storage end at %s mm exterior length', (exteriorLength) => {
     const p = params({ lid: true, lidText: '', sizing: 'length', exteriorLength });
     const r = resolveCardStorage(p, cards);

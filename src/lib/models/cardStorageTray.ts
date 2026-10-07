@@ -75,7 +75,6 @@ export interface CardStorageParams {
   dividerColor?: string;
   tabHeight: number;
   lid: boolean;
-  previewLid?: boolean;
   lidThickness: number;
   lidClearance: number;
   lidText?: string;
@@ -338,15 +337,23 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
   return parts;
 }
 
-export function createCardStoragePreview(p: CardStorageParams, cards: CardSize[], bodyColor = '#3d7a6a'): Geom3 {
+export function createCardStoragePreview(
+  p: CardStorageParams,
+  cards: CardSize[],
+  bodyColor = '#3d7a6a',
+  layout: 'assembled' | 'sideBySide' | 'bodyOnly' = 'assembled'
+): Geom3 {
   const r = resolveCardStorage(p, cards);
   // Keep the rest of the project view usable while invalid inputs are being edited.
   if (!r.valid) return jscad.geometries.geom3.create();
   return jscad.geometries.geom3.create(
-    createCardStorageParts(p, cards)
-      .filter((part) => part.id !== 'lid' || p.previewLid)
-      .flatMap((part) => [
-        ...jscad.geometries.geom3.toPolygons(part.assembled).map((poly) => ({
+    createCardStorageParts(p, cards).flatMap((part) => {
+      if (layout === 'bodyOnly' && part.id === 'lid') return [];
+      const beside = part.id === 'lid' && layout === 'sideBySide';
+      const geometry = beside ? translate([r.width + 10, 0, 0], part.geometry) : part.assembled;
+      const text = beside ? part.text && translate([r.width + 10, 0, 0], part.text) : part.assembledText;
+      return [
+        ...jscad.geometries.geom3.toPolygons(geometry).map((poly) => ({
           ...poly,
           color: previewColor(
             part.id === 'body' || part.id === 'lid'
@@ -356,12 +363,13 @@ export function createCardStoragePreview(p: CardStorageParams, cards: CardSize[]
                   DEFAULT_STORAGE_DIVIDER_COLOR)
           )
         })),
-        ...(part.assembledText
+        ...(text
           ? jscad.geometries.geom3
-              .toPolygons(part.assembledText)
+              .toPolygons(text)
               .map((poly) => ({ ...poly, color: [0.04, 0.04, 0.04, 1] as [number, number, number, number] }))
           : [])
-      ])
+      ];
+    })
   );
 }
 

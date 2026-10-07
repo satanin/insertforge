@@ -20,7 +20,7 @@
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
-  import { createCardStoragePreview, getCardStoragePositions } from '$lib/models/cardStorageTray';
+  import { createCardStorageParts, createCardStoragePreview, getCardStoragePositions, resolveCardStorage } from '$lib/models/cardStorageTray';
   import { createCardWellTray } from '$lib/models/cardWellTray';
   import { arrangeTrays, calculateTraySpacers, getTrayDimensionsForTray } from '$lib/models/box';
   import { createCupTray } from '$lib/models/cupTray';
@@ -826,6 +826,28 @@
   }
 
   let selectedTray = $derived(getSelectedTray());
+  let cardStorageDetail = $derived.by(() => {
+    if (selectedTray?.type !== 'cardStorage' || !selectedTray.params.lid) return null;
+    const cards = getProject().cardSizes;
+    const dimensions = resolveCardStorage(selectedTray.params, cards);
+    if (!dimensions.valid) return null;
+    const lid = createCardStorageParts(selectedTray.params, cards).find((part) => part.id === 'lid')!;
+    return {
+      body: jscadToBufferGeometry(createCardStoragePreview(selectedTray.params, cards, selectedTray.color, 'bodyOnly')),
+      lid: jscadToBufferGeometry(lid.assembled),
+      text: lid.assembledText ? jscadToBufferGeometry(lid.assembledText) : null,
+      slideDistance: dimensions.depth + dimensions.height * 0.5,
+      color: selectedTray.color
+    };
+  });
+  $effect(() => {
+    const detail = cardStorageDetail;
+    return () => {
+      detail?.body.dispose();
+      detail?.lid.dispose();
+      detail?.text?.dispose();
+    };
+  });
   let selectedBox = $derived(getSelectedBox());
   let selectedBoard = $derived(getSelectedBoard());
   let selectedLayer = $derived(getSelectedLayer());
@@ -1284,6 +1306,14 @@
     selectedTrayGeometry = selectedTray ? result.selectedTrayGeometry : null;
     selectedTrayCounters = selectedTray ? result.selectedTrayCounters : [];
     allTrayGeometries = result.allTrayGeometries;
+    if (selectedTray?.type === 'cardStorage') {
+      selectedTrayGeometry = jscadToBufferGeometry(
+        createCardStoragePreview(selectedTray.params, getProject().cardSizes, selectedTray.color, 'sideBySide')
+      );
+      allTrayGeometries = allTrayGeometries.map((item) =>
+        item.trayId === selectedTray.id ? { ...item, geometry: selectedTrayGeometry! } : item
+      );
+    }
     boxGeometry = selectedBox ? result.boxGeometry : null;
     lidGeometry = selectedBox ? result.lidGeometry : null;
 
@@ -1443,6 +1473,11 @@
         const cachedLooseTray = allLooseTrayGeometries.find((t) => t.trayId === generationTray.id);
         if (cachedLooseTray) {
           selectedTrayGeometry = cachedLooseTray.geometry;
+          if (selectedTray.type === 'cardStorage') {
+            selectedTrayGeometry = jscadToBufferGeometry(
+              createCardStoragePreview(selectedTray.params, project.cardSizes, selectedTray.color, 'sideBySide')
+            );
+          }
           selectedTrayCounters = cachedLooseTray.counterStacks;
           // For loose trays, allTrayGeometries is just this tray
           allTrayGeometries = [
@@ -1450,7 +1485,7 @@
               trayId: cachedLooseTray.trayId,
               name: cachedLooseTray.name,
               color: cachedLooseTray.color,
-              geometry: cachedLooseTray.geometry,
+              geometry: selectedTrayGeometry,
               placement: {
                 tray: generationTray,
                 x: 0,
@@ -2129,7 +2164,7 @@
           jscadGeom = createCupTray(looseTray.params, looseTray.name, maxHeight, spacerHeight, showEmboss);
           selectedTrayCounters = []; // Cup trays don't have counter positions
         } else if (looseTray.type === 'cardStorage') {
-          jscadGeom = createCardStoragePreview(looseTray.params, cardSizes, looseTray.color);
+          jscadGeom = createCardStoragePreview(looseTray.params, cardSizes, looseTray.color, 'sideBySide');
           selectedTrayCounters = getCardStoragePositions(looseTray.params, cardSizes);
         } else if (isMiniatureRackTray(looseTray)) {
           jscadGeom = createMiniatureRack(looseTray.params, looseTray.name, maxHeight, showEmboss);
@@ -3056,6 +3091,7 @@
           {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
             <TrayViewer
               geometry={visibleGeometries.tray}
+              cardStorageDetail={viewMode === 'tray' ? cardStorageDetail : null}
               allTrays={visibleGeometries.allTrays}
               allBoxes={visibleGeometries.allBoxes}
               allLooseTrays={visibleGeometries.allLooseTrays}
@@ -3128,6 +3164,12 @@
           <div data-testid="geometry-ready" style="display: none;"></div>
         {/if}
 
+        {#if viewMode === 'tray' && cardStorageDetail && !generating}
+          <div class="viewToolbar"><div class="sliderContainer">
+            <span class="sliderLabel">Explode</span>
+            <InputSlider min={0} max={100} bind:value={explosionAmount} />
+          </div></div>
+        {/if}
         {#if viewMode === 'layer' && !generating}
           <div class="viewToolbar">
             {#if selectionType === 'layeredBox'}
@@ -3333,6 +3375,7 @@
             <TrayViewer
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}
+              cardStorageDetail={viewMode === 'tray' ? cardStorageDetail : null}
               allBoxes={visibleGeometries.allBoxes}
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
@@ -3404,6 +3447,12 @@
           <div data-testid="geometry-ready" style="display: none;"></div>
         {/if}
 
+        {#if viewMode === 'tray' && cardStorageDetail && !generating && !debugParams.hideUI}
+          <div class="viewToolbar"><div class="sliderContainer">
+            <span class="sliderLabel">Explode</span>
+            <InputSlider min={0} max={100} bind:value={explosionAmount} />
+          </div></div>
+        {/if}
         {#if viewMode === 'layer' && !generating && !debugParams.hideUI}
           <div class="viewToolbar">
             {#if selectionType === 'layeredBox'}

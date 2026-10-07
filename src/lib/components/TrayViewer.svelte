@@ -118,6 +118,7 @@
 
   interface Props {
     geometry: BufferGeometry | null;
+    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string } | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
     allLooseTrays?: LooseTrayGeometryData[];
@@ -184,6 +185,7 @@
 
   let {
     geometry,
+    cardStorageDetail = null,
     allTrays = [],
     allBoxes = [],
     allLooseTrays = [],
@@ -287,6 +289,7 @@
   <Canvas>
     <TrayScene
       {geometry}
+      {cardStorageDetail}
       {allTrays}
       {allBoxes}
       {allLooseTrays}

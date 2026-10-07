@@ -128,6 +128,7 @@
 
   interface Props {
     geometry: BufferGeometry | null;
+    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string } | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
     allLooseTrays?: LooseTrayGeometryData[];
@@ -198,6 +199,7 @@
 
   let {
     geometry,
+    cardStorageDetail = null,
     allTrays = [],
     allBoxes = [],
     allLooseTrays = [],
@@ -1767,7 +1769,7 @@
     {/each}
   {:else if geometry && !showLayerView}
     <!-- Single selected tray -->
-    <T.Mesh {geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
+    <T.Mesh geometry={cardStorageDetail?.body ?? geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
         color={geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
         vertexColors={geometry.hasAttribute('color')}
@@ -1780,6 +1782,18 @@
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
+{#if !generating && geometry && cardStorageDetail && !showLayerView && !showAllTrays}
+  <T.Group position.x={meshOffset.x} position.z={meshOffset.z + cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
+    <T.Mesh geometry={cardStorageDetail.lid}>
+      <T.MeshStandardMaterial color={cardStorageDetail.color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
+    </T.Mesh>
+    {#if cardStorageDetail.text}
+      <T.Mesh geometry={cardStorageDetail.text}>
+        <T.MeshStandardMaterial color="#101010" side={THREE.DoubleSide} />
+      </T.Mesh>
+    {/if}
+  </T.Group>
+{/if}
 {#if !generating && lidGeometry && !showAllBoxes && !showLayerView && !visualEditMode}
   {@const lidWidth = lidBounds ? lidBounds.max.x - lidBounds.min.x : 0}
   {@const lidHeight = lidBounds ? lidBounds.max.z - lidBounds.min.z : 0}

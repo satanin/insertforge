@@ -152,14 +152,6 @@
       </select>
     </label>
     <p class="hint">Uses the Box sliding lock. The lid opens along the card-storage direction.</p>
-    <label class="checkbox">
-      <input
-        type="checkbox"
-        checked={tray.params.previewLid ?? false}
-        onchange={(e) => update('previewLid', e.currentTarget.checked)}
-      />
-      Show lid closed in preview
-    </label>
   {/if}
   <p class="summary">
     {result.width.toFixed(1)} × {result.depth.toFixed(1)} × {result.height.toFixed(1)} mm
@@ -353,17 +345,6 @@
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
-  }
-  .checkbox {
-    display: flex;
-    align-items: center;
-  }
-  .checkbox input {
-    appearance: auto;
-    padding: 0;
-    width: 1rem;
-    height: 1rem;
-    accent-color: #b94c38;
   }
   .hint,
   .summary {
