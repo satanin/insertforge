@@ -27,12 +27,27 @@ import {
   updateCardDrawTrayParams,
   updateLayeredBoxSection,
   updateGlobalSettings,
-  updateProjectName
+  updateProjectName,
+  updateTray
 } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 
 describe('Card Storage persistence and placement', () => {
   beforeEach(() => resetProject());
+  it('updates default lid lettering on successive renames, preserving custom and blank text', () => {
+    const created = addLooseTray(undefined, 'cardStorage');
+    const tray = getProject().layers.flatMap((layer) => layer.looseTrays).find((entry) => entry.id === created?.id);
+    if (tray?.type !== 'cardStorage') throw new Error('Missing storage');
+    updateTray(tray.id, { name: 'Player cards' });
+    expect(tray.params.lidText).toBe('Player cards');
+    updateTray(tray.id, { name: 'Encounter cards' });
+    expect(tray.params.lidText).toBe('Encounter cards');
+    for (const lidText of ['Custom label', '']) {
+      updateCardStorageParams(tray.id, { ...tray.params, lidText });
+      updateTray(tray.id, { name: 'Renamed storage' });
+      expect(tray.params.lidText).toBe(lidText);
+    }
+  });
   it('creates only as a loose tray and gives duplicated dividers fresh IDs', () => {
     const tray = addLooseTray(undefined, 'cardStorage');
     expect(tray?.type).toBe('cardStorage');

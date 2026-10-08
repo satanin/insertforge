@@ -3045,6 +3045,11 @@ export function updateTray(trayId: string, updates: Partial<Omit<Tray, 'id'>>): 
     // Check loose trays
     const looseTray = layer.looseTrays.find((t) => t.id === trayId);
     if (looseTray) {
+      if (looseTray.type === 'cardStorage' && updates.name !== undefined &&
+        (looseTray.params.lidText === undefined || looseTray.params.lidText === 'Card Storage' ||
+          looseTray.params.lidText === looseTray.name)) {
+        looseTray.params = { ...looseTray.params, lidText: updates.name };
+      }
       Object.assign(looseTray, updates);
       autosave();
       return;

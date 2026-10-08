@@ -1783,7 +1783,7 @@
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
 {#if !generating && geometry && cardStorageDetail && !showLayerView && !showAllTrays}
-  <T.Group position.x={meshOffset.x} position.z={meshOffset.z + cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
+  <T.Group position.x={meshOffset.x} position.z={meshOffset.z - cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
     <T.Mesh geometry={cardStorageDetail.lid}>
       <T.MeshStandardMaterial color={cardStorageDetail.color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
     </T.Mesh>

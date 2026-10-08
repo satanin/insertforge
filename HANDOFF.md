@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.15`
+- Version visible actual: `1.2.16`
 
 ## Desarrollo local
 
@@ -260,6 +260,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.16: sentido del slider de tapa y sincronizacion del texto predeterminado al renombrar Card Storage validados por el usuario en la app (2026-10-08).
 
 - v1.2.15: preview y slider Explode de Card Storage aceptados por el usuario para commit/push (2026-10-07). Migracion a tipo de Box aun pendiente de decidir.
 
