@@ -12,6 +12,7 @@ import {
 } from '$lib/models/counterTray';
 import { defaultCupTrayParams, type CupTrayParams } from '$lib/models/cupTray';
 import { defaultLidParams } from '$lib/models/lid';
+import { defaultMiniatureSocketRackParams } from '$lib/models/miniatureSocketRack';
 import {
   createDefaultMiniatureRackSlot,
   DEFAULT_MINIATURE_RACK_BASE_DEPTH,
@@ -870,8 +871,12 @@ function cloneCardWellParamsWithFreshIds(params: CardWellTrayParams): CardWellTr
 }
 
 function cloneMiniatureRackParamsWithFreshIds(params: MiniatureRackParams): MiniatureRackParams {
+  const modelIds = new Map((params.sockets?.models ?? []).map(model => [model.id, generateId()]));
   return {
     ...params,
+    ...(params.sockets ? { sockets: { ...params.sockets,
+      fillModelId: params.sockets.fillModelId ? modelIds.get(params.sockets.fillModelId) ?? null : null,
+      models: params.sockets.models?.map(model => ({ ...model, id: modelIds.get(model.id)! })) ?? [] } } : {}),
     slots: params.slots.map((slot) => ({
       ...slot,
       id: generateId()
@@ -2447,7 +2452,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
 
-  if (trayType !== 'empty' && trayType !== 'miniatureRack' && trayType !== 'cardStorage') {
+  if (trayType !== 'empty' && trayType !== 'miniatureRack' && trayType !== 'miniatureTray' && trayType !== 'cardStorage') {
     const color = getNextTrayColor(project.layers);
     let tray: Tray;
     if (trayType === 'cardDraw' || trayType === 'card') {
@@ -2802,6 +2807,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 export type TrayType =
   | 'cardStorage'
   | 'miniatureRack'
+  | 'miniatureTray'
   | 'tile'
   | 'counter'
   | 'cardDraw'
@@ -2827,6 +2833,11 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
       autoHeight: false, showEmboss: false, rotationOverride: 'auto',
       params: { ...defaultCardStorageParams, cardSizeId: getDefaultCardSizeId(project.cardSizes),
         dividers: [{ id: generateId(), label: '', tab: 'left' }] } };
+  } else if (trayType === 'miniatureTray') {
+    tray = createDefaultMiniatureRack(`Miniature Tray ${trayNumber}`, color);
+    tray.autoHeight = false;
+    tray.showEmboss = false;
+    tray.params = { ...tray.params, variant: 'sockets', sockets: { ...defaultMiniatureSocketRackParams, models: [] } };
   } else if (trayType === 'miniatureRack') {
     tray = createDefaultMiniatureRack(`Miniature Rack ${trayNumber}`, color);
   } else if (trayType === 'tile') {
@@ -2891,7 +2902,7 @@ export function addTray(boxId: string, trayType: TrayType = 'counter'): Tray | n
       const color = getNextTrayColor(project.layers);
 
       let tray: Tray;
-      if (trayType === 'miniatureRack') {
+      if (trayType === 'miniatureRack' || trayType === 'miniatureTray') {
         return null;
       }
       if (trayType === 'cardDraw' || trayType === 'card') {

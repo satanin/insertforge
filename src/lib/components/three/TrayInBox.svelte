@@ -145,6 +145,12 @@
 <!-- Counter previews in tray-local coordinates -->
 {#if showCounters && counterStacks.length > 0}
   {#each counterStacks as stack, stackIdx (stackIdx)}
+    {#if stack.previewEnvelope}
+      <T.Mesh position={[stack.x, stack.z + stack.previewEnvelope.height / 2, -stack.y]}>
+        <T.BoxGeometry args={[stack.previewEnvelope.width, stack.previewEnvelope.height, stack.previewEnvelope.depth]} />
+        <T.MeshStandardMaterial color={stack.color} transparent opacity={0.16} depthWrite={false} />
+      </T.Mesh>
+    {/if}
     {#if stack.isEdgeLoaded}
       <!-- Edge-loaded: counters standing on edge like books -->
       {#each Array(stack.count) as _, counterIdx (counterIdx)}

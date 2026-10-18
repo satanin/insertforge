@@ -1846,6 +1846,12 @@
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
 {#if !generating && effectiveShowCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
   {#each selectedTrayCounters as stack, stackIdx (stackIdx)}
+    {#if isCounterStack(stack) && stack.previewEnvelope}
+      <T.Mesh position={[meshOffset.x + stack.x, stack.z + stack.previewEnvelope.height / 2, meshOffset.z - stack.y]}>
+        <T.BoxGeometry args={[stack.previewEnvelope.width, stack.previewEnvelope.height, stack.previewEnvelope.depth]} />
+        <T.MeshStandardMaterial color={stack.color} transparent opacity={0.2} depthWrite={false} />
+      </T.Mesh>
+    {/if}
     {#if !isCounterStack(stack)}
       <!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
       {#each Array(stack.count) as _cardItem, cardIdx (cardIdx)}

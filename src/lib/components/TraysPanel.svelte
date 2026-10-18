@@ -14,7 +14,7 @@
     Popover,
     Text
   } from '@tableslayer/ui';
-  import { IconX, IconPlus } from '@tabler/icons-svelte';
+  import { IconX, IconPlus, IconChevronDown } from '@tabler/icons-svelte';
   import type { Box, Tray } from '$lib/types/project';
   import {
     isCounterTray,
@@ -38,7 +38,7 @@
   import CardStorageEditor from './panels/CardStorageEditor.svelte';
   import type { CardWellTrayParams } from '$lib/models/cardWellTray';
   import type { CupTrayParams } from '$lib/models/cupTray';
-  import type { MiniatureRackParams } from '$lib/models/miniatureRack';
+  import { getMiniatureRackSlotCount, type MiniatureRackParams } from '$lib/models/miniatureRack';
   import type { TileTrayParams } from '$lib/models/tileTray';
   import { countCups } from '$lib/types/cupLayout';
   import { countCells } from '$lib/types/cardWellLayout';
@@ -99,6 +99,9 @@
   }: Props = $props();
 
   let activeStackedTrayTab = $state<'tray' | 'contents'>('tray');
+  let isSocketRack = $derived(!!selectedTray && isMiniatureRackTray(selectedTray) && selectedTray.params.variant === 'sockets');
+  let usesTrayTabs = $derived(!!selectedTray && (isCounterTray(selectedTray) || isCardDividerTray(selectedTray)
+    || (isMiniatureRackTray(selectedTray) && selectedTray.params.variant !== 'sockets')));
 
   // Get the tray letter based on cumulative position across all layers
   let trayLetter = $derived.by(() => {
@@ -256,8 +259,8 @@
     }
     if (isMiniatureRackTray(tray)) {
       return {
-        stacks: tray.params.slots.length,
-        counters: tray.params.slots.length,
+        stacks: getMiniatureRackSlotCount(tray.params),
+        counters: getMiniatureRackSlotCount(tray.params),
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
@@ -416,7 +419,7 @@
   <!-- Tray Settings -->
   {#if selectedTray}
     <div class="panelForm">
-      {#if isCounterTray(selectedTray) || isCardDividerTray(selectedTray) || isMiniatureRackTray(selectedTray)}
+      {#if usesTrayTabs}
         <div
           class="trayEditorTabs"
           role="tablist"
@@ -445,7 +448,9 @@
         </div>
       {/if}
 
-      {#if (!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray) && !isMiniatureRackTray(selectedTray)) || activeStackedTrayTab === 'tray'}
+      {#if !usesTrayTabs || activeStackedTrayTab === 'tray'}
+        <details class="trayIdentity" class:socketIdentity={isSocketRack} open={!isSocketRack}>
+          <summary><span>Name, location &amp; appearance</span><IconChevronDown size={16} aria-hidden="true" /></summary>
         <div class="panelFormSection trayForm">
           <section class="traySection">
             <div class="sectionHeader">
@@ -522,7 +527,7 @@
 
             <Spacer size="1rem" />
 
-            {#if selectedTray.type !== 'cardStorage'}
+            {#if selectedTray.type !== 'cardStorage' && !(isMiniatureRackTray(selectedTray) && selectedTray.params.variant === 'sockets')}
             <InputCheckbox
               label="Emboss name on tray bottom"
               checked={selectedTray.showEmboss ?? true}
@@ -532,6 +537,7 @@
           </section>
         </div>
 
+        </details>
         <Hr class="trayDivider" />
       {/if}
 
@@ -589,7 +595,7 @@
           {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
-          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'slots'}
+          renderMode={!usesTrayTabs ? 'all' : activeStackedTrayTab === 'tray' ? 'settings' : 'slots'}
         />
       {:else if isTileTray(selectedTray) && onUpdateTileTrayParams}
         <TileTrayEditor
@@ -601,7 +607,7 @@
         />
       {/if}
 
-      {#if onDuplicateTray && ((!isCounterTray(selectedTray) && !isCardDividerTray(selectedTray) && !isMiniatureRackTray(selectedTray)) || activeStackedTrayTab === 'tray')}
+      {#if onDuplicateTray && (!usesTrayTabs || activeStackedTrayTab === 'tray')}
         <Hr class="trayDivider" />
 
         <section class="panelFormSection traySection">
@@ -625,6 +631,10 @@
 </div>
 
 <style>
+  .trayIdentity:not(.socketIdentity) > summary { display: none; }
+  .socketIdentity > summary { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; cursor: pointer; font-size: 0.8125rem; padding: 0.5rem; border: var(--borderThin); border-radius: var(--radius-2); list-style: none; }
+  .socketIdentity[open] > summary :global(svg) { transform: rotate(180deg); }
+  .socketIdentity[open] > summary { margin-bottom: 0.75rem; }
   .traysPanel {
     display: flex;
     flex-direction: column;

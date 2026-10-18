@@ -105,6 +105,7 @@ function getEdgeLoadedCounterSpan(count: number, thickness: number, clearance: n
 
 // Counter preview data for visualization
 export interface CounterStack {
+  previewEnvelope?: { width: number; depth: number; height: number };
   shape: 'square' | 'hex' | 'circle' | 'triangle' | 'custom';
   shapeId?: string; // The ID of the counter shape from project.counterShapes
   customShapeName?: string; // Only set when shape === 'custom'

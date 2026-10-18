@@ -10,7 +10,7 @@
   import CardWellTrayEditor from './panels/CardWellTrayEditor.svelte';
   import CupTrayEditor from './panels/CupTrayEditor.svelte';
   import TileTrayEditor from './panels/TileTrayEditor.svelte';
-  import type { MiniatureRackParams } from '$lib/models/miniatureRack';
+  import { getMiniatureRackSlotCount, type MiniatureRackParams } from '$lib/models/miniatureRack';
   import { getTrayDimensions } from '$lib/models/box';
   import {
     getProject,
@@ -536,7 +536,7 @@
       counters = resolveCardStorage(tray.params, getProject().cardSizes).capacity;
       isCards = true;
     } else if (isMiniatureRackTray(tray)) {
-      stacks = tray.params.slots.length;
+      stacks = getMiniatureRackSlotCount(tray.params);
       counters = stacks;
     } else if (isCardWellTray(tray)) {
       stacks = countCells(tray.params.layout);

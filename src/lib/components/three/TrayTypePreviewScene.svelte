@@ -21,6 +21,7 @@
     createMiniatureRack
   } from '$lib/models/miniatureRack';
   import { createTileTray, defaultTileTrayParams } from '$lib/models/tileTray';
+  import { createMiniatureSocketRack, defaultMiniatureSocketRackParams } from '$lib/models/miniatureSocketRack';
   import { getTileTrayPreviewPositions, type TileTrayPosition } from '$lib/models/tileTray';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
   import CounterMesh from './CounterMesh.svelte';
@@ -85,6 +86,13 @@
       return {
         ...centerGeometry(jscadToBufferGeometry(geometry)),
         tileStacks: getTileTrayPreviewPositions(params, DEFAULT_COUNTER_SHAPES)
+      };
+    }
+
+    if (type === 'miniatureTray') {
+      return {
+        ...centerGeometry(jscadToBufferGeometry(createMiniatureSocketRack(defaultMiniatureSocketRackParams))),
+        tileStacks: []
       };
     }
 

@@ -16,7 +16,7 @@
 - No marcar un problema como resuelto hasta que el usuario confirme que funciona.
 - No actualizar `HANDOFF.md` como cerrado si el cambio no esta validado.
 - Preferir iteraciones pequenas y verificables.
-- Antes de cada cambio, revisar si corresponde subir version; para fixes/regresiones visibles usar patch salvo que el usuario indique lo contrario.
+- Durante pruebas e iteraciones locales no subir version por cada cambio. Agrupar version y changelog cuando las decisiones esten tomadas y se prepare un bloque para commit/push; no hacer commit/push sin autorizacion.
 - Ejecutar `pnpm run check` al final de una iteracion tecnica salvo que haya una razon clara para no hacerlo.
 - No revertir cambios del usuario sin permiso explicito.
 - Mantener `HANDOFF.md` corto y enlazar documentos largos desde ahi.

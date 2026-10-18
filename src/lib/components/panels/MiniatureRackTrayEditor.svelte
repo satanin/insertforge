@@ -20,6 +20,7 @@
     type MiniatureRackSlot
   } from '$lib/models/miniatureRack';
   import type { MiniatureRackTray } from '$lib/types/project';
+  import MiniatureSocketRackEditor from './MiniatureSocketRackEditor.svelte';
 
   interface Props {
     tray: MiniatureRackTray;
@@ -79,6 +80,37 @@
   }
 </script>
 
+{#if renderMode === 'all' || renderMode === 'settings'}
+  <div class="panelFormSection">
+    <FormControl label="Rack type" name="miniatureRackVariant">
+      {#snippet input({ inputProps })}
+        <Select
+          {...inputProps}
+          selected={[tray.params.variant ?? 'rails']}
+          options={[
+            { value: 'rails', label: 'Vertical rails' },
+            { value: 'sockets', label: 'Individual bases · Experimental' }
+          ]}
+          onSelectedChange={(selected) => {
+            const variant = selected[0] === 'sockets' ? 'sockets' : 'rails';
+            updateParams({ variant });
+            if (variant === 'sockets') onUpdateTray?.({ autoHeight: false });
+          }}
+        />
+      {/snippet}
+    </FormControl>
+  </div>
+{/if}
+
+{#if tray.params.variant === 'sockets'}
+  {#if renderMode === 'all' || renderMode === 'settings'}
+    <div class="panelFormSection">
+      <MiniatureSocketRackEditor params={tray.params.sockets} onUpdate={(sockets) => updateParams({ sockets })} />
+    </div>
+  {:else}
+    <Text size="0.875rem" color="fgMuted">Configure individual bases in Rack Settings.</Text>
+  {/if}
+{:else}
 {#if renderMode === 'all' || renderMode === 'settings'}
 <div class="panelFormSection">
   <section class="section">
@@ -414,6 +446,8 @@
     </div>
   </section>
 </div>
+{/if}
+
 {/if}
 
 <style>

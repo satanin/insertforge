@@ -32,6 +32,27 @@ import {
 } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 
+describe('miniature tray menu entry', () => {
+  beforeEach(() => resetProject());
+  it('creates and persists sockets directly while keeping the rail entry unchanged', () => {
+    const tray = addLooseTray(undefined, 'miniatureTray');
+    const rack = addLooseTray(undefined, 'miniatureRack');
+    if (tray?.type !== 'miniatureRack' || rack?.type !== 'miniatureRack') throw new Error('Missing miniature trays');
+    expect(tray.name).toMatch(/^Miniature Tray /);
+    expect(tray.params.variant).toBe('sockets');
+    expect(tray.params.sockets?.requestedCount).toBe(6);
+    expect(tray.autoHeight).toBe(false);
+    expect(tray.showEmboss).toBe(false);
+    expect(rack.params.variant).not.toBe('sockets');
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    const result = restored.layers.flatMap(l => l.looseTrays).find(t => t.id === tray.id);
+    expect(result?.type).toBe('miniatureRack');
+    if (result?.type !== 'miniatureRack') throw new Error('Wrong restored type');
+    expect(result.params.variant).toBe('sockets');
+    expect(addTray(addBox().id, 'miniatureTray')).toBeNull();
+  });
+});
+
 describe('Card Storage persistence and placement', () => {
   beforeEach(() => resetProject());
   it('updates default lid lettering on successive renames, preserving custom and blank text', () => {

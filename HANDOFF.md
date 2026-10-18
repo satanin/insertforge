@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.16`
+- Version visible actual: `1.2.17`
 
 ## Desarrollo local
 
@@ -27,7 +27,7 @@ pnpm run check
 - Regla nueva para iteraciones:
   - cada fix o nueva funcionalidad debe intentar anadir o actualizar tests en la misma iteracion para cubrir la regresion o el flujo nuevo
   - empezar por tests pequenos y de alto valor antes que por cobertura amplia
-  - para mejoras visuales/UX pequenas, agrupar el bump de version por conjunto coherente de cambios, no necesariamente por cada ajuste o micro-fix dentro de la misma iteracion
+  - no subir version en cada prueba local; agrupar version y changelog al preparar el bloque decidido para commit/push
   - revisar y actualizar el changelog en cada bloque de cambios publicable; ahora mismo va retrasado desde abril
 
 ## Nota de ramas
@@ -260,6 +260,10 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.17: `Miniature tray (Experimental)` reúne las iteraciones locales: preview y acceso propios, panel por secciones, medidas fijas/máximas, modelos mixtos y cantidad completa/parcial/relleno. Usuario autoriza commit/push para probar desde producción (2026-10-18). Marcas visibles de Experimental y aviso de prueba impresa pendiente. No validado físicamente: comprobar laminado y muestra 1 × 2, retención, rigidez y apilado. Mantener rack de raíles y priorizar estas pruebas antes del generador; ver [seguimiento](docs/plans/miniature-socket-rack.md).
+
+- Plan de [generación automática de insertos desde componentes](docs/plans/automatic-insert-design.md): empezar con un juego pequeño solo de cartas; ampliar a varias capas y kits de jugador/personaje. Próximo paso: elegir juego y recoger medidas interiores de caja, mazos y contenido restante. Plan guardado; implementación pendiente.
 
 - v1.2.16: sentido del slider de tapa y sincronizacion del texto predeterminado al renombrar Card Storage validados por el usuario en la app (2026-10-08).
 

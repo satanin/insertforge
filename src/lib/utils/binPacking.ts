@@ -59,7 +59,8 @@ function tryPacking<T>(
   containerHeight: number,
   allowFlip: boolean,
   rectChoice: number,
-  splitMethod: number
+  splitMethod: number,
+  allowPartial: boolean = false
 ): PackingResult<T> | null {
   const packer = new GuillotineBinPack<PackRect<T>>(containerWidth, containerHeight, allowFlip);
 
@@ -70,7 +71,7 @@ function tryPacking<T>(
   packer.InsertSizes(rects, true, rectChoice, splitMethod);
 
   // Check if all were placed
-  if (packer.usedRectangles.length !== items.length) return null;
+  if ((!allowPartial && packer.usedRectangles.length !== items.length) || packer.usedRectangles.length === 0) return null;
 
   // Verify no overlaps
   const OVERLAP_EPSILON = 0.01;
@@ -133,7 +134,8 @@ function tryPacking<T>(
 export function packItems<T>(
   items: PackingItem<T>[],
   containerWidth: number,
-  containerHeight: number
+  containerHeight: number,
+  options: { allowRotation?: boolean; allowPartial?: boolean } = {}
 ): PackingResult<T> | null {
   if (items.length === 0) return null;
 
@@ -148,10 +150,10 @@ export function packItems<T>(
 
   const results: PackingResult<T>[] = [];
 
-  for (const allowFlip of [true, false]) {
+  for (const allowFlip of options.allowRotation === false ? [false] : [true, false]) {
     for (const rectChoice of rectChoices) {
       for (const splitMethod of splitMethods) {
-        const result = tryPacking(sortedItems, containerWidth, containerHeight, allowFlip, rectChoice, splitMethod);
+        const result = tryPacking(sortedItems, containerWidth, containerHeight, allowFlip, rectChoice, splitMethod, options.allowPartial);
         if (result) {
           results.push(result);
         }
@@ -161,7 +163,7 @@ export function packItems<T>(
 
   // Return the most compact result
   if (results.length > 0) {
-    results.sort((a, b) => a.area - b.area);
+    results.sort((a, b) => b.items.length - a.items.length || a.area - b.area);
     return results[0];
   }
 

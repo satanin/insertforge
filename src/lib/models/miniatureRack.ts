@@ -3,6 +3,7 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
 import { getSafeEmbossDepth } from './emboss';
+import { createMiniatureSocketRack, getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams } from './miniatureSocketRack';
 
 export interface MiniatureRackSlot {
   id: string;
@@ -18,6 +19,8 @@ export interface MiniatureRackSlot {
 }
 
 export interface MiniatureRackParams {
+  variant?: 'rails' | 'sockets';
+  sockets?: MiniatureSocketRackParams;
   rackHeight: number | null;
   rackBaseDepth: number;
   wallThickness: number;
@@ -34,6 +37,14 @@ export interface MiniatureRackDimensions {
   width: number;
   depth: number;
   height: number;
+}
+
+export function getMiniatureRackSlotCount(params: MiniatureRackParams): number {
+  if (params.variant !== 'sockets') return params.slots.length;
+  const p = normalizeMiniatureSocketRackParams(params.sockets);
+  if (p.quantityMode !== 'all' && p.sizingMode !== 'grid') return getMiniatureSocketRackLayout(p).seats.length;
+  return p.sizingMode === 'models' ? p.models.reduce((sum, model) => sum + model.count, 0)
+    : p.sizingMode === 'free' ? p.requestedCount : p.rows * p.columns;
 }
 
 const { cuboid } = jscad.primitives;
@@ -120,6 +131,7 @@ export function getMiniatureRackMaxMiniatureHeight(params: MiniatureRackParams):
 }
 
 export function getMiniatureRackResolvedHeight(params: MiniatureRackParams): number {
+  if (params.variant === 'sockets') return getMiniatureSocketRackLayout(params.sockets).height;
   if (typeof params.rackHeight === 'number' && Number.isFinite(params.rackHeight)) {
     return clampPositive(params.rackHeight, MIN_RACK_HEIGHT);
   }
@@ -167,6 +179,7 @@ export function normalizeMiniatureRackParams(params: MiniatureRackParams): Minia
   const resolvedRackHeight = getMiniatureRackResolvedHeight({ ...params, rackHeight, slots });
   const maxMiniatureHeight = getMiniatureRackMaxMiniatureHeight({ ...params, rackHeight, slots });
   return {
+    ...(params.variant === 'sockets' ? { variant: 'sockets' as const, sockets: normalizeMiniatureSocketRackParams(params.sockets) } : {}),
     rackHeight,
     rackBaseDepth: clampPositive(params.rackBaseDepth, getMiniatureRackMinimumBaseDepth(resolvedRackHeight, maxMiniatureHeight, wallThickness, rimHeight)),
     wallThickness,
@@ -202,6 +215,10 @@ export function getMiniatureRackDimensions(
   params: MiniatureRackParams,
   targetHeight?: number
 ): MiniatureRackDimensions {
+  if (params.variant === 'sockets') {
+    const { width, depth, height } = getMiniatureSocketRackLayout(params.sockets);
+    return { width, depth, height };
+  }
   const normalized = normalizeMiniatureRackParams(params);
   const resolvedHeight = getMiniatureRackResolvedHeight(normalized);
   const height = clampPositive(targetHeight ?? resolvedHeight, resolvedHeight);
@@ -324,6 +341,7 @@ export function createMiniatureRack(
   targetHeight?: number,
   showEmboss: boolean = true
 ): Geom3 {
+  if (params.variant === 'sockets') return createMiniatureSocketRack(params.sockets);
   const normalized = normalizeMiniatureRackParams(params);
   const dimensions = getMiniatureRackDimensions(normalized, targetHeight);
   const parts: Geom3[] = [];
@@ -555,6 +573,7 @@ export function createMiniatureRack(
 }
 
 export function getMiniatureRackPreviewPositions(params: MiniatureRackParams): CounterStack[] {
+  if (params.variant === 'sockets') return getMiniatureSocketRackPreviewPositions(params.sockets);
   const normalized = normalizeMiniatureRackParams(params);
   const dimensions = getMiniatureRackDimensions(normalized);
   const previewStacks: CounterStack[] = [];

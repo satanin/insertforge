@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getMiniatureRackSlotCount } from '$lib/models/miniatureRack';
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text, addToast } from '@tableslayer/ui';
   import { IconX, IconPackage, IconRuler, IconStack2, IconRectangle } from '@tabler/icons-svelte';
@@ -332,8 +333,8 @@
   } {
     if (isMiniatureRackTray(tray)) {
       return {
-        stacks: tray.params.slots.length,
-        counters: tray.params.slots.length,
+        stacks: getMiniatureRackSlotCount(tray.params),
+        counters: getMiniatureRackSlotCount(tray.params),
         isCardTray: false,
         isCardDivider: false,
         isCardWell: false,
@@ -1142,7 +1143,19 @@
                 onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Miniature rack</Text>
-                <Text size="0.75rem" color="var(--fgMuted)">Rack with vertical slots for miniature bases</Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Vertical rails for miniature bases</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'miniatureTray');
+                  contentProps.close();
+                }}
+                onmouseenter={(e) => handleTrayTypeHover('miniatureTray', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
+              >
+                <Text weight={500}>Miniature tray <span class="experimentalBadge">Experimental</span></Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Stackable tray with individual base sockets</Text>
               </button>
               <button
                 class="trayTypeOption"
@@ -1239,6 +1252,7 @@
 {/if}
 
 <style>
+  .experimentalBadge { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.35rem; border: 1px solid #d99522; border-radius: 0.25rem; background: rgb(217 149 34 / 12%); color: var(--fg); font-size: 0.65rem; font-weight: 600; vertical-align: middle; }
   :global(.navMenu) {
     position: fixed;
     top: 4rem;
