@@ -105,7 +105,7 @@
 {#if tray.params.variant === 'sockets'}
   {#if renderMode === 'all' || renderMode === 'settings'}
     <div class="panelFormSection">
-      <MiniatureSocketRackEditor params={tray.params.sockets} onUpdate={(sockets) => updateParams({ sockets })} />
+      <MiniatureSocketRackEditor params={tray.params.sockets} trayName={tray.name} onUpdate={(sockets) => updateParams({ sockets })} />
     </div>
   {:else}
     <Text size="0.875rem" color="fgMuted">Configure individual bases in Rack Settings.</Text>

@@ -3,7 +3,7 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
 import { getSafeEmbossDepth } from './emboss';
-import { createMiniatureSocketRack, getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams } from './miniatureSocketRack';
+import { createMiniatureSocketRackAssembly, getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams } from './miniatureSocketRack';
 
 export interface MiniatureRackSlot {
   id: string;
@@ -341,7 +341,7 @@ export function createMiniatureRack(
   targetHeight?: number,
   showEmboss: boolean = true
 ): Geom3 {
-  if (params.variant === 'sockets') return createMiniatureSocketRack(params.sockets);
+  if (params.variant === 'sockets') return createMiniatureSocketRackAssembly(params.sockets, trayName);
   const normalized = normalizeMiniatureRackParams(params);
   const dimensions = getMiniatureRackDimensions(normalized, targetHeight);
   const parts: Geom3[] = [];

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import jscad from '@jscad/modeling';
 import {
   createMiniatureSocketRack, defaultMiniatureSocketRackParams,
+  createMiniatureSocketRackLid, createMiniatureSocketRackParts,
   getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions,
   normalizeMiniatureSocketRackParams
 } from './miniatureSocketRack';
@@ -17,6 +18,58 @@ const { translate } = jscad.transforms;
 const socketParams = { ...defaultMiniatureSocketRackParams, sizingMode: 'grid' as const, rows: 1, columns: 2 };
 
 describe('individual miniature base rack', () => {
+  it('lightens new rack floors by default and preserves an explicitly solid floor', () => {
+    expect(defaultMiniatureSocketRackParams.perforated).toBe(true);
+    expect(normalizeMiniatureSocketRackParams().perforated).toBe(true);
+    expect(normalizeMiniatureSocketRackParams({ perforated: false }).perforated).toBe(false);
+  });
+  it('keeps an asymmetric glyph readable from above in the assembled and printable lid', () => {
+    const p = { ...socketParams, rows: 1, columns: 1, fixedWidth: 100, fixedDepth: 70, lid: true };
+    const lid = createMiniatureSocketRackLid(p, 'F');
+    const probe = (x: number, y: number, z: number) => translate([x, y, z],
+      jscad.primitives.cuboid({ size: [0.2, 0.2, 0.2] }));
+    // The upper bar of F is at +Y; reflecting it would put this cut at -Y instead.
+    expect(Math.abs(measureVolume(intersect(lid, probe(52, 39.5, 2.8))))).toBeLessThan(0.00001);
+    expect(measureVolume(intersect(lid, probe(52, 30.5, 2.8)))).toBeCloseTo(0.008, 5);
+    const printable = createMiniatureSocketRackParts(p, 'F').find(part => part.id === 'lid')!.geometry;
+    // Printing turns the whole lid over around X, preserving the engraving's physical orientation.
+    expect(Math.abs(measureVolume(intersect(printable, probe(52, 30.5, 0.2))))).toBeLessThan(0.00001);
+    expect(measureVolume(intersect(printable, probe(52, 39.5, 0.2)))).toBeCloseTo(0.008, 5);
+  });
+  it('engraves the tray name or custom text without changing the lid bounds or peg pockets', () => {
+    const p = { ...socketParams, lid: true };
+    const blank = createMiniatureSocketRackLid({ ...p, lidTextEnabled: false }, 'A');
+    const named = createMiniatureSocketRackLid(p, 'Á');
+    expect(measureVolume(named)).toBeLessThan(measureVolume(blank));
+    expect(measureBoundingBox(named)).toEqual(measureBoundingBox(blank));
+    const custom = createMiniatureSocketRackLid({ ...p, lidText: 'B' }, 'A');
+    const renamed = createMiniatureSocketRackLid({ ...p, lidText: 'B' }, 'Different tray');
+    expect(measureVolume(custom)).toBeCloseTo(measureVolume(renamed), 6);
+    expect(measureVolume(createMiniatureSocketRackLid(p, 'B'))).toBeCloseTo(measureVolume(custom), 6);
+    expect(measureVolume(createMiniatureSocketRackLid({ ...p, lidTextEnabled: false, lidText: 'B' }, 'A')))
+      .toBeCloseTo(measureVolume(blank), 6);
+    expect(normalizeMiniatureSocketRackParams({ lidText: '   ' }).lidText).toBeNull();
+    expect(normalizeMiniatureSocketRackParams({}).lidTextEnabled).toBe(true);
+    const printed = createMiniatureSocketRackParts(p, 'B').find(part => part.id === 'lid')!;
+    expect(measureVolume(printed.geometry)).toBeCloseTo(measureVolume(custom), 5);
+  });
+  it('supports a separate flat lid on the posts without interfering with pegs or miniatures', () => {
+    const p = { ...socketParams, lid: true, fixedHeight: 65 };
+    const layout = getMiniatureSocketRackLayout(p);
+    expect(layout.height).toBe(65);
+    const parts = createMiniatureSocketRackParts(p);
+    expect(parts.map(part => part.id)).toEqual(['body', 'lid']);
+    expect(Math.abs(measureVolume(intersect(parts[0].assembled, parts[1].assembled)))).toBeLessThan(0.001);
+    const lidBounds = measureBoundingBox(createMiniatureSocketRackLid(p));
+    expect(lidBounds[0][2]).toBeCloseTo(0);
+    expect(lidBounds[1][2]).toBeCloseTo(3);
+    const printBounds = measureBoundingBox(parts[1].geometry);
+    expect(printBounds[0][2]).toBeCloseTo(0);
+    expect(printBounds[1][2]).toBeCloseTo(3);
+    expect(layout.stackPitch).toBeGreaterThan(p.floorThickness + p.miniatureHeight);
+    expect(getMiniatureSocketRackLayout({ ...p, fixedHeight: 50 }).error).toContain('Required rack height');
+    expect(normalizeMiniatureSocketRackParams({ lidThickness: 1 }).lidThickness).toBe(2.8);
+  });
   it('honours fixed exterior dimensions and stacks racks with different contents', () => {
     const p = { sizingMode: 'free' as const, requestedCount: 2,
       fixedWidth: 143, fixedDepth: 100, fixedHeight: 85, maxHeight: 90 };

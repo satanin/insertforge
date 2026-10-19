@@ -2,6 +2,7 @@
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
+  import ElementExport from './ElementExport.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
   import CounterTrayEditor from './panels/CounterTrayEditor.svelte';
@@ -1502,6 +1503,20 @@
         {/if}
       {/if}
     </div>
+      {#if selectionType === 'tray' && selectedTray && selectedTray.type !== 'cardStorage'}
+        <ElementExport elementId={selectedTray.id} name={selectedTray.name}
+          hasLid={selectedTray.type === 'miniatureRack' && selectedTray.params.variant === 'sockets' && selectedTray.params.sockets?.lid === true} />
+      {:else if selectionType === 'box' && selectedBox}
+        <ElementExport elementId={selectedBox.id} name={selectedBox.name} />
+      {:else if selectionType === 'layeredBox' && selectedLayeredBox}
+        <ElementExport elementId={selectedLayeredBox.id} name={selectedLayeredBox.name} />
+      {:else if selectionType === 'board' && selectedBoard}
+        <ElementExport elementId={selectedBoard.id} name={selectedBoard.name} referenceVolume />
+      {:else if selectionType === 'layeredBoxSection' && selectedLayeredBoxSection}
+        <ElementExport elementId={selectedLayeredBoxSection.id} name={selectedLayeredBoxSection.name} />
+      {:else if selectionType === 'layeredBoxLayer' && selectedLayeredBoxLayer}
+        <ElementExport elementId={selectedLayeredBoxLayer.id} name={selectedLayeredBoxLayer.name} />
+      {/if}
   </Panel>
 </aside>
 
@@ -1535,6 +1550,7 @@
 
   .panelContent {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
   }
 

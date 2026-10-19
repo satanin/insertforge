@@ -37,6 +37,8 @@ import {
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
+import { createMiniatureSocketRackParts } from '$lib/models/miniatureSocketRack';
+import { selectExportElements } from '$lib/utils/exportElements';
 import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
 import type {
   Box,
@@ -340,11 +342,15 @@ interface ExportStlMessage {
 interface ExportAllStlsMessage {
   type: 'export-all-stls';
   id: number;
+  elementId?: string;
+  partId?: string;
 }
 
 interface Export3mfMessage {
   type: 'export-3mf';
   id: number;
+  elementId?: string;
+  partId?: string;
 }
 
 type WorkerMessage = GenerateMessage | ExportStlMessage | ExportAllStlsMessage | Export3mfMessage;
@@ -457,12 +463,13 @@ let cachedProjectName = 'insertforge';
 
 // Cache for all boxes (for export all)
 interface CachedBoxData {
+  elementId?: string;
   boxName: string;
   boxGeom: Geom3 | null;
   lidGeom: Geom3 | null;
   lidTextInlayGeom: Geom3 | null;
   lidTextInlayColor?: [number, number, number, number];
-  trays: { jscadGeom: Geom3; name: string }[];
+  trays: { jscadGeom: Geom3; name: string; elementId?: string }[];
   extraGeometries?: { jscadGeom: Geom3; name: string; groupKey?: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
@@ -491,12 +498,18 @@ function getContrastingRgba(hex: string): [number, number, number, number] {
 
 // Cache for all loose trays (for export all)
 interface CachedLooseTrayData {
+  elementId?: string;
   trayName: string;
   trayGeom: Geom3;
   parts?: CardStoragePart[];
   error?: string;
 }
 let cachedAllLooseTrays: CachedLooseTrayData[] = [];
+let cachedIndividualParts: CachedLooseTrayData[] = [];
+
+function getExportElements(elementId?: string, partId?: string) {
+  return selectExportElements(cachedAllBoxes, cachedAllLooseTrays, cachedIndividualParts, elementId, partId);
+}
 
 /**
  * Create tray geometry based on tray type
@@ -850,6 +863,7 @@ async function yieldToPendingGenerateMessages(id: number): Promise<boolean> {
  */
 async function handleGenerate(msg: GenerateMessage): Promise<void> {
   const { id, project, selectedBoxId, selectedTrayId, selectedLayerId, scope = 'all', selectedView = 'assembly' } = msg;
+  cachedIndividualParts = [];
   const timings: { name: string; ms: number }[] = [];
   const time = (name: string, fn: () => void) => {
     const start = performance.now();
@@ -1244,7 +1258,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         boxTargetLayerHeight > 0 ? Math.max(requiredTrayHeight, maxNaturalTrayHeight) : maxNaturalTrayHeight;
 
       // Cache JSCAD geometries for this box's trays
-      const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
+      const cachedTraysForBox: { jscadGeom: Geom3; name: string; elementId?: string }[] = [];
 
       const trayGeoms: TrayGeometryResult[] = [];
       for (const placement of boxPlacements) {
@@ -1255,7 +1269,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
 
         // Cache for STL export
-        cachedTraysForBox.push({ jscadGeom, name: placement.tray.name });
+        cachedTraysForBox.push({ jscadGeom, name: placement.tray.name, elementId: placement.tray.id });
 
         trayGeoms.push({
           trayId: placement.tray.id,
@@ -1276,6 +1290,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
       // Cache this box's JSCAD geometries for export
       cachedAllBoxes.push({
+        elementId: projectBox.id,
         boxName: projectBox.name,
         boxGeom: boxJscad,
         lidGeom: lidJscad,
@@ -1328,7 +1343,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       time(`createLidTextInlay (${layeredBox.name})`, () => {
         lidTextInlayJscad = createLidTextInlay(syntheticBox, cardSizes, counterShapes);
       });
-      const cachedTraysForBox: { jscadGeom: Geom3; name: string }[] = [];
+      const cachedTraysForBox: { jscadGeom: Geom3; name: string; elementId?: string }[] = [];
       const extraGeometries: { jscadGeom: Geom3; name: string; groupKey?: string }[] = [];
       const sectionGeometryMap = new Map<string, Geom3>();
       const sectionReliefGeometryMap = new Map<string, Geom3>();
@@ -1344,6 +1359,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
           createLayeredBoxSectionJscadGeometry(placement, cardSizes, counterShapes, placement.dimensions.height) ??
           createTrayGeometry(tray, cardSizes, counterShapes, placement.dimensions.height, 0);
         sectionGeometryMap.set(placement.section.id, jscadGeom);
+        cachedIndividualParts.push({ elementId: placement.section.id, trayName: placement.section.name, trayGeom: jscadGeom });
         sectionReliefGeometryMap.set(placement.section.id, jscadGeom);
 
         if (!fillSolidLayerIds.has(placement.internalLayerId)) {
@@ -1353,10 +1369,18 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
       for (const internalLayer of layout.internalLayers) {
         if (await yieldToPendingGenerateMessages(id)) return;
-        if (!fillSolidLayerIds.has(internalLayer.id)) continue;
         const layerSections = layout.sections.filter((section) => section.internalLayerId === internalLayer.id);
         if (layerSections.length === 0) continue;
         const sourceLayer = layeredBox.layers.find((layer) => layer.id === internalLayer.id);
+        if (!fillSolidLayerIds.has(internalLayer.id)) {
+          const parts = layerSections.flatMap(section => {
+            const geometry = sectionGeometryMap.get(section.section.id);
+            return geometry ? [{ id: section.section.id, name: section.section.name, geometry, assembled: geometry }] : [];
+          });
+          if (parts.length) cachedIndividualParts.push({ elementId: internalLayer.id,
+            trayName: sourceLayer?.name ?? internalLayer.id, trayGeom: parts[0].geometry, parts });
+          continue;
+        }
         const assemblyGeometry = createLayeredBoxInternalLayerAssemblyGeometry({
           internalLayer,
           layerSections,
@@ -1365,6 +1389,8 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
           sectionReliefGeometryMap
         });
         if (!assemblyGeometry) continue;
+        cachedIndividualParts.push({ elementId: internalLayer.id,
+          trayName: sourceLayer?.name ?? internalLayer.id, trayGeom: assemblyGeometry });
         const layerName = sanitizeExportName(sourceLayer?.name ?? internalLayer.id);
         extraGeometries.push({
           jscadGeom: assemblyGeometry,
@@ -1374,6 +1400,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       }
 
       cachedAllBoxes.push({
+        elementId: layeredBox.id,
         boxName: layeredBox.name,
         boxGeom: boxJscad,
         lidGeom: lidJscad,
@@ -1392,6 +1419,12 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       if (await yieldToPendingGenerateMessages(id)) return;
       // Get the unified layer height - loose trays match box exterior height
       const layerHeight = layerHeights.get(layer.id) ?? 0;
+
+      for (const board of layer.boards ?? []) {
+        cachedIndividualParts.push({ elementId: board.id, trayName: board.name,
+          trayGeom: jscad.transforms.translate([board.width / 2, board.depth / 2, board.height / 2],
+            jscad.primitives.cuboid({ size: [board.width, board.depth, board.height] })) });
+      }
 
       for (const looseTray of layer.looseTrays) {
         if (await yieldToPendingGenerateMessages(id)) return;
@@ -1417,8 +1450,11 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
         // Cache for STL export
         cachedAllLooseTrays.push({
+          elementId: looseTray.id,
           trayName: looseTray.name,
           trayGeom: jscadGeom,
+          ...(looseTray.type === 'miniatureRack' && looseTray.params.variant === 'sockets'
+            ? { parts: createMiniatureSocketRackParts(looseTray.params.sockets, looseTray.name) } : {}),
           ...(looseTray.type === 'cardStorage'
             ? {
                 parts: resolveCardStorage(looseTray.params, cardSizes).valid
@@ -1633,9 +1669,10 @@ function getUniqueFilename(baseFilename: string, usedFilenames: Set<string>): st
  */
 async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
   const { id } = msg;
+  const { boxes: exportBoxes, trays: exportTrays } = getExportElements(msg.elementId, msg.partId);
 
   try {
-    if (cachedAllBoxes.length === 0 && cachedAllLooseTrays.length === 0) {
+    if (exportBoxes.length === 0 && exportTrays.length === 0) {
       self.postMessage({
         type: 'export-all-stls-result',
         id,
@@ -1650,7 +1687,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
     const usedFilenames = new Set<string>();
 
     // Export boxes and their contents
-    for (const boxData of cachedAllBoxes) {
+    for (const boxData of exportBoxes) {
       const boxPrefix = sanitizeExportName(boxData.boxName, 'box');
 
       // Export box
@@ -1710,7 +1747,7 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
     }
 
     // Export loose trays
-    for (const looseTray of cachedAllLooseTrays) {
+    for (const looseTray of exportTrays) {
       if (looseTray.error) throw new Error(`${looseTray.trayName}: ${looseTray.error}`);
       if (looseTray.parts) {
         for (const part of looseTray.parts) {
@@ -1763,9 +1800,10 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
  */
 async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
   const { id } = msg;
+  const { boxes: exportBoxes, trays: exportTrays } = getExportElements(msg.elementId, msg.partId);
 
   try {
-    if (cachedAllBoxes.length === 0 && cachedAllLooseTrays.length === 0) {
+    if (exportBoxes.length === 0 && exportTrays.length === 0) {
       self.postMessage({
         type: 'export-3mf-result',
         id,
@@ -1797,7 +1835,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     };
 
     // Add boxes and their contents
-    for (const boxData of cachedAllBoxes) {
+    for (const boxData of exportBoxes) {
       const boxPrefix = sanitizeExportName(boxData.boxName, 'box');
 
       // Add box
@@ -1850,7 +1888,7 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
     }
 
     // Add loose trays
-    for (const looseTray of cachedAllLooseTrays) {
+    for (const looseTray of exportTrays) {
       if (looseTray.error) throw new Error(`${looseTray.trayName}: ${looseTray.error}`);
       if (looseTray.parts) {
         for (const part of looseTray.parts) {

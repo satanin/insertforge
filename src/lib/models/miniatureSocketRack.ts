@@ -2,6 +2,7 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
 import { packItems } from '$lib/utils/binPacking';
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 export interface MiniatureRackModel {
   id: string;
@@ -16,6 +17,11 @@ export interface MiniatureRackModel {
 
 /** Horizontal bases are tilted under a rigid tab, never snapped into place. */
 export interface MiniatureSocketRackParams {
+  lid: boolean;
+  lidThickness: number;
+  lidTextEnabled: boolean;
+  /** Null follows the tray name, including future renames. */
+  lidText: string | null;
   quantityMode: 'all' | 'partial' | 'fill';
   fillModelId: string | null;
   fixedWidth: number | null;
@@ -51,6 +57,8 @@ export interface MiniatureSocketRackParams {
 }
 
 export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
+  lid: false, lidThickness: 3,
+  lidTextEnabled: true, lidText: null,
   quantityMode: 'all', fillModelId: null, fixedWidth: null, fixedDepth: null, fixedHeight: null,
   sizingMode: 'free', requestedCount: 6, maxWidth: 200, maxDepth: 200, maxHeight: null,
   spacingX: 6, spacingY: 6, linkedSpacing: true, models: [],
@@ -58,7 +66,7 @@ export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
   diameterClearance: 1, verticalClearance: 1, tabOverlapPercent: 25,
   tabThickness: 1.6, wallThickness: 2, floorThickness: 2, spacing: 6,
   miniatureHeight: 45, headroom: 5, postWidth: 10, stackingClearance: 0.3,
-  perforated: false
+  perforated: true
 };
 
 const PEG_HEIGHT = 2;
@@ -95,6 +103,9 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     height: Math.max(finite(m.height, 45, 5, 300), finite(m.baseThickness, 3, 1, 15))
   }));
   return {
+    lid: input.lid === true, lidThickness: number('lidThickness', 2.8, 8),
+    lidTextEnabled: input.lidTextEnabled !== false,
+    lidText: typeof input.lidText === 'string' && input.lidText.trim() ? input.lidText.trim().slice(0, 100) : null,
     quantityMode: input.quantityMode === 'partial' || input.quantityMode === 'fill' ? input.quantityMode : 'all',
     fillModelId: models.some(m => m.id === input.fillModelId) ? input.fillModelId! : models[0]?.id ?? null,
     fixedWidth: typeof input.fixedWidth === 'number' && Number.isFinite(input.fixedWidth) ? finite(input.fixedWidth, 200, 30, 600) : null,
@@ -148,8 +159,9 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
   let capacity = p.rows * p.columns;
   let requestedCount = p.sizingMode === 'models' ? p.models.reduce((sum, m) => sum + m.count, 0)
     : p.sizingMode === 'free' ? p.requestedCount : p.rows * p.columns;
+  const topHeight = p.lid ? p.lidThickness : PEG_HEIGHT;
   const requiredHeightFor = (height: number, thickness: number) => p.floorThickness
-    + Math.max(height, thickness + p.verticalClearance + p.tabThickness) + p.headroom + PEG_HEIGHT;
+    + Math.max(height, thickness + p.verticalClearance + p.tabThickness) + p.headroom + topHeight;
   if (!error && p.sizingMode === 'models') {
     const margin = p.postWidth;
     const makeItems = (models: MiniatureRackModel[]) => models.flatMap(m => Array.from({ length: m.count }, () => ({
@@ -248,10 +260,10 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
   const maxMiniatureHeight = p.sizingMode === 'models'
     ? Math.max(5, ...seats.map(s => Math.max(s.miniatureHeight, s.baseThickness + p.verticalClearance + p.tabThickness)))
     : p.miniatureHeight;
-  const requiredHeight = p.floorThickness + maxMiniatureHeight + p.headroom + PEG_HEIGHT;
+  const requiredHeight = p.floorThickness + maxMiniatureHeight + p.headroom + topHeight;
   if (!error && limitHeight !== null && requiredHeight > limitHeight + 1e-8)
     error = `Required rack height is ${requiredHeight.toFixed(1)} mm, above the maximum/fixed height ${limitHeight.toFixed(1)} mm.`;
-  const stackPitch = (p.fixedHeight ?? requiredHeight) - PEG_HEIGHT;
+  const stackPitch = (p.fixedHeight ?? requiredHeight) - topHeight;
   const modelCounts = p.models.map(m => {
     const placed = seats.filter(s => s.modelId === m.id).length;
     const requested = isFill && m.id === p.fillModelId ? null : m.count;
@@ -267,7 +279,7 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
     { x: p.postWidth / 2, y: depth - p.postWidth / 2 },
     { x: width - p.postWidth / 2, y: depth - p.postWidth / 2 }
   ];
-  return { p, radius, outerRadius, width, depth, height: stackPitch + PEG_HEIGHT,
+  return { p, radius, outerRadius, width, depth, height: stackPitch + topHeight,
     stackPitch, seats, posts, error, warnings, requestedCount, remainingCount, modelCounts, capacity, columns, rows };
 }
 
@@ -321,6 +333,54 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
   }
   const rack = union(...parts);
   return cuts.length ? subtract(rack, ...cuts) : rack;
+}
+
+/** Flat cap, registered on the existing pegs. Its blind pockets leave a solid top skin. */
+export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackParams> = {}, trayName = ''): Geom3 {
+  const { p, width, depth, posts, error } = getMiniatureSocketRackLayout(input);
+  if (error) throw new Error(error);
+  const plate = translate([width / 2, depth / 2, p.lidThickness / 2],
+    cuboid({ size: [width, depth, p.lidThickness] }));
+  const pocketWidth = p.postWidth - 4 + p.stackingClearance * 2;
+  const cuts = posts.map(({ x, y }) => translate([x, y, (SOCKET_DEPTH - 0.1) / 2],
+    cuboid({ size: [pocketWidth, pocketWidth, SOCKET_DEPTH + 0.1] })));
+  const label = p.lidText ?? trayName.trim().slice(0, 100);
+  if (p.lidTextEnabled && label) {
+    const strokes = vectorTextWithAccents({ height: 6, text: label }).filter(segment => segment.length >= 2)
+      .map(segment => jscad.extrusions.extrudeLinear({ height: 0.5 }, jscad.expansions.expand(
+        { delta: 0.6, corners: 'round', segments: 32 }, jscad.geometries.path2.fromPoints({}, segment))));
+    if (strokes.length) {
+      // The engraving is viewed from +Z. Mirroring Y would reverse the glyphs.
+      let text = union(...strokes);
+      if (depth > width) text = jscad.transforms.rotateZ(Math.PI / 2, text);
+      const [min, max] = jscad.measurements.measureBoundingBox(text);
+      // Keep engraving away from the blind peg pockets and preserve the flat stacking surface.
+      const fit = Math.min(1, (width - 2 * (p.postWidth + 2)) / (max[0] - min[0]),
+        (depth - 2 * (p.postWidth + 2)) / (max[1] - min[1]));
+      text = jscad.transforms.scale([fit, fit, 1], text);
+      cuts.push(translate([width / 2 - (min[0] + max[0]) * fit / 2,
+        depth / 2 - (min[1] + max[1]) * fit / 2, p.lidThickness - 0.4], text));
+    }
+  }
+  return subtract(plate, ...cuts);
+}
+
+export function createMiniatureSocketRackParts(input: Partial<MiniatureSocketRackParams> = {}, trayName = '') {
+  const layout = getMiniatureSocketRackLayout(input);
+  const rack = createMiniatureSocketRack(input);
+  const parts = [{ id: 'body', name: 'Rack', geometry: rack, assembled: rack }];
+  if (layout.p.lid) {
+    const lid = createMiniatureSocketRackLid(input, trayName);
+    // Print with the flat top on the bed, pockets facing upwards, without supports.
+    const printable = translate([0, layout.depth, layout.p.lidThickness], jscad.transforms.rotateX(Math.PI, lid));
+    parts.push({ id: 'lid', name: 'Lid', geometry: printable,
+      assembled: translate([0, 0, layout.stackPitch], lid) });
+  }
+  return parts;
+}
+
+export function createMiniatureSocketRackAssembly(input: Partial<MiniatureSocketRackParams> = {}, trayName = ''): Geom3 {
+  return union(...createMiniatureSocketRackParts(input, trayName).map(part => part.assembled));
 }
 
 export function getMiniatureSocketRackPreviewPositions(input: Partial<MiniatureSocketRackParams> = {}): CounterStack[] {

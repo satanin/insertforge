@@ -389,7 +389,7 @@ export class GeometryWorkerManager {
   /**
    * Export all STLs for all boxes
    */
-  async exportAllStls(): Promise<StlFile[]> {
+  async exportAllStls(elementId?: string, partId?: string): Promise<StlFile[]> {
     if (!this.worker) {
       await this.init();
     }
@@ -407,6 +407,7 @@ export class GeometryWorkerManager {
 
       this.worker!.postMessage({
         type: 'export-all-stls',
+        elementId, partId,
         id
       });
     });
@@ -415,7 +416,7 @@ export class GeometryWorkerManager {
   /**
    * Export all geometries to a single 3MF file
    */
-  async export3mf(): Promise<{ data: ArrayBuffer; filename: string }> {
+  async export3mf(elementId?: string, partId?: string): Promise<{ data: ArrayBuffer; filename: string }> {
     if (!this.worker) {
       await this.init();
     }
@@ -433,6 +434,7 @@ export class GeometryWorkerManager {
 
       this.worker!.postMessage({
         type: 'export-3mf',
+        elementId, partId,
         id
       });
     });

@@ -55,6 +55,21 @@ Sin nueva versión durante las pruebas. Agrupar versión/changelog al preparar e
 
 ## Evolución posterior
 
+### Tapa y export individual (2026-10-19, local)
+
+El usuario confirma que las primeras pruebas impresas son correctas. Se mantiene Experimental para iteraciones nuevas.
+
+Aligerado bajo cada base activo por defecto en bandejas nuevas; se respeta `perforated: false` guardado. Etiquetado de alojamientos pendiente de decidir: preferir códigos cortos junto al socket y leyenda en borde/tapa para evitar nombres ilegibles o tapados por peanas.
+
+- Tapa opcional plana apoyada en cuatro postes, con cavidades ciegas para los tetones y la misma holgura de apilado. Espesor por defecto 3 mm, mínimo 2,8 mm para conservar material sobre cavidades de 2,2 mm. No tiene cierre ni sella los laterales.
+- Texto de tapa opcional, activo por defecto: campo vacío sigue el nombre actual de bandeja, texto personalizado lo sustituye. Grabado de 0,4 mm con ajuste a superficie central, sin alterar altura/apilado ni invadir cavidades de tetones. Se conserva en preview y export de tapa; pendiente prueba impresa.
+- Corrección local: retirado reflejo Y del texto, que lo mostraba invertido desde arriba. Test con letra asimétrica F en tapa montada y orientada para impresión; pendiente confirmación visual del usuario.
+- Huella igual al rack; la altura fija/máxima pasa a incluir la tapa cuando está activa. Sin tapa los proyectos mantienen la geometría anterior. En preview se muestra montada; para ver el interior desactivar temporalmente la tapa.
+- STL/3MF general separa cuerpo y tapa. Tapa exportada con cara plana hacia la cama y cavidades hacia arriba. Export individual permite rack+tapa, solo rack o solo tapa.
+- Sección de export común para bandejas, cajas con contenido, cajas por capas, capas internas y secciones; Card Storage conserva su selector específico. Los boards permiten exportar su volumen sólido de referencia, no una reproducción del tablero original.
+- Export individual conserva alturas calculadas en contexto del proyecto y filtra por ID, no por nombre. Worker independiente para no alterar la caché de la vista. 3MF conserva el paso por group3mf.
+- Usuario acepta el bloque para commit local v1.2.18 como punto de retorno antes de explorar etiquetas de sockets. Sin push. Pendiente encaje físico de tapa, flexión y carga admisible. Etiquetado de sockets todavía sin implementar.
+
 Descubrimiento: Add loose tray ofrece `Miniature rack` (raíles) y `Miniature tray` (alojamientos individuales apilables), cada uno con su preview giratoria y creación directa. `miniatureTray` es un identificador de creación/preview; se guarda como `miniatureRack` con variante `sockets`, conservando proyectos existentes y la posibilidad de cambiar de variante.
 
 UI local: el rack individual usa un único panel con resumen y secciones de dimensiones (máximas/fijas), estructura/apilado, miniaturas/distribución y alojamientos/retención. Los desplegables nativos llevan un indicador de flecha explícito y textos más cortos. La pestaña Slots se conserva para el rack de raíles, donde sí edita sus canales individuales. Pendiente de revisión del usuario.

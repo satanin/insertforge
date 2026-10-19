@@ -3,13 +3,15 @@
   import { IconChevronDown } from '@tabler/icons-svelte';
   import { getMiniatureSocketRackLayout, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams, type MiniatureRackModel } from '$lib/models/miniatureSocketRack';
 
-  let { params, onUpdate }: {
+  let { params, onUpdate, trayName = '' }: {
+    trayName?: string;
     params?: MiniatureSocketRackParams;
     onUpdate: (params: MiniatureSocketRackParams) => void;
   } = $props();
   let layout = $derived(getMiniatureSocketRackLayout(params));
-  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
+  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
   const fields: { key: NumberKey; label: string; min: number; max: number; step: number; mode?: string }[] = [
+    { key: 'lidThickness', label: 'Lid thickness', min: 2.8, max: 8, step: 0.1 },
     { key: 'maxWidth', label: 'Maximum rack width', min: 30, max: 600, step: 1, mode: 'limits' },
     { key: 'maxDepth', label: 'Maximum rack depth', min: 30, max: 600, step: 1, mode: 'limits' },
     { key: 'requestedCount', label: 'Number of miniatures', min: 1, max: 100, step: 1, mode: 'free' },
@@ -83,8 +85,8 @@
 
 <div class="socketEditor">
   <aside class="experimentalNotice" role="note" aria-label="Experimental feature">
-    <strong>Experimental · physical print validation pending</strong>
-    <p>This tray has not yet been validated with printed parts. Test fit, base retention, strength and stacking with a small sample before printing a full rack.</p>
+    <strong>Experimental · further print validation pending</strong>
+    <p>Initial rack print tests passed. New options, including the lid, still need physical validation. Test fit and strength with a small sample first.</p>
   </aside>
   <div class="rackSummary" aria-label="Rack summary">
     <strong>{layout.width.toFixed(1)} × {layout.depth.toFixed(1)} × {layout.height.toFixed(1)} mm</strong>
@@ -138,6 +140,27 @@
     <InputCheckbox label="Lighten floor below each base" checked={layout.p.perforated}
       onchange={(e) => update({ perforated: e.currentTarget.checked })} />
     <p class="help">To stack racks, match width, depth, post width and stacking clearance. Each rack can have its own height.</p>
+  </section>
+
+  <section class="editorSection" aria-label="Rack lid">
+    <h3>Lid</h3>
+    <InputCheckbox label="Add flat stacking lid" checked={layout.p.lid}
+      onchange={(e) => update({ lid: e.currentTarget.checked })} />
+    {#if layout.p.lid}
+      {@render numericFields(['lidThickness'])}
+      <InputCheckbox label="Add lid text" checked={layout.p.lidTextEnabled}
+        onchange={(e) => update({ lidTextEnabled: e.currentTarget.checked })} />
+      {#if layout.p.lidTextEnabled}
+        <FormControl label="Lid text" name="socket-lidText">
+          {#snippet input({ inputProps })}
+            <Input {...inputProps} value={layout.p.lidText ?? ''} placeholder={trayName} maxlength={100}
+              onchange={(e) => update({ lidText: e.currentTarget.value })} />
+          {/snippet}
+        </FormControl>
+        <p class="help">Leave blank to follow the tray name. Text is engraved 0.4 mm deep so the top stays flat for stacking.</p>
+      {/if}
+      <p class="help">Rests on the four posts and locates over the pegs. The top is flat for other items. Height limits include the lid. Exported separately, flat side down. Not a sealed or locking lid; load capacity needs print testing.</p>
+    {/if}
   </section>
 
   <section class="editorSection" aria-label="Miniatures and layout">

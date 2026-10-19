@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.17`
+- Version visible actual: `1.2.18`
 
 ## Desarrollo local
 
@@ -261,7 +261,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
-- v1.2.17: `Miniature tray (Experimental)` reúne las iteraciones locales: preview y acceso propios, panel por secciones, medidas fijas/máximas, modelos mixtos y cantidad completa/parcial/relleno. Usuario autoriza commit/push para probar desde producción (2026-10-18). Marcas visibles de Experimental y aviso de prueba impresa pendiente. No validado físicamente: comprobar laminado y muestra 1 × 2, retención, rigidez y apilado. Mantener rack de raíles y priorizar estas pruebas antes del generador; ver [seguimiento](docs/plans/miniature-socket-rack.md).
+- v1.2.18 (2026-10-19): usuario acepta bloque actual y pide commit de retorno antes de explorar etiquetas de sockets. Incluye tapa plana con texto grabado y orientación corregida, export individual STL/3MF y suelo aligerado por defecto. Primeras pruebas impresas del rack correctas; tapa/carga pendientes de prueba física. Mantener Experimental. Commit local autorizado, sin push; etiquetado aún sin implementar. Ver [seguimiento](docs/plans/miniature-socket-rack.md).
 
 - Plan de [generación automática de insertos desde componentes](docs/plans/automatic-insert-design.md): empezar con un juego pequeño solo de cartas; ampliar a varias capas y kits de jugador/personaje. Próximo paso: elegir juego y recoger medidas interiores de caja, mazos y contenido restante. Plan guardado; implementación pendiente.
 
