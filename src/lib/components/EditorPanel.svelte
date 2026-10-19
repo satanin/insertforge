@@ -95,8 +95,8 @@
   } from '$lib/models/layer';
 
   const lidTextModeOptions = [
-    { value: 'emboss', label: 'Emboss' },
-    { value: 'inlay', label: 'Inlay' }
+    { value: 'emboss', label: 'Engraved' },
+    { value: 'inlay', label: 'Inlay (multicolour)' }
   ];
   import { getLidHeight } from '$lib/models/box';
 

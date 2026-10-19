@@ -75,8 +75,8 @@
   // Minimum total height (box + lid) for display
   const minTotalHeight = $derived(minimums.minHeight + lidHeight);
   const lidTextModeOptions = [
-    { value: 'emboss', label: 'Emboss' },
-    { value: 'inlay', label: 'Inlay' }
+    { value: 'emboss', label: 'Engraved' },
+    { value: 'inlay', label: 'Inlay (multicolour)' }
   ];
 
   // Display value for height input: convert box height to total height

@@ -29,6 +29,8 @@ export interface MiniatureSocketRackParams {
   lidTextEnabled: boolean;
   /** Null follows the tray name, including future renames. */
   lidText: string | null;
+  lidTextMode: 'engraved' | 'inlay' | 'raised';
+  lidTextColor: string;
   quantityMode: 'all' | 'partial' | 'fill';
   fillModelId: string | null;
   fixedWidth: number | null;
@@ -68,6 +70,7 @@ export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
   labelTextMode: 'engraved', labelTextColor: '#ffffff',
   lid: false, lidThickness: 3,
   lidTextEnabled: true, lidText: null,
+  lidTextMode: 'engraved', lidTextColor: '#ffffff',
   quantityMode: 'all', fillModelId: null, fixedWidth: null, fixedDepth: null, fixedHeight: null,
   sizingMode: 'free', requestedCount: 6, maxWidth: 200, maxDepth: 200, maxHeight: null,
   spacingX: 6, spacingY: 6, linkedSpacing: true, models: [],
@@ -120,6 +123,8 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     labelHeight: number('labelHeight', 4, 12), nozzleDiameter: number('nozzleDiameter', 0.2, 0.8),
     lid: input.lid === true, lidThickness: number('lidThickness', 2.8, 8),
     lidTextEnabled: input.lidTextEnabled !== false,
+    lidTextMode: input.lidTextMode === 'inlay' || input.lidTextMode === 'raised' ? input.lidTextMode : 'engraved',
+    lidTextColor: typeof input.lidTextColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.lidTextColor) ? input.lidTextColor : '#ffffff',
     lidText: typeof input.lidText === 'string' && input.lidText.trim() ? input.lidText.trim().slice(0, 100) : null,
     quantityMode: input.quantityMode === 'partial' || input.quantityMode === 'fill' ? input.quantityMode : 'all',
     fillModelId: models.some(m => m.id === input.fillModelId) ? input.fillModelId! : models[0]?.id ?? null,
@@ -174,7 +179,7 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
   let capacity = p.rows * p.columns;
   let requestedCount = p.sizingMode === 'models' ? p.models.reduce((sum, m) => sum + m.count, 0)
     : p.sizingMode === 'free' ? p.requestedCount : p.rows * p.columns;
-  const topHeight = p.lid ? p.lidThickness : PEG_HEIGHT;
+  const topHeight = p.lid ? p.lidThickness + (p.lidTextEnabled && p.lidTextMode === 'raised' ? 0.6 : 0) : PEG_HEIGHT;
   const requiredHeightFor = (height: number, thickness: number) => p.floorThickness
     + Math.max(height, thickness + p.verticalClearance + p.tabThickness) + p.headroom + topHeight;
   if (!error && p.sizingMode === 'models') {
@@ -473,7 +478,7 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
 }
 
 /** Flat cap, registered on the existing pegs. Its blind pockets leave a solid top skin. */
-export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackParams> = {}, trayName = ''): Geom3 {
+export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackParams> = {}, trayName = '', includeText = true): Geom3 {
   const { p, width, depth, posts, error } = getMiniatureSocketRackLayout(input);
   if (error) throw new Error(error);
   const plate = translate([width / 2, depth / 2, p.lidThickness / 2],
@@ -481,10 +486,19 @@ export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackP
   const pocketWidth = p.postWidth - 4 + p.stackingClearance * 2;
   const cuts = posts.map(({ x, y }) => translate([x, y, (SOCKET_DEPTH - 0.1) / 2],
     cuboid({ size: [pocketWidth, pocketWidth, SOCKET_DEPTH + 0.1] })));
+  const text = createMiniatureSocketRackLidText(input, trayName);
+  if (text && p.lidTextMode !== 'raised') cuts.push(text);
+  const lid = subtract(plate, ...cuts);
+  return includeText && text && p.lidTextMode !== 'engraved' ? union(lid, text) : lid;
+}
+
+export function createMiniatureSocketRackLidText(input: Partial<MiniatureSocketRackParams> = {}, trayName = ''): Geom3 | null {
+  const { p, width, depth, error } = getMiniatureSocketRackLayout(input);
+  if (error) throw new Error(error);
   const label = p.lidText ?? trayName.trim().slice(0, 100);
   if (p.lidTextEnabled && label) {
     const strokes = vectorTextWithAccents({ height: 6, text: label }).filter(segment => segment.length >= 2)
-      .map(segment => jscad.extrusions.extrudeLinear({ height: 0.5 }, jscad.expansions.expand(
+      .map(segment => jscad.extrusions.extrudeLinear({ height: p.lidTextMode === 'raised' ? 0.6 : 0.4 }, jscad.expansions.expand(
         { delta: 0.6, corners: 'round', segments: 32 }, jscad.geometries.path2.fromPoints({}, segment))));
     if (strokes.length) {
       // The engraving is viewed from +Z. Mirroring Y would reverse the glyphs.
@@ -495,11 +509,13 @@ export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackP
       const fit = Math.min(1, (width - 2 * (p.postWidth + 2)) / (max[0] - min[0]),
         (depth - 2 * (p.postWidth + 2)) / (max[1] - min[1]));
       text = jscad.transforms.scale([fit, fit, 1], text);
-      cuts.push(translate([width / 2 - (min[0] + max[0]) * fit / 2,
-        depth / 2 - (min[1] + max[1]) * fit / 2, p.lidThickness - 0.4], text));
+      text = translate([width / 2 - (min[0] + max[0]) * fit / 2,
+        depth / 2 - (min[1] + max[1]) * fit / 2, p.lidThickness + (p.lidTextMode === 'raised' ? 0 : -0.4)], text);
+      const rgb = [1, 3, 5].map(offset => parseInt(p.lidTextColor.slice(offset, offset + 2), 16) / 255);
+      return jscad.colors.colorize([rgb[0], rgb[1], rgb[2], 1], text);
     }
   }
-  return subtract(plate, ...cuts);
+  return null;
 }
 
 export function createMiniatureSocketRackParts(input: Partial<MiniatureSocketRackParams> = {}, trayName = '') {
@@ -509,11 +525,14 @@ export function createMiniatureSocketRackParts(input: Partial<MiniatureSocketRac
   const parts: import('./cardStorageTray').CardStoragePart[] = [{ id: 'body', name: 'Rack', geometry: rack, assembled: rack,
     ...(text ? { text, assembledText: text } : {}) }];
   if (layout.p.lid) {
-    const lid = createMiniatureSocketRackLid(input, trayName);
+    const lid = createMiniatureSocketRackLid(input, trayName, false);
+    const lidText = layout.p.lidTextMode === 'engraved' ? null : createMiniatureSocketRackLidText(input, trayName);
     // Print with the flat top on the bed, pockets facing upwards, without supports.
-    const printable = translate([0, layout.depth, layout.p.lidThickness], jscad.transforms.rotateX(Math.PI, lid));
-    parts.push({ id: 'lid', name: 'Lid', geometry: printable,
-      assembled: translate([0, 0, layout.stackPitch], lid) });
+    const printPose = (geometry: Geom3) => layout.p.lidTextEnabled && layout.p.lidTextMode === 'raised' ? geometry
+      : translate([0, layout.depth, layout.p.lidThickness], jscad.transforms.rotateX(Math.PI, geometry));
+    parts.push({ id: 'lid', name: 'Lid', geometry: printPose(lid),
+      assembled: translate([0, 0, layout.stackPitch], lid),
+      ...(lidText ? { text: printPose(lidText), assembledText: translate([0, 0, layout.stackPitch], lidText) } : {}) });
   }
   return parts;
 }
@@ -525,7 +544,8 @@ export function createMiniatureSocketRackAssembly(input: Partial<MiniatureSocket
 
 export function createMiniatureSocketRackPreview(input: Partial<MiniatureSocketRackParams> = {}, trayName = '', bodyColor = '#3d7a6a'): Geom3 {
   const p = normalizeMiniatureSocketRackParams(input);
-  if (!p.labelsEnabled || p.labelTextMode === 'engraved') return createMiniatureSocketRackAssembly(input, trayName);
+  if ((!p.labelsEnabled || p.labelTextMode === 'engraved') &&
+    (!p.lid || !p.lidTextEnabled || p.lidTextMode === 'engraved')) return createMiniatureSocketRackAssembly(input, trayName);
   const rgb = [1, 3, 5].map(offset => parseInt(bodyColor.slice(offset, offset + 2), 16) / 255);
   const base: [number, number, number, number] = [rgb[0], rgb[1], rgb[2], 1];
   // Keep the flush inlay faces separate: a boolean union would erase their colour boundary.

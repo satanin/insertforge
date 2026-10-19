@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.19`
+- Version visible actual: `1.2.20`
 
 ## Desarrollo local
 
@@ -261,6 +261,7 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
+- v1.2.20: usuario acepta y autoriza commit/push de modos/color en tapa de miniaturas, con controles compartidos con etiquetas. 3MF solo tapa con cuerpo+texto agrupados comprobado. Relieve incluido en altura total y orientación de impresión adaptada; afecta superficie plana de apoyo. Prueba impresa de tapa con texto prevista el 2026-10-20; mantener Experimental y pendiente validación física. Ver [detalle](docs/plans/miniature-socket-rack.md).
 - v1.2.19: usuario autoriza commit/push del bloque de etiquetas y compactación (2026-10-19) para pruebas impresas el 2026-10-20. Mantener Experimental: comprobar lectura, texto multicolor/relieve, entrada/extracción de peanas, apilado y tapa. Punto de retorno anterior a etiquetas: `f7c84b7`. Ver [seguimiento](docs/plans/miniature-socket-rack.md).
 
 - Plan de [generación automática de insertos desde componentes](docs/plans/automatic-insert-design.md): empezar con un juego pequeño solo de cartas; ampliar a varias capas y kits de jugador/personaje. Próximo paso: elegir juego y recoger medidas interiores de caja, mazos y contenido restante. Plan guardado; implementación pendiente.

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { FormControl, Input, InputCheckbox } from '@tableslayer/ui';
   import { IconChevronDown } from '@tabler/icons-svelte';
+  import TextStyleControls from './TextStyleControls.svelte';
   import { getMiniatureSocketRackLayout, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams, type MiniatureRackModel } from '$lib/models/miniatureSocketRack';
 
   let { params, onUpdate, trayName = '' }: {
@@ -9,7 +10,7 @@
     onUpdate: (params: MiniatureSocketRackParams) => void;
   } = $props();
   let layout = $derived(getMiniatureSocketRackLayout(params));
-  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'labelTextMode' | 'labelTextColor' | 'labelsEnabled' | 'labelText' | 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
+  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'lidTextMode' | 'lidTextColor' | 'labelTextMode' | 'labelTextColor' | 'labelsEnabled' | 'labelText' | 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
   const fields: { key: NumberKey; label: string; min: number; max: number; step: number; mode?: string }[] = [
     { key: 'labelHeight', label: 'Letter height (minimum 4 mm)', min: 4, max: 12, step: 0.5 },
     { key: 'nozzleDiameter', label: 'Nozzle diameter', min: 0.2, max: 0.8, step: 0.1 },
@@ -159,9 +160,11 @@
               onchange={(e) => update({ lidText: e.currentTarget.value })} />
           {/snippet}
         </FormControl>
-        <p class="help">Leave blank to follow the tray name. Text is engraved 0.4 mm deep so the top stays flat for stacking.</p>
+        <TextStyleControls label="Lid" mode={layout.p.lidTextMode} color={layout.p.lidTextColor}
+          onMode={(lidTextMode) => update({ lidTextMode })} onColor={(lidTextColor) => update({ lidTextColor })} />
+        <p class="help">Leave blank to follow the tray name. Engraved and inlay text keep the top flat. Raised text affects flat stacking and is included in the total height.</p>
       {/if}
-      <p class="help">Rests on the four posts and locates over the pegs. The top is flat for other items. Height limits include the lid. Exported separately, flat side down. Not a sealed or locking lid; load capacity needs print testing.</p>
+      <p class="help">Rests on the four posts and locates over the pegs. Height limits include the lid and any raised text. Exported separately; raised lettering faces up for printing. Check the underside pockets when slicing. Not a sealed or locking lid; load capacity needs print testing.</p>
     {/if}
   </section>
 
@@ -171,24 +174,8 @@
       onchange={(e) => update({ labelsEnabled: e.currentTarget.checked })} />
     {#if layout.p.labelsEnabled}
       {@render numericFields(['nozzleDiameter', 'labelHeight'])}
-      <label class="modeLabel">Label text mode
-        <span class="selectControl">
-          <select value={layout.p.labelTextMode}
-            onchange={(e) => update({ labelTextMode: e.currentTarget.value as MiniatureSocketRackParams['labelTextMode'] })}>
-            <option value="engraved">Engraved</option>
-            <option value="inlay">Inlay (multicolour)</option>
-            <option value="raised">Raised / extruded</option>
-          </select>
-          <IconChevronDown size={16} aria-hidden="true" />
-        </span>
-      </label>
-      {#if layout.p.labelTextMode !== 'engraved'}
-        <label class="modeLabel">Label text colour
-          <input type="color" value={layout.p.labelTextColor}
-            oninput={(e) => update({ labelTextColor: e.currentTarget.value })} />
-        </label>
-        <p class="help">3MF keeps one separate text body for the rack, with the selected colour. STL combines the geometry without colour. Inlay is flush (0.4 mm); raised text is 0.6 mm high.</p>
-      {/if}
+      <TextStyleControls label="Label" mode={layout.p.labelTextMode} color={layout.p.labelTextColor}
+        onMode={(labelTextMode) => update({ labelTextMode })} onColor={(labelTextColor) => update({ labelTextColor })} />
       {#if layout.p.sizingMode !== 'models'}
         <FormControl label="Socket label" name="socket-labelText">
           {#snippet input({ inputProps })}
@@ -318,7 +305,6 @@
 </div>
 
 <style>
-  input[type='color'] { appearance: auto; width: 3rem; height: 2rem; padding: 0.15rem; border: 1px solid var(--fgMuted); border-radius: var(--radius-2); cursor: pointer; }
   .experimentalNotice { display: grid; gap: 0.4rem; padding: 0.75rem; border: 1px solid #d99522; border-radius: var(--radius-2); background: rgb(217 149 34 / 10%); font-size: 0.8125rem; line-height: 1.5; }
   .socketEditor { display: grid; gap: 1rem; }
   .rackSummary { display: grid; gap: 0.3rem; padding: 0.75rem; background: var(--inputBg); border: var(--borderThin); border-radius: var(--radius-2); }

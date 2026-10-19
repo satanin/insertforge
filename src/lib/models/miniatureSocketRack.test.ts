@@ -4,6 +4,7 @@ import {
   createMiniatureSocketRack, defaultMiniatureSocketRackParams,
   createMiniatureSocketRackLid, createMiniatureSocketRackParts,
   createMiniatureSocketRackLabelText,
+  createMiniatureSocketRackLidText,
   createMiniatureSocketRackPreview,
   getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions,
   normalizeMiniatureSocketRackParams
@@ -20,6 +21,30 @@ const { translate } = jscad.transforms;
 const socketParams = { ...defaultMiniatureSocketRackParams, sizingMode: 'grid' as const, rows: 1, columns: 2 };
 
 describe('individual miniature base rack', () => {
+  it('shares lid text modes, separate colour bodies and correct print poses with socket labels', () => {
+    const p = { ...socketParams, rows: 1, columns: 1, lid: true, lidText: 'F', lidTextColor: '#ff8000' };
+    for (const mode of ['engraved', 'inlay', 'raised'] as const) {
+      const input = { ...p, lidTextMode: mode };
+      const layout = getMiniatureSocketRackLayout(input);
+      const part = createMiniatureSocketRackParts(input).find(part => part.id === 'lid')!;
+      const text = createMiniatureSocketRackLidText(input)!;
+      expect(text.color).toEqual([1, 128 / 255, 0, 1]);
+      expect(!!part.text).toBe(mode !== 'engraved');
+      expect(layout.height).toBeCloseTo(getMiniatureSocketRackLayout(p).height + (mode === 'raised' ? 0.6 : 0));
+      if (part.text) {
+        expect(Math.abs(measureVolume(intersect(part.geometry, part.text)))).toBeLessThan(0.001);
+        expect(measureBoundingBox(part.text)[1][2]).toBeCloseTo(mode === 'raised' ? p.lidThickness + 0.6 : 0.4);
+        expect(measureBoundingBox(part.assembledText!)[1][2]).toBeCloseTo(layout.height);
+        expect(jscad.geometries.geom3.toPolygons(createMiniatureSocketRackPreview(input)).some(poly => poly.color?.[0] === 1 && poly.color?.[1] === 128 / 255)).toBe(true);
+      }
+    }
+    const fixed = getMiniatureSocketRackLayout({ ...p, fixedHeight: 70, lidTextMode: 'raised' });
+    expect(fixed.height).toBe(70);
+    expect(fixed.stackPitch).toBeCloseTo(66.4);
+    expect(createMiniatureSocketRackLidText({ ...p, lidTextEnabled: false })).toBeNull();
+    expect(normalizeMiniatureSocketRackParams().lidTextMode).toBe('engraved');
+    expect(normalizeMiniatureSocketRackParams({ lidTextColor: 'invalid' }).lidTextColor).toBe('#ffffff');
+  });
   it('searches compact footprints for the 3 Runners + 3 Tanks case without fixed dimensions', () => {
     const input = { sizingMode: 'models' as const, wallThickness: 1.5, floorThickness: 1.5, postWidth: 8,
       models: [

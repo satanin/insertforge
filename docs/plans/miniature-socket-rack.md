@@ -72,6 +72,10 @@ Compactación por modelos: al ajustar todas las miniaturas (o cantidad parcial),
 
 ### Tapa y export individual (2026-10-19, local)
 
+Opciones de texto de tapa aceptadas para commit/push v1.2.20 el 2026-10-19. El usuario probará la tapa con texto el 2026-10-20. La aceptación funcional no cierra la validación física de encaje, letras y apilado.
+
+Iteración posterior a v1.2.19: tapa de miniaturas usa los mismos controles reutilizables de modos/color que las etiquetas: grabado, inserción a ras de 0,4 mm y relieve de 0,6 mm. Texto de tapa como un cuerpo independiente agrupado con la tapa en 3MF, también al exportar solo tapa; STL fusionado. Preview conserva colores. Altura fija/máxima incluye relieve; orientación de impresión con letras hacia arriba si hay relieve (verificar puentes de cavidades inferiores). Grabado/inlay conservan superficie plana; relieve afecta apoyo de otros objetos. Se normalizan nombres de modos existentes en Box/Layered Box sin modificar su geometría de tapa deslizante. Pendiente validación en app/laminador/impresión, sin versión/commit/push durante la iteración.
+
 El usuario confirma que las primeras pruebas impresas son correctas. Se mantiene Experimental para iteraciones nuevas.
 
 Aligerado bajo cada base activo por defecto en bandejas nuevas; se respeta `perforated: false` guardado. Etiquetado de alojamientos pendiente de decidir: preferir códigos cortos junto al socket y leyenda en borde/tapa para evitar nombres ilegibles o tapados por peanas.
