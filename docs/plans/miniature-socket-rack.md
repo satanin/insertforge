@@ -55,6 +55,21 @@ Sin nueva versión durante las pruebas. Agrupar versión/changelog al preparar e
 
 ## Evolución posterior
 
+### Prototipo de etiquetas de sockets (local, posterior a f7c84b7)
+
+Publicación v1.2.19 autorizada por el usuario el 2026-10-19, junto al commit previo de tapa/export v1.2.18. Validación física prevista para el 2026-10-20; mantener Experimental. Las notas de estado local siguientes describen las iteraciones previas al bloque publicado.
+
+Compactación por modelos: al ajustar todas las miniaturas (o cantidad parcial), se prueban también contenedores más estrechos/bajos, no solo el máximo disponible. Se prioriza cantidad colocada y luego área exterior/perímetro, sin girar ni reducir envolventes. Búsqueda acotada a 32 candidatos por eje libre; conserva medidas fijas y no altera Fill. Regresión de referencia: 3 Runners de peana 26 mm + 3 Tanks de 32 mm, envolventes 32 × 32 mm, rack previo 90 × 174 mm. Pendiente revisión visual del usuario; no garantiza el óptimo global.
+
+- Activación opcional, apagada en proyectos existentes. Placa recta exterior detrás de cada socket (lado de la solapa, sin cubrir la entrada opuesta), al nivel superior de la solapa. Apoyo sólido hasta suelo para imprimir sin una repisa suspendida.
+- Anchura igual al diámetro exterior del socket. Profundidad como máximo gap Y + pared, recortada por límite del rack, postes y bounds conservadores de sockets/envolventes vecinos. No cambia colocación, capacidad ni tamaño exterior. Si falta hueco, error; no fuerza crecimiento. Comprueba solapes entre placas y posible invasión de la envolvente del propio modelo.
+- Modo por modelos: nombre completo como texto predeterminado, campo de abreviatura opcional por modelo. Modo libre/rejilla: texto común configurable. No se trunca ni reduce texto para encajarlo.
+- Altura real de glifo configurable desde 4 mm, mínimo conservador máximo entre 4 mm y 10 veces nozzle. Trazo mínimo máximo entre 0,8 mm y 2 veces nozzle. Grabado de 0,4 mm. Perfil dimensional orientativo, no garantía de legibilidad; validar laminado/impresión.
+- Modos opcionales: grabado (predeterminado), inserción a ras de 0,4 mm y relieve de 0,6 mm. Inserción/relieve admiten color: un único cuerpo de texto por rack en 3MF, agrupado con el rack y procesado por group3mf. STL une cuerpo y texto, sin color. Preview incluye texto; pendiente validación real en laminador/impresión de estos modos.
+- Nombres largos, texto vacío o espacio insuficiente invalidan geometría/exportación con aviso de abreviar/aumentar espaciado/desactivar. Preview y exports comparten geometría. Etiquetas sin commit/push ni cambio de versión mientras se explora.
+- El cruce con la envolvente aproximada del propio modelo solo genera advertencia de comprobar acceso/holgura con la miniatura real: no demuestra colisión y no implica texto demasiado largo. Se mantienen los errores de encaje real del texto y solapes de placas.
+- Tests: bounds sin crecer, placas dentro de diámetro/gap, sin colisión de peanas en reposo, modelos mixtos y abreviaturas, rechazo de texto largo y nozzle incompatible. Pendiente prueba real con dos sockets contiguos, lectura con miniaturas, acceso inclinado y rigidez.
+
 ### Tapa y export individual (2026-10-19, local)
 
 El usuario confirma que las primeras pruebas impresas son correctas. Se mantiene Experimental para iteraciones nuevas.

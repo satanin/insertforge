@@ -9,8 +9,10 @@
     onUpdate: (params: MiniatureSocketRackParams) => void;
   } = $props();
   let layout = $derived(getMiniatureSocketRackLayout(params));
-  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
+  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'labelTextMode' | 'labelTextColor' | 'labelsEnabled' | 'labelText' | 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
   const fields: { key: NumberKey; label: string; min: number; max: number; step: number; mode?: string }[] = [
+    { key: 'labelHeight', label: 'Letter height (minimum 4 mm)', min: 4, max: 12, step: 0.5 },
+    { key: 'nozzleDiameter', label: 'Nozzle diameter', min: 0.2, max: 0.8, step: 0.1 },
     { key: 'lidThickness', label: 'Lid thickness', min: 2.8, max: 8, step: 0.1 },
     { key: 'maxWidth', label: 'Maximum rack width', min: 30, max: 600, step: 1, mode: 'limits' },
     { key: 'maxDepth', label: 'Maximum rack depth', min: 30, max: 600, step: 1, mode: 'limits' },
@@ -32,7 +34,7 @@
     { key: 'postWidth', label: 'Stacking post width', min: 8, max: 20, step: 0.5 },
     { key: 'stackingClearance', label: 'Stacking clearance per side', min: 0.1, max: 0.8, step: 0.1 }
   ];
-  const modelFields: { key: Exclude<keyof MiniatureRackModel, 'id' | 'name'>; label: string; min: number; max: number }[] = [
+  const modelFields: { key: Exclude<keyof MiniatureRackModel, 'id' | 'name' | 'label'>; label: string; min: number; max: number }[] = [
     { key: 'count', label: 'Quantity', min: 1, max: 100 },
     { key: 'baseDiameter', label: 'Base diameter', min: 10, max: 100 },
     { key: 'baseThickness', label: 'Base thickness', min: 1, max: 15 },
@@ -163,6 +165,42 @@
     {/if}
   </section>
 
+  <section class="editorSection" aria-label="Socket labels">
+    <h3>Socket labels · Experimental</h3>
+    <InputCheckbox label="Add socket label plates" checked={layout.p.labelsEnabled}
+      onchange={(e) => update({ labelsEnabled: e.currentTarget.checked })} />
+    {#if layout.p.labelsEnabled}
+      {@render numericFields(['nozzleDiameter', 'labelHeight'])}
+      <label class="modeLabel">Label text mode
+        <span class="selectControl">
+          <select value={layout.p.labelTextMode}
+            onchange={(e) => update({ labelTextMode: e.currentTarget.value as MiniatureSocketRackParams['labelTextMode'] })}>
+            <option value="engraved">Engraved</option>
+            <option value="inlay">Inlay (multicolour)</option>
+            <option value="raised">Raised / extruded</option>
+          </select>
+          <IconChevronDown size={16} aria-hidden="true" />
+        </span>
+      </label>
+      {#if layout.p.labelTextMode !== 'engraved'}
+        <label class="modeLabel">Label text colour
+          <input type="color" value={layout.p.labelTextColor}
+            oninput={(e) => update({ labelTextColor: e.currentTarget.value })} />
+        </label>
+        <p class="help">3MF keeps one separate text body for the rack, with the selected colour. STL combines the geometry without colour. Inlay is flush (0.4 mm); raised text is 0.6 mm high.</p>
+      {/if}
+      {#if layout.p.sizingMode !== 'models'}
+        <FormControl label="Socket label" name="socket-labelText">
+          {#snippet input({ inputProps })}
+            <Input {...inputProps} value={layout.p.labelText} maxlength={100}
+              onchange={(e) => update({ labelText: e.currentTarget.value })} />
+          {/snippet}
+        </FormControl>
+      {/if}
+      <p class="help">Plates stay behind the retaining tab, within the socket diameter and existing Y gap. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(4, layout.p.nozzleDiameter * 10).toFixed(1)} mm. These conservative limits still need a test print.</p>
+    {/if}
+  </section>
+
   <section class="editorSection" aria-label="Miniatures and layout">
     <h3>Miniatures &amp; layout</h3>
     <label class="modeLabel">Layout mode
@@ -228,6 +266,13 @@
             {#snippet input({ inputProps })}<Input {...inputProps} value={model.name}
               onchange={(e) => updateModel(index, { name: e.currentTarget.value })} />{/snippet}
           </FormControl>
+          {#if layout.p.labelsEnabled}
+            <FormControl label="Short label (blank follows model name)" name={`model-label-${model.id}`}>
+              {#snippet input({ inputProps })}<Input {...inputProps} value={model.label ?? ''}
+                placeholder={model.name} maxlength={100}
+                onchange={(e) => updateModel(index, { label: e.currentTarget.value })} />{/snippet}
+            </FormControl>
+          {/if}
           <div class="socketFields">
             {#each modelFields as field (field.key)}
               {#if !(field.key === 'count' && layout.p.quantityMode === 'fill' && layout.p.fillModelId === model.id)}
@@ -273,6 +318,7 @@
 </div>
 
 <style>
+  input[type='color'] { appearance: auto; width: 3rem; height: 2rem; padding: 0.15rem; border: 1px solid var(--fgMuted); border-radius: var(--radius-2); cursor: pointer; }
   .experimentalNotice { display: grid; gap: 0.4rem; padding: 0.75rem; border: 1px solid #d99522; border-radius: var(--radius-2); background: rgb(217 149 34 / 10%); font-size: 0.8125rem; line-height: 1.5; }
   .socketEditor { display: grid; gap: 1rem; }
   .rackSummary { display: grid; gap: 0.3rem; padding: 0.75rem; background: var(--inputBg); border: var(--borderThin); border-radius: var(--radius-2); }

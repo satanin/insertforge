@@ -37,7 +37,7 @@ import {
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
-import { createMiniatureSocketRackParts } from '$lib/models/miniatureSocketRack';
+import { createMiniatureSocketRackParts, createMiniatureSocketRackPreview } from '$lib/models/miniatureSocketRack';
 import { selectExportElements } from '$lib/utils/exportElements';
 import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
 import type {
@@ -545,6 +545,7 @@ function createTrayGeometry(
     return createCardDrawTray(tray.params, cardSizes, tray.name, maxHeight, spacerHeight, showEmboss);
   }
   if (isMiniatureRackTray(tray)) {
+    if (tray.params.variant === 'sockets') return createMiniatureSocketRackPreview(tray.params.sockets, tray.name, tray.color);
     return createMiniatureRack(tray.params, tray.name, maxHeight, showEmboss);
   }
   if (isTileTray(tray)) {
@@ -1896,7 +1897,8 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
           namedGeometries.push({ geom: cleanGeometryForExport(part.geometry), name, groupKey: name });
           if (part.text) {
             const geom = cleanGeometryForExport(part.text) as Geom3 & { color: [number, number, number, number] };
-            geom.color = [0.98, 0.98, 0.98, 1];
+            const textColor = part.text.color ?? [0.98, 0.98, 0.98, 1];
+            geom.color = [textColor[0], textColor[1], textColor[2], textColor[3] ?? 1];
             namedGeometries.push({ geom, name: getUniqueName(`${name}-text`), groupKey: name });
           }
         }
