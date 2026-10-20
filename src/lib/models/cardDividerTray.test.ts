@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import jscad from '@jscad/modeling';
 
 import {
   createCardDividerTray,
@@ -29,6 +30,29 @@ const cardSizes: CardSize[] = [
 ];
 
 describe('card divider tray angled height limits', () => {
+  it('reuses identical requests and invalidates for labels, parameters and custom card sizes', () => {
+    const p = { ...defaultCardDividerTrayParams, stacks: [{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 10, label: 'A' }] };
+    const first = createCardDividerTray(p, cardSizes, 'Test', undefined, undefined, false);
+    expect(createCardDividerTray({ ...p }, cardSizes.map(size => ({ ...size })), 'Test', undefined, undefined, false)).toBe(first);
+    const noLabels = createCardDividerTray(p, cardSizes, 'Test', undefined, undefined, false, false);
+    expect(noLabels).not.toBe(first);
+    expect(jscad.measurements.measureVolume(noLabels)).toBeGreaterThan(jscad.measurements.measureVolume(first));
+    p.stacks[0].count = 20;
+    const edited = createCardDividerTray(p, cardSizes, 'Test', undefined, undefined, false);
+    expect(edited).not.toBe(first);
+    expect(createCardDividerTray(p, cardSizes.map(size => ({ ...size, thickness: size.thickness + 0.1 })), 'Test', undefined, undefined, false)).not.toBe(edited);
+  });
+
+  it('keeps the labelled reference tray close to the original high-resolution solid', () => {
+    const p = { ...defaultCardDividerTrayParams, stacks: Array.from({ length: 4 }, (_, i) => ({
+      cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: `Deck ${i + 1}`
+    })) };
+    const geometry = createCardDividerTray(p, cardSizes, 'Cards');
+    // Measured before optimization with 128-segment arcs; tolerate 0.02%.
+    const referenceVolume = 78468.53896436136;
+    expect(Math.abs(jscad.measurements.measureVolume(geometry) - referenceVolume) / referenceVolume).toBeLessThan(0.0002);
+    expect(jscad.geometries.geom3.toPolygons(geometry).length).toBeLessThan(4500);
+  });
   it('tilts taller stacks when max height is lower than the natural height', () => {
     const natural = getCardDividerTrayDimensions(defaultCardDividerTrayParams, cardSizes);
     const minimum = validateCardDividerHeight(defaultCardDividerTrayParams, cardSizes).minimumHeight;

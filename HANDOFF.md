@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.21`
+- Version visible actual: `1.2.22`
 
 ## Desarrollo local
 
@@ -260,6 +260,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.21 publicada en `main`, commit `1bd2f8d`. Card Divider: usuario acepta la mejora y autoriza commit/push v1.2.22 (2026-10-21); caso 4 mazos etiquetados 3,38 s → 0,71 s. Validación impresa pendiente. Ver [mediciones](docs/plans/geometry-performance.md).
 
 - Revisar rendimiento del resto de piezas, prioridad **Card Dividers**: usuario informa lentitud en varias piezas y confirma mejora muy notable en Miniature Tray (2026-10-21). Ver [plan de revisión](docs/plans/geometry-performance.md). Investigación autorizada tras publicar v1.2.21.
 

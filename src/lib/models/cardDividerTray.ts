@@ -470,7 +470,8 @@ function createStackLabelGeometry(
   for (const segment of textSegments) {
     if (segment.length >= 2) {
       const pathObj = path2.fromPoints({ closed: false }, segment);
-      const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+      // At radius 0.5 mm, 24 segments deviate by less than 0.005 mm.
+      const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 24 }, pathObj);
       const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
       textShapes.push(extruded);
     }
@@ -581,7 +582,26 @@ function createCardDividerSlotCavity(
   return rotateZ(Math.PI / 2, rotateX(Math.PI / 2, cavity));
 }
 
+let cardDividerGeometryCache: { key: string; geometry: Geom3 } | null = null;
+
 export function createCardDividerTray(
+  params: CardDividerTrayParams,
+  customCardSizes: CustomCardSize[],
+  trayName?: string,
+  targetHeight?: number,
+  floorSpacerHeight?: number,
+  showEmboss = true,
+  showStackLabels = true
+): Geom3 {
+  const key = JSON.stringify([params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels]);
+  if (cardDividerGeometryCache?.key === key) return cardDividerGeometryCache.geometry;
+  const geometry = buildCardDividerTray(params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels);
+  // Bound memory to one tray and invalidate by values, including card sizes.
+  cardDividerGeometryCache = { key, geometry };
+  return geometry;
+}
+
+function buildCardDividerTray(
   params: CardDividerTrayParams,
   customCardSizes: CustomCardSize[],
   _trayName?: string,
@@ -692,6 +712,8 @@ export function createCardDividerTray(
   }
 
   const cutoutRadius = maxCutoutDimension / 4; // Diameter is half the dimension, so radius is quarter
+  // Keep circular approximation error below 0.02 mm even for large custom cards.
+  const cutoutSegments = Math.max(32, Math.ceil(Math.PI / Math.acos(1 - Math.min(0.02 / cutoutRadius, 1)) / 4) * 4);
   const cutoutCenterZ = trayHeight; // Cylinder midpoint at top of tray
 
   if (stackDirection === 'frontToBack') {
@@ -701,7 +723,7 @@ export function createCardDividerTray(
 
     const fingerCutout = translate(
       [trayWidth / 2, trayDepth / 2, cutoutCenterZ],
-      rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 }))
+      rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: cutoutSegments }))
     );
     tray = subtract(tray, fingerCutout);
   } else {
@@ -721,7 +743,7 @@ export function createCardDividerTray(
 
       const fingerCutout = translate(
         [stackCenterX, trayDepth / 2, cutoutCenterZ],
-        rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: 128 }))
+        rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: cutoutSegments }))
       );
       tray = subtract(tray, fingerCutout);
 
@@ -744,7 +766,8 @@ export function createCardDividerTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+          // Radius 0.6 mm: under 0.006 mm chord error with 24 segments.
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 24 }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }
