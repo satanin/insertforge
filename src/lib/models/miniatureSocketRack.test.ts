@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import jscad from '@jscad/modeling';
 import {
-  createMiniatureSocketRack, defaultMiniatureSocketRackParams,
+  createMiniatureSocketRack as createMiniatureSocketRackCurrent, defaultMiniatureSocketRackParams,
   createMiniatureSocketRackLid, createMiniatureSocketRackParts,
   createMiniatureSocketRackLabelText,
   createMiniatureSocketRackLidText,
   createMiniatureSocketRackPreview,
-  getMiniatureSocketRackLayout, getMiniatureSocketRackPreviewPositions,
+  getMiniatureSocketRackLayout as getMiniatureSocketRackLayoutCurrent, getMiniatureSocketRackPreviewPositions,
   normalizeMiniatureSocketRackParams
 } from './miniatureSocketRack';
 import {
@@ -18,9 +18,105 @@ import { arrangeLayerContents } from './layer';
 const { measureBoundingBox, measureVolume } = jscad.measurements;
 const { intersect } = jscad.booleans;
 const { translate } = jscad.transforms;
-const socketParams = { ...defaultMiniatureSocketRackParams, sizingMode: 'grid' as const, rows: 1, columns: 2 };
+// Existing size/capacity fixtures represent saved racks with the original fit settings.
+const savedFit = { diameterClearance: 1, tabThickness: 1.6, baseDiameter: 32, postWidth: 10, wallThickness: 2, floorThickness: 2 };
+const getMiniatureSocketRackLayout = (input: Parameters<typeof getMiniatureSocketRackLayoutCurrent>[0] = {}) =>
+  getMiniatureSocketRackLayoutCurrent({ ...savedFit, ...input });
+const createMiniatureSocketRack = (input: Parameters<typeof createMiniatureSocketRackCurrent>[0] = {}) =>
+  createMiniatureSocketRackCurrent({ ...savedFit, ...input });
+const socketParams = { ...defaultMiniatureSocketRackParams, ...savedFit, sizingMode: 'grid' as const, rows: 1, columns: 2 };
 
 describe('individual miniature base rack', () => {
+  it('keeps local engraving equivalent to cutting the complete rack', () => {
+    const p = { requestedCount: 2, labelsEnabled: true, labelText: 'F' };
+    const layout = getMiniatureSocketRackLayoutCurrent(p);
+    expect(layout.error).toBeNull();
+    const plates = layout.labels.map(label => translate([label.x, label.y, (layout.p.floorThickness - 0.1 + label.top) / 2],
+      jscad.primitives.cuboid({ size: [label.width, label.depth, label.top - layout.p.floorThickness + 0.1] })));
+    const cuts = layout.labels.flatMap(label => label.textSegments.map(segment => translate([0, 0, label.top - 0.4],
+      jscad.extrusions.extrudeLinear({ height: 0.5 }, jscad.expansions.expand(
+        { delta: label.stroke / 2, corners: 'round', segments: 24 }, jscad.geometries.path2.fromPoints({}, segment))))));
+    const reference = jscad.booleans.subtract(jscad.booleans.union(
+      createMiniatureSocketRackCurrent({ ...p, labelsEnabled: false }), ...plates), ...cuts);
+    const actual = createMiniatureSocketRackCurrent(p);
+    expect(measureVolume(actual)).toBeCloseTo(measureVolume(reference), 4);
+    expect(Math.abs(measureVolume(jscad.booleans.subtract(actual, reference)))).toBeLessThan(0.001);
+    expect(Math.abs(measureVolume(jscad.booleans.subtract(reference, actual)))).toBeLessThan(0.001);
+  });
+  it('reuses unchanged layout and assembly work but invalidates after parameter edits', () => {
+    const input = { requestedCount: 1 };
+    const layout = getMiniatureSocketRackLayoutCurrent(input);
+    expect(getMiniatureSocketRackLayoutCurrent({ ...input })).toBe(layout);
+    const first = createMiniatureSocketRackParts(input);
+    const repeated = createMiniatureSocketRackParts({ ...input });
+    expect(repeated[0]).not.toBe(first[0]);
+    expect(repeated[0].geometry).toBe(first[0].geometry);
+    input.requestedCount = 2;
+    expect(getMiniatureSocketRackLayoutCurrent(input).seats).toHaveLength(2);
+    const edited = createMiniatureSocketRackParts(input);
+    expect(edited[0].geometry).not.toBe(first[0].geometry);
+    expect(measureVolume(edited[0].geometry)).toBeGreaterThan(measureVolume(first[0].geometry));
+  });
+  it('packs ten Walkers and one Runner into four compact rows', () => {
+    const p = { sizingMode: 'models' as const, lid: true, labelsEnabled: true, models: [
+      { id: 'walker', name: 'Walker', count: 10, baseDiameter: 26, baseThickness: 3, width: 26, depth: 26, height: 45 },
+      { id: 'runner', name: 'Runner', count: 1, baseDiameter: 26, baseThickness: 3, width: 26, depth: 26, height: 45 }
+    ] };
+    const layout = getMiniatureSocketRackLayoutCurrent(p);
+    expect(layout.error).toBeNull();
+    expect(layout.width * layout.depth).toBeLessThanOrEqual(119.2 * 155.6 + 0.001);
+  });
+  it('sizes label plate width to the printed text with a 1 mm margin on each side', () => {
+    const short = getMiniatureSocketRackLayoutCurrent({ labelsEnabled: true, labelText: 'Mini' });
+    const long = getMiniatureSocketRackLayoutCurrent({ labelsEnabled: true, labelText: 'Miniature' });
+    expect(short.error).toBeNull();
+    expect(long.error).toBeNull();
+    for (const layout of [short, long]) {
+      const label = layout.labels[0];
+      const xs = label.textSegments.flat().map(point => point[0]);
+      expect(label.width).toBeCloseTo(Math.max(...xs) - Math.min(...xs) + label.stroke + 2);
+    }
+    expect(short.labels[0].width).toBeLessThan(long.labels[0].width);
+    expect([short.width, short.depth]).toEqual([long.width, long.depth]);
+  });
+  it('enables labels with printable default text on a new 26 mm tray', () => {
+    const p = { labelsEnabled: true };
+    expect(normalizeMiniatureSocketRackParams(p).labelText).toBe('Mini');
+    expect(getMiniatureSocketRackLayoutCurrent(p).error).toBeNull();
+    expect(measureVolume(createMiniatureSocketRackCurrent({ ...p, requestedCount: 1 }))).toBeGreaterThan(0);
+  });
+  it('measures the space required by Miniature at the default printable height', () => {
+    const p = { labelsEnabled: true, labelText: 'Miniature' };
+    const layout = getMiniatureSocketRackLayoutCurrent(p);
+    expect(layout.error).toBeNull();
+    expect(layout.warnings.some(warning => warning.includes('reduced side margins'))).toBe(false);
+    expect(layout.labels[0].stroke).toBe(0.8);
+    const points = layout.labels[0].textSegments.flat();
+    expect(Math.max(...points.map(p => p[1])) - Math.min(...points.map(p => p[1]))).toBeCloseTo(4);
+    expect(getMiniatureSocketRackLayoutCurrent({ ...p, labelText: 'Miniature too long' }).error).toContain('does not fit');
+    expect(measureVolume(createMiniatureSocketRackCurrent({ ...p, requestedCount: 1 }))).toBeGreaterThan(0);
+  });
+  it('uses a looser base fit and thinner tab for new racks while preserving saved settings', () => {
+    const p = normalizeMiniatureSocketRackParams();
+    expect(p.diameterClearance).toBe(1.4);
+    expect(p.tabThickness).toBe(1.4);
+    expect(getMiniatureSocketRackLayoutCurrent().radius).toBeCloseTo(13.7);
+    expect(normalizeMiniatureSocketRackParams().baseDiameter).toBe(26);
+    expect(normalizeMiniatureSocketRackParams().postWidth).toBe(8);
+    const saved = normalizeMiniatureSocketRackParams({ diameterClearance: 1, tabThickness: 1.6 });
+    expect(saved.diameterClearance).toBe(1);
+    expect(saved.tabThickness).toBe(1.6);
+  });
+  it('allows large independent clearances without silently clamping them to 40 mm', () => {
+    const input = { ...socketParams, linkedSpacing: false, spacingX: 75, spacingY: 95, maxWidth: 600, maxDepth: 600 };
+    const p = normalizeMiniatureSocketRackParams(input);
+    expect([p.spacingX, p.spacingY]).toEqual([75, 95]);
+    const layout = getMiniatureSocketRackLayout(input);
+    expect(layout.error).toBeNull();
+    expect(layout.seats[1].x - layout.seats[0].x).toBeCloseTo(112);
+    expect(normalizeMiniatureSocketRackParams({ spacing: 80 }).spacingX).toBe(80);
+    expect(normalizeMiniatureSocketRackParams().spacingX).toBe(6);
+  });
   it('shares lid text modes, separate colour bodies and correct print poses with socket labels', () => {
     const p = { ...socketParams, rows: 1, columns: 1, lid: true, lidText: 'F', lidTextColor: '#ff8000' };
     for (const mode of ['engraved', 'inlay', 'raised'] as const) {
@@ -56,10 +152,49 @@ describe('individual miniature base rack', () => {
     expect(layout.seats).toHaveLength(6);
     expect(layout.width * layout.depth).toBeLessThan(90 * 174);
     expect(layout.modelCounts.map(model => model.placed)).toEqual([3, 3]);
+    const runners = layout.seats.filter(seat => seat.modelId === 'r').sort((a, b) => a.x - b.x);
+    expect(runners[0].x - 16).toBeCloseTo(8);
+    expect(runners[2].x + 16).toBeCloseTo(layout.width - 8);
+    expect(runners[1].x).toBeCloseTo(layout.width / 2);
+    expect(runners[1].x - runners[0].x).toBeCloseTo(runners[2].x - runners[1].x);
     expect(getMiniatureSocketRackLayout({ ...input, fixedWidth: 90 }).width).toBe(90);
     const fill = getMiniatureSocketRackLayout({ ...input, quantityMode: 'fill' });
     expect([fill.width, fill.depth]).toEqual([200, 200]);
   });
+  it('mixes orientations to reduce the footprint without fixed dimensions', () => {
+    const layout = getMiniatureSocketRackLayout({ sizingMode: 'models', models: [
+      { id: 'wide', name: 'A', count: 2, baseDiameter: 25, baseThickness: 3, width: 100, depth: 35, height: 45 },
+      { id: 'tall', name: 'B', count: 1, baseDiameter: 25, baseThickness: 3, width: 35, depth: 100, height: 45 }
+    ] });
+    expect(layout.error).toBeNull();
+    expect(layout.seats.some(seat => seat.rotated)).toBe(true);
+    expect(layout.seats.some(seat => !seat.rotated)).toBe(true);
+    expect(layout.width * layout.depth).toBeLessThanOrEqual(120 * 137);
+  });
+
+  it('rotates individual model sockets, envelopes and labels to fit a compact rack', () => {
+    const input = { sizingMode: 'models' as const, maxWidth: 90, maxDepth: 300,
+      labelsEnabled: true, spacingX: 10, spacingY: 14, linkedSpacing: false,
+      models: [
+        { id: 'wide', name: 'A', count: 1, baseDiameter: 25, baseThickness: 3, width: 100, depth: 35, height: 45 },
+        { id: 'small', name: 'B', count: 2, baseDiameter: 25, baseThickness: 3, width: 35, depth: 60, height: 45 }
+      ] };
+    const layout = getMiniatureSocketRackLayout(input);
+    expect(layout.error).toBeNull();
+    expect(layout.seats).toHaveLength(3);
+    const wide = layout.seats.find(seat => seat.modelId === 'wide')!;
+    expect(wide.rotated).toBe(true);
+    expect([wide.envelopeWidth, wide.envelopeDepth]).toEqual([35, 100]);
+    expect(layout.width).toBeLessThanOrEqual(90);
+    const label = layout.labels.find(label => label.text === 'A')!;
+    expect(label.x).toBeGreaterThan(wide.x);
+    const textYs = label.textSegments.flat().map(point => point[1]);
+    expect(label.depth).toBeCloseTo(Math.max(...textYs) - Math.min(...textYs) + label.stroke + 2);
+    const preview = getMiniatureSocketRackPreviewPositions(input).find(item => item.label === 'A');
+    expect(preview?.previewEnvelope).toEqual({ width: 35, depth: 100, height: 45 });
+    expect(measureVolume(createMiniatureSocketRack(input))).toBeGreaterThan(0);
+  });
+
   it('exports inlay and raised labels as a separate coloured text body without overlap', () => {
     const p = { ...socketParams, rows: 1, columns: 1, labelsEnabled: true, labelText: 'F', labelTextColor: '#ff8000' };
     expect(createMiniatureSocketRackLabelText(p)).toBeNull();
@@ -89,7 +224,7 @@ describe('individual miniature base rack', () => {
     layout.labels.forEach((label, index) => {
       const seat = layout.seats[index];
       const diameter = seat.baseDiameter + layout.p.diameterClearance + 2 * layout.p.wallThickness;
-      expect(label.width).toBeLessThanOrEqual(diameter);
+      expect(label.width).toBeLessThanOrEqual(diameter + Math.min(2, layout.p.spacingX / 2));
       expect(label.depth).toBeLessThanOrEqual(layout.p.spacingY + layout.p.wallThickness);
       expect(label.y - label.depth / 2).toBeGreaterThanOrEqual(layout.p.wallThickness);
       expect(label.top).toBe(layout.p.floorThickness + seat.baseThickness + layout.p.verticalClearance + layout.p.tabThickness);
@@ -164,6 +299,14 @@ describe('individual miniature base rack', () => {
     const printed = createMiniatureSocketRackParts(p, 'B').find(part => part.id === 'lid')!;
     expect(measureVolume(printed.geometry)).toBeCloseTo(measureVolume(custom), 5);
   });
+  it('can preview only the rack while keeping the lid available for export', () => {
+    const p = { ...socketParams, lid: true, lidTextEnabled: false };
+    const body = createMiniatureSocketRackPreview(p, '', '#3d7a6a', true);
+    const assembly = createMiniatureSocketRackPreview(p);
+    expect(measureBoundingBox(body)[1][2]).toBeLessThan(measureBoundingBox(assembly)[1][2]);
+    expect(createMiniatureSocketRackParts(p).map(part => part.id)).toEqual(['body', 'lid']);
+  });
+
   it('supports a separate flat lid on the posts without interfering with pegs or miniatures', () => {
     const p = { ...socketParams, lid: true, fixedHeight: 65 };
     const layout = getMiniatureSocketRackLayout(p);
@@ -252,7 +395,7 @@ describe('individual miniature base rack', () => {
     expect(layout.modelCounts.find(m => m.id === 'runners')!.requested).toBeNull();
     expect(layout.seats.length).toBe(layout.requestedCount);
     expect([layout.width, layout.depth]).toEqual([143, 110]);
-    const restored = getMiniatureSocketRackLayout(JSON.parse(JSON.stringify(normalizeMiniatureSocketRackParams(p))));
+    const restored = getMiniatureSocketRackLayout(JSON.parse(JSON.stringify(normalizeMiniatureSocketRackParams({ ...savedFit, ...p }))));
     expect(restored.modelCounts).toEqual(layout.modelCounts);
     expect(restored.seats).toEqual(layout.seats);
     expect(getMiniatureSocketRackLayout({ ...p, models: [filler, { ...large, count: 30 }] }).error).toContain('other models do not fit');
@@ -288,7 +431,7 @@ describe('individual miniature base rack', () => {
       floorThickness: 0, diameterClearance: -1, verticalClearance: 0, tabOverlap: 100 });
     expect(p.rows).toBe(1);
     expect(p.columns).toBe(10);
-    expect(p.baseDiameter).toBe(32);
+    expect(p.baseDiameter).toBe(26);
     expect(p.floorThickness).toBeGreaterThanOrEqual(1.2);
     expect(p.diameterClearance).toBeGreaterThan(0);
     expect(p.verticalClearance).toBeGreaterThan(0);

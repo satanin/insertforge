@@ -37,7 +37,7 @@ import {
 } from '$lib/models/layeredBoxGeometry';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay } from '$lib/models/lid';
 import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/models/miniatureRack';
-import { createMiniatureSocketRackParts, createMiniatureSocketRackPreview } from '$lib/models/miniatureSocketRack';
+import { createMiniatureSocketRackParts, createMiniatureSocketRackPreview, getMiniatureSocketRackLayout } from '$lib/models/miniatureSocketRack';
 import { selectExportElements } from '$lib/utils/exportElements';
 import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
 import type {
@@ -404,6 +404,7 @@ interface LooseTrayGeometryResult {
 }
 
 interface GenerateResult {
+  socketPreview?: { trayId: string; paramsKey: string; name: string; body: GeometryData; lid: GeometryData; text: GeometryData | null; slideDistance: number; color: string; textColor: string } | null;
   type: 'generate-result';
   id: number;
   selectedTrayGeometry: GeometryData;
@@ -947,6 +948,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
     // If tray is in a box, generate box-related geometry
     let selectedTrayGeometry: GeometryData = createEmptyGeometryData();
+    let socketPreview: GenerateResult['socketPreview'] = null;
     let selectedTrayCounters: CounterStack[] = [];
     let allTrayGeometries: TrayGeometryResult[] = [];
     let boxGeometry: GeometryData | null = null;
@@ -1143,8 +1145,27 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       cachedBoxName = '';
     }
 
+    if (tray?.type === 'miniatureRack' && tray.params.variant === 'sockets' && tray.params.sockets?.lid) {
+      const params = tray.params.sockets;
+      const parts = createMiniatureSocketRackParts(params, tray.name);
+      const lid = parts.find(part => part.id === 'lid');
+      if (lid) socketPreview = {
+        trayId: tray.id, paramsKey: JSON.stringify(params), name: tray.name,
+        body: jscadToArrays(createMiniatureSocketRackPreview(params, tray.name, tray.color, true)),
+        lid: jscadToArrays(lid.assembled), text: lid.assembledText ? jscadToArrays(lid.assembledText) : null,
+        slideDistance: getMiniatureSocketRackLayout(params).depth + 10,
+        color: tray.color, textColor: getMiniatureSocketRackLayout(params).p.lidTextColor
+      };
+    }
+
     if (scope === 'selected') {
       const transferableSet = new Set<ArrayBuffer>();
+      for (const geometry of socketPreview ? [socketPreview.body, socketPreview.lid, socketPreview.text] : []) {
+        if (!geometry) continue;
+        transferableSet.add(geometry.positions.buffer as ArrayBuffer);
+        transferableSet.add(geometry.normals.buffer as ArrayBuffer);
+        if (geometry.colors) transferableSet.add(geometry.colors.buffer as ArrayBuffer);
+      }
 
       transferableSet.add(selectedTrayGeometry.positions.buffer as ArrayBuffer);
       transferableSet.add(selectedTrayGeometry.normals.buffer as ArrayBuffer);
@@ -1165,6 +1186,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       }
 
       const result: GenerateResult = {
+        socketPreview,
         type: 'generate-result',
         id,
         selectedTrayGeometry,
@@ -1482,6 +1504,12 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
     // Collect all transferable arrays (use Set to avoid duplicates when same geometry is referenced multiple times)
     const transferableSet = new Set<ArrayBuffer>();
+    for (const geometry of socketPreview ? [socketPreview.body, socketPreview.lid, socketPreview.text] : []) {
+      if (!geometry) continue;
+      transferableSet.add(geometry.positions.buffer as ArrayBuffer);
+      transferableSet.add(geometry.normals.buffer as ArrayBuffer);
+      if (geometry.colors) transferableSet.add(geometry.colors.buffer as ArrayBuffer);
+    }
 
     transferableSet.add(selectedTrayGeometry.positions.buffer as ArrayBuffer);
     transferableSet.add(selectedTrayGeometry.normals.buffer as ArrayBuffer);
@@ -1542,6 +1570,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
     }
 
     const result: GenerateResult = {
+      socketPreview,
       type: 'generate-result',
       id,
       selectedTrayGeometry,

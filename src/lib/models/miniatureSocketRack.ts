@@ -66,7 +66,7 @@ export interface MiniatureSocketRackParams {
 }
 
 export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
-  labelsEnabled: false, labelText: 'Miniature', labelHeight: 4, nozzleDiameter: 0.4,
+  labelsEnabled: false, labelText: 'Mini', labelHeight: 4, nozzleDiameter: 0.4,
   labelTextMode: 'engraved', labelTextColor: '#ffffff',
   lid: false, lidThickness: 3,
   lidTextEnabled: true, lidText: null,
@@ -74,10 +74,10 @@ export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
   quantityMode: 'all', fillModelId: null, fixedWidth: null, fixedDepth: null, fixedHeight: null,
   sizingMode: 'free', requestedCount: 6, maxWidth: 200, maxDepth: 200, maxHeight: null,
   spacingX: 6, spacingY: 6, linkedSpacing: true, models: [],
-  rows: 2, columns: 3, baseDiameter: 32, baseThickness: 3,
-  diameterClearance: 1, verticalClearance: 1, tabOverlapPercent: 25,
-  tabThickness: 1.6, wallThickness: 2, floorThickness: 2, spacing: 6,
-  miniatureHeight: 45, headroom: 5, postWidth: 10, stackingClearance: 0.3,
+  rows: 2, columns: 3, baseDiameter: 26, baseThickness: 3,
+  diameterClearance: 1.4, verticalClearance: 1, tabOverlapPercent: 25,
+  tabThickness: 1.4, wallThickness: 1.5, floorThickness: 1.5, spacing: 6,
+  miniatureHeight: 45, headroom: 5, postWidth: 8, stackingClearance: 0.3,
   perforated: true
 };
 
@@ -105,13 +105,13 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     ? input.tabOverlapPercent : legacyOverlapPercent;
   const finite = (value: number | undefined, fallback: number, min: number, max: number) =>
     Math.min(max, Math.max(min, typeof value === 'number' && Number.isFinite(value) ? value : fallback));
-  const spacingX = finite(input.spacingX ?? input.spacing, 6, 0, 40);
+  const spacingX = finite(input.spacingX ?? input.spacing, 6, 0, 600);
   const linkedSpacing = input.linkedSpacing ?? true;
   const models = (input.models ?? []).slice(0, 10).map((m, index) => ({
     label: typeof m.label === 'string' && m.label.trim() ? m.label.trim() : null,
     id: m.id || `model-${index + 1}`, name: m.name ?? `Model ${index + 1}`,
     count: Math.floor(finite(m.count, 1, 1, 100)),
-    baseDiameter: finite(m.baseDiameter, 32, 10, 100), baseThickness: finite(m.baseThickness, 3, 1, 15),
+    baseDiameter: finite(m.baseDiameter, defaultMiniatureSocketRackParams.baseDiameter, 10, 100), baseThickness: finite(m.baseThickness, 3, 1, 15),
     width: finite(m.width, 32, 1, 300), depth: finite(m.depth, 32, 1, 300),
     height: Math.max(finite(m.height, 45, 5, 300), finite(m.baseThickness, 3, 1, 15))
   }));
@@ -119,7 +119,7 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     labelsEnabled: input.labelsEnabled === true,
     labelTextMode: input.labelTextMode === 'inlay' || input.labelTextMode === 'raised' ? input.labelTextMode : 'engraved',
     labelTextColor: typeof input.labelTextColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.labelTextColor) ? input.labelTextColor : '#ffffff',
-    labelText: typeof input.labelText === 'string' ? input.labelText.trim() : 'Miniature',
+    labelText: typeof input.labelText === 'string' ? input.labelText.trim() : defaultMiniatureSocketRackParams.labelText,
     labelHeight: number('labelHeight', 4, 12), nozzleDiameter: number('nozzleDiameter', 0.2, 0.8),
     lid: input.lid === true, lidThickness: number('lidThickness', 2.8, 8),
     lidTextEnabled: input.lidTextEnabled !== false,
@@ -137,7 +137,7 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     maxWidth: number('maxWidth', 30, 600), maxDepth: number('maxDepth', 30, 600),
     maxHeight: typeof input.maxHeight === 'number' && Number.isFinite(input.maxHeight)
       ? finite(input.maxHeight, 100, 5, 400) : null,
-    spacingX, spacingY: linkedSpacing ? spacingX : finite(input.spacingY ?? input.spacing, 6, 0, 40),
+    spacingX, spacingY: linkedSpacing ? spacingX : finite(input.spacingY ?? input.spacing, 6, 0, 600),
     linkedSpacing, models,
     rows: Math.floor(number('rows', 1, 10)), columns: Math.floor(number('columns', 1, 10)),
     baseDiameter, baseThickness,
@@ -145,14 +145,36 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     tabOverlapPercent: Math.min(45, Math.max(1, requestedOverlapPercent)),
     tabThickness, wallThickness: number('wallThickness', 1.2, 5),
     floorThickness: number('floorThickness', 1.2, 8),
-    spacing: number('spacing', 0, 40),
+    spacing: number('spacing', 0, 600),
     miniatureHeight: Math.max(number('miniatureHeight', 5, 200), baseThickness + verticalClearance + tabThickness),
     headroom: number('headroom', 1, 30), postWidth: number('postWidth', 8, 20),
     stackingClearance: number('stackingClearance', 0.1, 0.8), perforated: p.perforated === true
   };
 }
 
-export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackParams> = {}) {
+// Geometry, preview counters and editor validation ask for the same layout.
+// Keep a small bounded cache, keyed by values so edits always invalidate it.
+const layoutCache = new Map<string, ReturnType<typeof computeMiniatureSocketRackLayout>>();
+export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackParams> = {}, allowRotation = true) {
+  const key = JSON.stringify([normalizeMiniatureSocketRackParams(input), allowRotation]);
+  const cached = layoutCache.get(key);
+  if (cached) return cached;
+  const layout = computeMiniatureSocketRackLayout(input, allowRotation);
+  // Preserve printable labels when a smaller rotated packing cannot fit them.
+  if (layout.error && allowRotation && layout.seats.some(seat => seat.rotated)) {
+    const fallback = computeMiniatureSocketRackLayout(input, false);
+    if (!fallback.error) {
+      if (layoutCache.size >= 8) layoutCache.delete(layoutCache.keys().next().value!);
+      layoutCache.set(key, fallback);
+      return fallback;
+    }
+  }
+  if (layoutCache.size >= 8) layoutCache.delete(layoutCache.keys().next().value!);
+  layoutCache.set(key, layout);
+  return layout;
+}
+
+function computeMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackParams>, allowRotation: boolean) {
   const p = normalizeMiniatureSocketRackParams(input);
   const radius = (p.baseDiameter + p.diameterClearance) / 2;
   const outerRadius = radius + p.wallThickness;
@@ -166,7 +188,7 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
   let width = p.postWidth * 2 + outerRadius * 2 + (p.columns - 1) * pitchX;
   let depth = p.postWidth * 2 + outerRadius * 2 + (p.rows - 1) * pitchY;
   type Seat = { x: number; y: number; baseDiameter: number; baseThickness: number;
-    miniatureHeight: number; modelName: string; modelId?: string; envelopeWidth?: number; envelopeDepth?: number };
+    miniatureHeight: number; modelName: string; modelId?: string; envelopeWidth?: number; envelopeDepth?: number; rotated?: boolean };
   let seats: Seat[] = [];
   let error: string | null = null;
   const warnings: string[] = [];
@@ -184,10 +206,10 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
     + Math.max(height, thickness + p.verticalClearance + p.tabThickness) + p.headroom + topHeight;
   if (!error && p.sizingMode === 'models') {
     const margin = p.postWidth;
-    const makeItems = (models: MiniatureRackModel[]) => models.flatMap(m => Array.from({ length: m.count }, () => ({
+    const makeItems = (models: MiniatureRackModel[], gapX = p.spacingX, gapY = p.spacingY) => models.flatMap(m => Array.from({ length: m.count }, () => ({
         data: m,
-        width: Math.max(m.width, m.baseDiameter + p.diameterClearance + p.wallThickness * 2) + p.spacingX,
-        depth: Math.max(m.depth, m.baseDiameter + p.diameterClearance + p.wallThickness * 2) + p.spacingY
+        width: Math.max(m.width, m.baseDiameter + p.diameterClearance + p.wallThickness * 2) + gapX,
+        depth: Math.max(m.depth, m.baseDiameter + p.diameterClearance + p.wallThickness * 2) + gapY
       })));
     const fitsHeight = (m: MiniatureRackModel) => limitHeight === null || requiredHeightFor(m.height, m.baseThickness) <= limitHeight + 1e-8;
     const pack = (models: MiniatureRackModel[], partial = false) => {
@@ -195,17 +217,25 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
       const availableWidth = Math.max(0, limitWidth - margin * 2 + p.spacingX);
       const availableDepth = Math.max(0, limitDepth - margin * 2 + p.spacingY);
       const options = { allowRotation: false, allowPartial: partial };
-      let best = packItems(items, availableWidth, availableDepth, options);
+      const initial = packItems(items, availableWidth, availableDepth, options);
+      let best = initial ? { ...initial, gapX: p.spacingX, gapY: p.spacingY } : null;
       // Filling and exact dimensions deliberately preserve their requested footprint.
       if (isFill || !items.length || (p.fixedWidth !== null && p.fixedDepth !== null)) return best;
       const score = (result: NonNullable<typeof best>) => {
-        const w = p.fixedWidth ?? result.totalWidth - p.spacingX + margin * 2;
-        const d = p.fixedDepth ?? result.totalDepth - p.spacingY + margin * 2;
+        const w = p.fixedWidth ?? result.totalWidth - result.gapX + margin * 2;
+        const d = p.fixedDepth ?? result.totalDepth - result.gapY + margin * 2;
         return { area: w * d, perimeter: w + d };
       };
-      const consider = (w: number, d: number) => {
-        const candidate = packItems(items, w, d, options);
-        if (!candidate) return;
+      const consider = (w: number, d: number, rotated = false) => {
+        // A common gap can rotate safely even when X/Y minimum gaps differ.
+        const gap = Math.max(p.spacingX, p.spacingY);
+        const gapX = rotated ? gap : p.spacingX, gapY = rotated ? gap : p.spacingY;
+        // Exact decimal row multiples can lose a few binary digits during
+        // guillotine subtraction (e.g. 3 × 36.4). Leave numerical slack only;
+        // exterior dimensions still come from the actual packed items.
+        const result = packItems(rotated ? makeItems(models, gapX, gapY) : items, w + 1e-7, d + 1e-7, { ...options, allowRotation: rotated });
+        if (!result) return;
+        const candidate = { ...result, gapX, gapY };
         const a = score(candidate), b = best && score(best);
         if (!best || candidate.items.length > best.items.length ||
           (candidate.items.length === best.items.length && b &&
@@ -222,6 +252,32 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
       };
       if (p.fixedWidth === null) for (const width of candidates(items.map(item => item.width), availableWidth)) consider(width, availableDepth);
       if (p.fixedDepth === null) for (const depth of candidates(items.map(item => item.depth), availableDepth)) consider(availableWidth, depth);
+      // Keep the original layout on ties; only adopt rotations that improve fit/area.
+      const gap = Math.max(p.spacingX, p.spacingY);
+      const rotatingItems = makeItems(models, gap, gap);
+      const rw = Math.max(0, limitWidth - margin * 2 + gap);
+      const rd = Math.max(0, limitDepth - margin * 2 + gap);
+      if (allowRotation) consider(rw, rd, true);
+      const sides = rotatingItems.flatMap(item => [item.width, item.depth]);
+      if (allowRotation && p.fixedWidth === null) for (const w of candidates(sides, rw)) consider(w, rd, true);
+      if (allowRotation && p.fixedDepth === null) for (const d of candidates(sides, rd)) consider(rw, d, true);
+      // Constraining only one axis can favour long strips even when a compact
+      // rectangle fits. Also test paired width/depth limits, smallest first.
+      const pairedSearch = (rotated: boolean) => {
+        const source = rotated ? rotatingItems : items;
+        const maxW = rotated ? rw : availableWidth, maxD = rotated ? rd : availableDepth;
+        const sizesW = rotated ? sides : source.map(item => item.width);
+        const sizesD = rotated ? sides : source.map(item => item.depth);
+        const widths = p.fixedWidth === null ? candidates(sizesW, maxW) : [maxW];
+        const depths = p.fixedDepth === null ? candidates(sizesD, maxD) : [maxD];
+        const minimumArea = partial ? 0 : source.reduce((sum, item) => sum + item.width * item.depth, 0);
+        const pairs = widths.flatMap(w => depths.map(d => ({ w, d })))
+          .filter(({ w, d }) => w * d >= minimumArea - 1e-6)
+          .sort((a, b) => a.w * a.d - b.w * b.d || a.w + a.d - b.w - b.d);
+        for (const { w, d } of pairs.slice(0, 64)) consider(w, d, rotated);
+      };
+      pairedSearch(false);
+      if (allowRotation) pairedSearch(true);
       return best;
     };
     let packed: ReturnType<typeof pack> = null;
@@ -257,16 +313,21 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
       if (!packed) error = 'No layout found within the rack dimensions. Increase its size, reduce spacing or use fewer miniatures.';
     }
     if (packed) {
-      width = p.fixedWidth ?? (isFill ? limitWidth : packed.totalWidth - p.spacingX + margin * 2);
-      depth = p.fixedDepth ?? (isFill ? limitDepth : packed.totalDepth - p.spacingY + margin * 2);
-      seats = packed.items.map(item => ({
-        x: margin + item.x + (item.width - p.spacingX) / 2,
-        y: margin + item.y + (item.depth - p.spacingY) / 2,
+      width = p.fixedWidth ?? (isFill ? limitWidth : packed.totalWidth - packed.gapX + margin * 2);
+      depth = p.fixedDepth ?? (isFill ? limitDepth : packed.totalDepth - packed.gapY + margin * 2);
+      seats = packed.items.map(item => {
+        // Square packing rectangles have no meaningful orientation; the packer
+        // reports them as flipped even when rotation was disabled.
+        const rotated = item.rotated && Math.abs(item.width - item.depth) > 1e-6;
+        return {
+        x: margin + item.x + (item.width - packed!.gapX) / 2,
+        y: margin + item.y + (item.depth - packed!.gapY) / 2,
         baseDiameter: item.data.baseDiameter, baseThickness: item.data.baseThickness,
         miniatureHeight: item.data.height, modelName: item.data.name, modelId: item.data.id,
-        envelopeWidth: Math.max(item.data.width, item.data.baseDiameter),
-        envelopeDepth: Math.max(item.data.depth, item.data.baseDiameter)
-      }));
+        rotated,
+        envelopeWidth: Math.max(rotated ? item.data.depth : item.data.width, item.data.baseDiameter),
+        envelopeDepth: Math.max(rotated ? item.data.width : item.data.depth, item.data.baseDiameter)
+      }; });
       capacity = seats.length;
     }
   } else if (!error) {
@@ -302,6 +363,33 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
   }
   width = p.fixedWidth ?? width;
   depth = p.fixedDepth ?? depth;
+  // Spread each horizontal row over the existing footprint, using full miniature
+  // envelopes rather than just bases. Never move into a neighbouring packed row.
+  if (!error && seats.length) {
+    const halfWidth = (s: Seat) => Math.max(s.envelopeWidth ?? 0, s.baseDiameter + p.diameterClearance + 2 * p.wallThickness) / 2;
+    const halfDepth = (s: Seat) => Math.max(s.envelopeDepth ?? 0, s.baseDiameter + p.diameterClearance + 2 * p.wallThickness) / 2;
+    const rowGroups = new Map<number, number[]>();
+    seats.forEach((s, i) => {
+      const key = Math.round(s.y * 1e6);
+      rowGroups.set(key, [...(rowGroups.get(key) ?? []), i]);
+    });
+    for (const indices of rowGroups.values()) {
+      indices.sort((a, b) => seats[a].x - seats[b].x);
+      const first = seats[indices[0]], last = seats[indices[indices.length - 1]];
+      const left = p.postWidth + halfWidth(first);
+      const right = width - p.postWidth - halfWidth(last);
+      const span = last.x - first.x;
+      if (right < left || right - left < span - 1e-6) continue;
+      const proposed = seats.map(s => ({ ...s }));
+      indices.forEach(i => {
+        proposed[i].x = span > 1e-6 ? left + (seats[i].x - first.x) / span * (right - left) : (left + right) / 2;
+      });
+      const overlaps = proposed.some((a, i) => proposed.slice(i + 1).some(b =>
+        Math.abs(a.x - b.x) < halfWidth(a) + halfWidth(b) + p.spacingX - 1e-6 &&
+        Math.abs(a.y - b.y) < halfDepth(a) + halfDepth(b) + p.spacingY - 1e-6));
+      if (!overlaps) seats = proposed;
+    }
+  }
   if (!error && seats.some(s => {
     const r = (s.baseDiameter + p.diameterClearance) / 2 + p.wallThickness;
     return s.x - r < p.postWidth - 1e-6 || s.y - r < p.postWidth - 1e-6
@@ -337,54 +425,88 @@ export function getMiniatureSocketRackLayout(input: Partial<MiniatureSocketRackP
     if (p.labelHeight < minimumHeight) error = `Labels require at least ${minimumHeight.toFixed(1)} mm letter height for this nozzle.`;
     for (const seat of seats) {
       if (error) break;
+      // Validate in the socket's local frame, then rotate the plate and lettering
+      // together with the retaining tab into the packed orientation.
+      const local = (x: number, y: number) => seat.rotated
+        ? { x: seat.x + y - seat.y, y: seat.y - x + seat.x } : { x, y };
+      const world = (x: number, y: number): [number, number] => seat.rotated
+        ? [seat.x - y + seat.y, seat.y + x - seat.x] : [x, y];
       const r = (seat.baseDiameter + p.diameterClearance) / 2 + p.wallThickness;
-      const left = seat.x - r, right = seat.x + r;
+      // Add up to 1 mm per side, spending at most a quarter of the
+      // configured transverse gap. Keep the plate inside the existing rim.
+      const extra = Math.min(1, (seat.rotated ? p.spacingY : p.spacingX) / 4);
+      const minX = seat.rotated ? seat.x - seat.y + p.wallThickness : p.wallThickness;
+      const maxX = seat.rotated ? seat.x + depth - seat.y - p.wallThickness : width - p.wallThickness;
+      const left = Math.max(minX, seat.x - r - extra), right = Math.min(maxX, seat.x + r + extra);
       const front = seat.y - r + p.wallThickness;
-      let back = Math.max(p.wallThickness, seat.y - r - p.spacingY);
+      const localSpacing = seat.rotated ? p.spacingX : p.spacingY;
+      const backBoundary = seat.rotated ? seat.y - (width - seat.x - p.wallThickness) : p.wallThickness;
+      let back = Math.max(backBoundary, seat.y - r - localSpacing);
       // Use only the gap already available. Conservative bounds include other models' envelopes.
       for (const other of seats) {
         if (other === seat) continue;
         const otherR = (other.baseDiameter + p.diameterClearance) / 2 + p.wallThickness;
-        const halfW = Math.max(otherR, (other.envelopeWidth ?? 0) / 2);
-        const halfD = Math.max(otherR, (other.envelopeDepth ?? 0) / 2);
-        if (other.x + halfW > left && other.x - halfW < right) {
-          if (other.y < seat.y) back = Math.max(back, other.y + halfD + 0.5);
-          else if (other.y - halfD < front && other.y + halfD > back)
+        const halfW = Math.max(otherR, ((seat.rotated ? other.envelopeDepth : other.envelopeWidth) ?? 0) / 2);
+        const halfD = Math.max(otherR, ((seat.rotated ? other.envelopeWidth : other.envelopeDepth) ?? 0) / 2);
+        const otherLocal = local(other.x, other.y);
+        if (otherLocal.x + halfW > left && otherLocal.x - halfW < right) {
+          if (otherLocal.y < seat.y) back = Math.max(back, otherLocal.y + halfD + 0.5);
+          else if (otherLocal.y - halfD < front && otherLocal.y + halfD > back)
             back = front; // No room alongside a neighbouring model envelope.
         }
       }
       for (const post of posts) {
-        if (post.x + p.postWidth / 2 > left && post.x - p.postWidth / 2 < right && post.y < seat.y)
-          back = Math.max(back, post.y + p.postWidth / 2 + 0.5);
+        const point = local(post.x, post.y);
+        // The small plate overhang may join a post; only the original socket
+        // span constrains its depth. Lettering is checked separately below.
+        if (point.x + p.postWidth / 2 > seat.x - r && point.x - p.postWidth / 2 < seat.x + r && point.y < seat.y)
+          back = Math.max(back, point.y + p.postWidth / 2 + 0.5);
       }
       const model = p.models.find(model => model.id === seat.modelId);
       const text = model ? model.label ?? model.name : p.labelText;
       const fail = (reason: string) => { error = `Label “${text}”: ${reason} Use a shorter label, increase spacing or disable labels.`; };
       if (text.length > 100) { fail('label exceeds 100 characters.'); break; }
-      if ((seat.envelopeDepth ?? 0) / 2 > r - p.wallThickness) {
+      if (((seat.rotated ? seat.envelopeWidth : seat.envelopeDepth) ?? 0) / 2 > r - p.wallThickness) {
         const warning = `Label “${text}”: the approximate miniature envelope extends over the plate. The text may fit, but check clearance with the actual miniature using Preview counters. This is not a text-size error.`;
         if (!warnings.includes(warning)) warnings.push(warning);
       }
       const shapes = vectorTextWithAccents({ height: p.labelHeight, text }).filter(segment => segment.length >= 2);
       if (!shapes.length) { fail('enter a printable label.'); break; }
       const points = shapes.flat();
-      const minX = Math.min(...points.map(point => point[0])), maxX = Math.max(...points.map(point => point[0]));
+      const glyphMinX = Math.min(...points.map(point => point[0])), glyphMaxX = Math.max(...points.map(point => point[0]));
       const minY = Math.min(...points.map(point => point[1])), maxY = Math.max(...points.map(point => point[1]));
       // Set the actual glyph height, independently of JSCAD font units. Never scale to fit the plate.
       const scale = p.labelHeight / (maxY - minY);
       const stroke = Math.max(0.8, p.nozzleDiameter * 2);
-      const textWidth = (maxX - minX) * scale + stroke;
+      const textWidth = (glyphMaxX - glyphMinX) * scale + stroke;
       const textHeight = p.labelHeight + stroke;
-      if (textWidth > right - left - 2 || textHeight > front - back - 2) {
-        fail(`text does not fit at a printable size (${textWidth.toFixed(1)} × ${textHeight.toFixed(1)} mm needed, ${(right - left - 2).toFixed(1)} × ${Math.max(0, front - back - 2).toFixed(1)} mm available).`); break;
+      // Allow a modest reduction in lateral border, never glyph height/stroke
+      // or plate bounds. This fits Miniature on a 26 mm base without shrinking.
+      const minimumSideMargin = Math.max(0.25, p.nozzleDiameter / 2);
+      if (textWidth > right - left - 2 * minimumSideMargin || textHeight > front - back - 2) {
+        fail(`text does not fit at a printable size (${textWidth.toFixed(1)} × ${textHeight.toFixed(1)} mm needed, ${(right - left - 2 * minimumSideMargin).toFixed(1)} × ${Math.max(0, front - back - 2).toFixed(1)} mm available).`); break;
+      }
+      if (textWidth > right - left - 2) {
+        const warning = `Label “${text}”: reduced side margins (${((right - left - textWidth) / 2).toFixed(2)} mm). Letter height and stroke are unchanged; check the sliced text before printing.`;
+        if (!warnings.includes(warning)) warnings.push(warning);
       }
       const top = p.floorThickness + seat.baseThickness + p.verticalClearance + p.tabThickness;
-      const x = seat.x, y = (back + front) / 2;
-      const textSegments = shapes.map(segment => segment.map((point): [number, number] => [
-          x + (point[0] - (minX + maxX) / 2) * scale,
+      const x = (left + right) / 2, y = (back + front) / 2;
+      if (posts.some(post => {
+        const point = local(post.x, post.y);
+        return Math.abs(point.x - x) < (p.postWidth + textWidth) / 2 - 1e-6 &&
+          Math.abs(point.y - y) < (p.postWidth + textHeight) / 2 - 1e-6;
+      })) { fail('text overlaps a stacking post.'); break; }
+      const textSegments = shapes.map(segment => segment.map((point): [number, number] => world(
+          x + (point[0] - (glyphMinX + glyphMaxX) / 2) * scale,
           y + (point[1] - (minY + maxY) / 2) * scale
-        ]));
-      labels.push({ x, y, width: right - left, depth: front - back, top, text, stroke, textSegments });
+        )));
+      const [worldX, worldY] = world(x, y);
+      // Trim unused lateral material while keeping 1 mm around the actual
+      // printed strokes. Depth still joins the plate firmly to the socket.
+      const plateWidth = Math.min(right - left, textWidth + 2);
+      labels.push({ x: worldX, y: worldY, width: seat.rotated ? front - back : plateWidth,
+        depth: seat.rotated ? plateWidth : front - back, top, text, stroke, textSegments });
     }
     for (let i = 0; !error && i < labels.length; i++) {
       for (let j = i + 1; j < labels.length; j++) {
@@ -422,7 +544,9 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
     translate([x, y, z + h / 2], cylinder({ radius: r, height: h, segments: 48 }));
   const seatHeight = Math.max(p.baseThickness, ...seats.map(s => s.baseThickness)) + p.verticalClearance + p.tabThickness;
   const parts: Geom3[] = [box(width / 2, depth / 2, 0, width, depth, p.floorThickness)];
-  const cuts: Geom3[] = [];
+  const pegWidth = p.postWidth - 4;
+  const postPocket = (x: number, y: number) => box(x, y, -0.1,
+    pegWidth + p.stackingClearance * 2, pegWidth + p.stackingClearance * 2, SOCKET_DEPTH + 0.1);
 
   // A continuous perimeter beam joins the four stacking posts and stiffens the plate.
   const rimHeight = Math.min(seatHeight, 5);
@@ -432,47 +556,59 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
     box(p.wallThickness / 2, depth / 2, p.floorThickness - 0.1, p.wallThickness, depth, rimHeight + 0.1),
     box(width - p.wallThickness / 2, depth / 2, p.floorThickness - 0.1, p.wallThickness, depth, rimHeight + 0.1)
   );
-  for (const { x, y, baseDiameter, baseThickness } of seats) {
+  const floorCuts = [
+    ...posts.map(({ x, y }) => postPocket(x, y)),
+    ...(p.perforated ? seats.map(({ x, y, baseDiameter }) => round(x, y, -0.1, baseDiameter * 0.28, p.floorThickness + 0.2)) : [])
+  ];
+  // Drill the simple floor/perimeter before adding detailed engraved sockets.
+  const base = subtract(union(...parts), ...floorCuts);
+  parts.splice(0, parts.length, base);
+  for (const [index, { x, y, baseDiameter, baseThickness, rotated }] of seats.entries()) {
+    const socketParts: Geom3[] = [];
+    const orient = (geometry: Geom3) => rotated ? translate([x, y, 0],
+      jscad.transforms.rotateZ(Math.PI / 2, translate([-x, -y, 0], geometry))) : geometry;
     const radius = (baseDiameter + p.diameterClearance) / 2;
     const outerRadius = radius + p.wallThickness;
     const seatHeight = baseThickness + p.verticalClearance + p.tabThickness;
     const tabBottom = p.floorThickness + baseThickness + p.verticalClearance;
-    parts.push(subtract(
+    socketParts.push(orient(subtract(
       round(x, y, p.floorThickness - 0.1, outerRadius, seatHeight + 0.1),
       round(x, y, p.floorThickness - 0.2, radius, seatHeight + 0.4),
       // Access the edge of the base opposite the tab to tilt it without pulling the figure.
       box(x, y + outerRadius, p.floorThickness - 0.2,
         baseDiameter * 0.45, outerRadius, seatHeight + 0.4)
-    ));
+    )));
     // Circular segment on one side only. Overlap is measured against the actual base,
     // rather than the cavity, so lateral clearance cannot cancel the retaining tab.
     const edgeY = y - baseDiameter / 2 + baseDiameter * p.tabOverlapPercent / 100;
-    parts.push(intersect(
+    socketParts.push(orient(intersect(
       round(x, y, tabBottom, outerRadius, p.tabThickness),
       box(x, (y - outerRadius + edgeY) / 2, tabBottom,
         outerRadius * 2 + 1, edgeY - (y - outerRadius), p.tabThickness)
-    ));
-    if (p.perforated) cuts.push(round(x, y, -0.1, baseDiameter * 0.28, p.floorThickness + 0.2));
-  }
-  const pegWidth = p.postWidth - 4;
-  for (const label of labels) {
-    // Solid support down to the existing floor: no suspended shelf or slicer supports.
-    parts.push(box(label.x, label.y, p.floorThickness - 0.1,
-      label.width, label.depth, label.top - p.floorThickness + 0.1));
-    for (const segment of p.labelTextMode === 'raised' ? [] : label.textSegments) {
-      const path = jscad.geometries.path2.fromPoints({}, segment);
-      cuts.push(translate([0, 0, label.top - 0.4], jscad.extrusions.extrudeLinear({ height: 0.5 },
-        jscad.expansions.expand({ delta: label.stroke / 2, corners: 'round', segments: 24 }, path))));
+    )));
+    const label = labels[index];
+    const labelCuts: Geom3[] = [];
+    if (label) {
+      socketParts.push(box(label.x, label.y, p.floorThickness - 0.1,
+        label.width, label.depth, label.top - p.floorThickness + 0.1));
+      for (const segment of p.labelTextMode === 'raised' ? [] : label.textSegments) {
+        const path = jscad.geometries.path2.fromPoints({}, segment);
+        labelCuts.push(translate([0, 0, label.top - 0.4], jscad.extrusions.extrudeLinear({ height: 0.5 },
+          jscad.expansions.expand({ delta: label.stroke / 2, corners: 'round', segments: 24 }, path))));
+      }
     }
+    // Engrave only the socket/plate that owns the label. Cutting every glyph
+    // through the complete rack creates rapidly growing intermediate meshes.
+    const socket = union(...socketParts);
+    parts.push(labelCuts.length ? subtract(socket, ...labelCuts) : socket);
   }
   for (const { x, y } of posts) {
-    parts.push(box(x, y, 0, p.postWidth, p.postWidth, stackPitch));
-    parts.push(box(x, y, stackPitch - 0.1, pegWidth, pegWidth, PEG_HEIGHT + 0.1));
-    cuts.push(box(x, y, -0.1, pegWidth + p.stackingClearance * 2,
-      pegWidth + p.stackingClearance * 2, SOCKET_DEPTH + 0.1));
+    parts.push(subtract(union(
+      box(x, y, 0, p.postWidth, p.postWidth, stackPitch),
+      box(x, y, stackPitch - 0.1, pegWidth, pegWidth, PEG_HEIGHT + 0.1)
+    ), postPocket(x, y)));
   }
-  const rack = union(...parts);
-  const body = cuts.length ? subtract(rack, ...cuts) : rack;
+  const body = union(...parts);
   const text = includeLabelText ? createMiniatureSocketRackLabelText(input) : null;
   return text ? union(body, text) : body;
 }
@@ -518,7 +654,18 @@ export function createMiniatureSocketRackLidText(input: Partial<MiniatureSocketR
   return null;
 }
 
+// One heavy assembly per JS context (worker/main thread), shared by preview
+// and export. Retaining only the latest avoids accumulating large meshes.
+let partsCache: { key: string; parts: import('./cardStorageTray').CardStoragePart[] } | null = null;
 export function createMiniatureSocketRackParts(input: Partial<MiniatureSocketRackParams> = {}, trayName = '') {
+  const key = JSON.stringify([normalizeMiniatureSocketRackParams(input), trayName]);
+  if (partsCache?.key === key) return partsCache.parts.map(part => ({ ...part }));
+  const parts = buildMiniatureSocketRackParts(input, trayName);
+  partsCache = { key, parts };
+  return parts.map(part => ({ ...part }));
+}
+
+function buildMiniatureSocketRackParts(input: Partial<MiniatureSocketRackParams>, trayName: string) {
   const layout = getMiniatureSocketRackLayout(input);
   const rack = createMiniatureSocketRack(input, false);
   const text = createMiniatureSocketRackLabelText(input);
@@ -542,14 +689,12 @@ export function createMiniatureSocketRackAssembly(input: Partial<MiniatureSocket
     [part.assembled, ...(part.assembledText ? [part.assembledText] : [])]));
 }
 
-export function createMiniatureSocketRackPreview(input: Partial<MiniatureSocketRackParams> = {}, trayName = '', bodyColor = '#3d7a6a'): Geom3 {
-  const p = normalizeMiniatureSocketRackParams(input);
-  if ((!p.labelsEnabled || p.labelTextMode === 'engraved') &&
-    (!p.lid || !p.lidTextEnabled || p.lidTextMode === 'engraved')) return createMiniatureSocketRackAssembly(input, trayName);
+export function createMiniatureSocketRackPreview(input: Partial<MiniatureSocketRackParams> = {}, trayName = '', bodyColor = '#3d7a6a', bodyOnly = false): Geom3 {
   const rgb = [1, 3, 5].map(offset => parseInt(bodyColor.slice(offset, offset + 2), 16) / 255);
   const base: [number, number, number, number] = [rgb[0], rgb[1], rgb[2], 1];
-  // Keep the flush inlay faces separate: a boolean union would erase their colour boundary.
-  return jscad.geometries.geom3.create(createMiniatureSocketRackParts(input, trayName).flatMap(part => [
+  // Preview needs assembled surfaces, not an expensive boolean union of parts.
+  // Also keep flush inlay boundaries. Printable exports still use the parts.
+  return jscad.geometries.geom3.create(createMiniatureSocketRackParts(input, trayName).filter(part => !bodyOnly || part.id === 'body').flatMap(part => [
     ...jscad.geometries.geom3.toPolygons(part.assembled).map(poly => ({ ...poly, color: base })),
     ...(part.assembledText ? jscad.geometries.geom3.toPolygons(part.assembledText).map(poly => ({
       ...poly, color: part.assembledText!.color

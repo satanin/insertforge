@@ -56,7 +56,7 @@ const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
-export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 32;
+export const DEFAULT_MINIATURE_RACK_SLOT_WIDTH = 26;
 export const DEFAULT_MINIATURE_RACK_SLOT_HEIGHT = 3;
 export const DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT = 45;
 export const DEFAULT_MINIATURE_RACK_SPACING = 6;

@@ -55,6 +55,10 @@ Sin nueva versión durante las pruebas. Agrupar versión/changelog al preparar e
 
 ## Evolución posterior
 
+Ajuste local tras prueba de inserción/extracción ajustada (2026-10-20): holgura diametral predeterminada 1 → 1,4 mm (+0,2 mm por lado) y grosor de solapa 1,6 → 1,4 mm. Altura libre sobre peana y porcentaje de retención se conservan. No se migran valores explícitos guardados; aplicar esos dos valores a la bandeja existente para probar. Adelgazar la solapa reduce material y mejora la maniobra, pero no aumenta por sí solo la holgura bajo ella. Pendiente prueba física de acceso y retención; sin commit/push.
+
+2026-10-20: el usuario confirma impresión de bandeja con etiquetas bastante bien y aporta fotos de miniaturas que sobresalen ampliamente de las peanas. Corregido en local el clamp de espaciado de 40 mm a 600 mm en normalización y UI, sin cambiar el defecto 6 mm ni las envolventes/cantidades guardadas. Sigue aplicándose el tamaño máximo/fijo del rack: no se reduce silenciosamente una separación para que quepa. Medir ancho y fondo completos por modelo; el modo libre sigue separando sockets, no volúmenes. Las envolventes actuales están centradas en la peana: para voladizos asimétricos hay que reservar conservadoramente dos veces la mayor distancia desde el centro en cada eje. Offsets o extensiones por lado quedan para una iteración posterior. Fotos orientativas, sin inferir medidas exactas por perspectiva.
+
 ### Prototipo de etiquetas de sockets (local, posterior a f7c84b7)
 
 Publicación v1.2.19 autorizada por el usuario el 2026-10-19, junto al commit previo de tapa/export v1.2.18. Validación física prevista para el 2026-10-20; mantener Experimental. Las notas de estado local siguientes describen las iteraciones previas al bloque publicado.
@@ -97,3 +101,7 @@ UI local: el rack individual usa un único panel con resumen y secciones de dime
 - Comparar refuerzos y aligerados con impresiones reales.
 - Mejorar el acceso y la densidad según las miniaturas de prueba.
 - Mantener esta iteración antes del generador automático de insertos; no iniciar el resto de piezas sugeridas hasta revisar este rack.
+
+## Compactación con rotaciones (2026-10-20, local)
+
+El modo por modelos compara distribuciones con y sin giros individuales de 90° usando área exterior y perímetro. Se mantienen todos los componentes antes de minimizar área. El giro incluye solapa, apertura de extracción, placa, texto y envolvente de preview. Con espaciados X/Y distintos, las propuestas con giros reservan el mayor de ambos para conservar separaciones mínimas. Fill y dos dimensiones fijas conservan su comportamiento. Si una propuesta girada impide una etiqueta imprimible, se conserva una alternativa válida sin giros. La búsqueda es heurística y acotada; no garantiza el mínimo absoluto. Pendiente validación visual/física del usuario.

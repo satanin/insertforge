@@ -41,6 +41,11 @@ describe('miniature tray menu entry', () => {
     expect(tray.name).toMatch(/^Miniature Tray /);
     expect(tray.params.variant).toBe('sockets');
     expect(tray.params.sockets?.requestedCount).toBe(6);
+    expect(tray.params.sockets?.baseDiameter).toBe(26);
+    expect(tray.params.sockets?.postWidth).toBe(8);
+    expect(tray.params.sockets?.wallThickness).toBe(1.5);
+    expect(tray.params.sockets?.floorThickness).toBe(1.5);
+    expect(rack.params.slots[0].baseWidth).toBe(26);
     expect(tray.autoHeight).toBe(false);
     expect(tray.showEmboss).toBe(false);
     expect(rack.params.variant).not.toBe('sockets');
@@ -336,8 +341,8 @@ describe('project store blank reset', () => {
     expect(project.selectedBoxId).toBeNull();
     expect(project.selectedTrayId).toBeNull();
     expect(project.globalSettings).toEqual({
-      gameContainerWidth: 150,
-      gameContainerDepth: 200,
+      gameContainerWidth: 250,
+      gameContainerDepth: 250,
       gameContainerHeight: null
     });
     expect(project.counterShapes.length).toBeGreaterThan(0);

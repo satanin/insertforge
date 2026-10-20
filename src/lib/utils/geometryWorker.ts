@@ -47,6 +47,7 @@ interface LooseTrayGeometryResult {
 }
 
 interface GenerateResult {
+  socketPreview?: { trayId: string; paramsKey: string; name: string; body: GeometryData; lid: GeometryData; text: GeometryData | null; slideDistance: number; color: string; textColor: string } | null;
   type: 'generate-result';
   id: number;
   selectedTrayGeometry: GeometryData;
@@ -137,6 +138,7 @@ export interface LooseTrayGeometryData {
 }
 
 export interface GenerationResult {
+  socketPreview?: { trayId: string; paramsKey: string; name: string; body: THREE.BufferGeometry; lid: THREE.BufferGeometry; text: THREE.BufferGeometry | null; slideDistance: number; color: string; textColor: string } | null;
   selectedTrayGeometry: THREE.BufferGeometry;
   selectedTrayCounters: CounterStack[];
   allTrayGeometries: TrayGeometryData[];
@@ -294,6 +296,10 @@ export class GeometryWorkerManager {
           }));
 
           resolve({
+            socketPreview: r.socketPreview ? { ...r.socketPreview,
+              body: arrayToBufferGeometry(r.socketPreview.body),
+              lid: arrayToBufferGeometry(r.socketPreview.lid),
+              text: r.socketPreview.text ? arrayToBufferGeometry(r.socketPreview.text) : null } : null,
             selectedTrayGeometry,
             selectedTrayCounters: r.selectedTrayCounters,
             allTrayGeometries,

@@ -607,6 +607,7 @@
   let communityProjects = $state<CommunityProject[]>([]);
   let showReferenceLabels = $state(false);
   let showPreviewSizes = $state(false);
+  let showLidPreview = $state(true);
   let hidePrintBed = $state(false);
   let isMobile = $state(false);
   let captureFunction = $state<
@@ -826,7 +827,13 @@
   }
 
   let selectedTray = $derived(getSelectedTray());
+  let socketPreview = $state<GenerationResult['socketPreview']>(null);
   let cardStorageDetail = $derived.by(() => {
+    if (selectedTray?.type === 'miniatureRack' && selectedTray.params.variant === 'sockets' && selectedTray.params.sockets?.lid) {
+      return socketPreview?.trayId === selectedTray.id && socketPreview.name === selectedTray.name &&
+        socketPreview.color === selectedTray.color && socketPreview.paramsKey === JSON.stringify(selectedTray.params.sockets)
+        ? { ...socketPreview, lift: 4 } : null;
+    }
     if (selectedTray?.type !== 'cardStorage' || !selectedTray.params.lid) return null;
     const cards = getProject().cardSizes;
     const dimensions = resolveCardStorage(selectedTray.params, cards);
@@ -842,6 +849,7 @@
   });
   $effect(() => {
     const detail = cardStorageDetail;
+    if (selectedTray?.type === 'miniatureRack') return; // Owned by the worker result cache.
     return () => {
       detail?.body.dispose();
       detail?.lid.dispose();
@@ -1303,6 +1311,7 @@
   }
 
   function useGenerationResult(result: GenerationResult, selectedBox: Box | null, selectedTray: Tray | null, updateGlobalCache: boolean) {
+    socketPreview = result.socketPreview ?? null;
     selectedTrayGeometry = selectedTray ? result.selectedTrayGeometry : null;
     selectedTrayCounters = selectedTray ? result.selectedTrayCounters : [];
     allTrayGeometries = result.allTrayGeometries;
@@ -3091,7 +3100,7 @@
           {#await import('$lib/components/TrayViewer.svelte') then { default: TrayViewer }}
             <TrayViewer
               geometry={visibleGeometries.tray}
-              cardStorageDetail={viewMode === 'tray' ? cardStorageDetail : null}
+              cardStorageDetail={viewMode === 'tray' && cardStorageDetail ? { ...cardStorageDetail, visible: selectedTray?.type !== 'miniatureRack' || showLidPreview } : null}
               allTrays={visibleGeometries.allTrays}
               allBoxes={visibleGeometries.allBoxes}
               allLooseTrays={visibleGeometries.allLooseTrays}
@@ -3375,7 +3384,7 @@
             <TrayViewer
               geometry={visibleGeometries.tray}
               allTrays={visibleGeometries.allTrays}
-              cardStorageDetail={viewMode === 'tray' ? cardStorageDetail : null}
+              cardStorageDetail={viewMode === 'tray' && cardStorageDetail ? { ...cardStorageDetail, visible: selectedTray?.type !== 'miniatureRack' || showLidPreview } : null}
               allBoxes={visibleGeometries.allBoxes}
               allLooseTrays={visibleGeometries.allLooseTrays}
               boxGeometry={visibleGeometries.box}
@@ -3604,6 +3613,9 @@
             </Popover>
             {#if !isLayoutEditMode && !isLayerLayoutEditMode}
               <div class="toolbarRight">
+                {#if viewMode === 'tray' && selectedTray?.type === 'miniatureRack' && cardStorageDetail}
+                  <InputCheckbox checked={showLidPreview} onchange={(e) => (showLidPreview = e.currentTarget.checked)} label="Preview lid" />
+                {/if}
                 <InputCheckbox
                   checked={showCounters}
                   onchange={(e) => (showCounters = e.currentTarget.checked)}

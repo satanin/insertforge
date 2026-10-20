@@ -26,8 +26,8 @@
     { key: 'verticalClearance', label: 'Clearance above base', min: 0.2, max: 5, step: 0.1 },
     { key: 'tabOverlapPercent', label: 'Retaining tab overlap (% of base diameter)', min: 1, max: 45, step: 1 },
     { key: 'tabThickness', label: 'Tab thickness', min: 1, max: 4, step: 0.1 },
-    { key: 'spacingX', label: 'Spacing X', min: 0, max: 40, step: 0.5 },
-    { key: 'spacingY', label: 'Spacing Y', min: 0, max: 40, step: 0.5 },
+    { key: 'spacingX', label: 'Spacing X', min: 0, max: 600, step: 0.5 },
+    { key: 'spacingY', label: 'Spacing Y', min: 0, max: 600, step: 0.5 },
     { key: 'wallThickness', label: 'Wall thickness', min: 1.2, max: 5, step: 0.1 },
     { key: 'floorThickness', label: 'Floor thickness', min: 1.2, max: 8, step: 0.1 },
     { key: 'miniatureHeight', label: 'Miniature height including base', min: 5, max: 200, step: 0.5, mode: 'base' },
@@ -184,7 +184,7 @@
           {/snippet}
         </FormControl>
       {/if}
-      <p class="help">Plates stay behind the retaining tab, within the socket diameter and existing Y gap. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(4, layout.p.nozzleDiameter * 10).toFixed(1)} mm. These conservative limits still need a test print.</p>
+      <p class="help">Plates stay behind the retaining tab and use the existing gap, extending up to 1 mm per side where spacing allows. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(4, layout.p.nozzleDiameter * 10).toFixed(1)} mm. These conservative limits still need a test print.</p>
     {/if}
   </section>
 
@@ -241,7 +241,7 @@
       <p class="help">Capacity at these limits: {layout.capacity}. Rows and columns are calculated from the quantity.</p>
     {/if}
     {#if layout.p.sizingMode === 'models'}
-      <p class="help">Measure the whole miniature including its base, arms and weapons. Volumes are centred on the base.</p>
+      <p class="help">Measure the whole miniature including its base, arms and weapons. Volumes are centred on the base. Automatic sizing compares individual 90° rotations to reduce the footprint; tabs and labels turn with each socket.</p>
       {#each layout.p.models as model, index (model.id)}
         {@const counts = layout.modelCounts.find(c => c.id === model.id)}
         <fieldset class="modelCard">
@@ -286,6 +286,7 @@
 
   <section class="editorSection" aria-label="Sockets and retention">
     <h3>Sockets &amp; retention</h3>
+    <p class="help">In free/grid mode, spacing is the gap between socket walls. By miniature models, it is extra clearance beyond each model's full width/depth. For arms, wings or weapons, measure the whole miniature, not just its base. X/Y can be unlinked. Large spacing still has to fit within the rack limits.</p>
     <h4>Spacing</h4>
     <InputCheckbox label="Use the same spacing in X and Y" checked={layout.p.linkedSpacing}
       onchange={(e) => update({ linkedSpacing: e.currentTarget.checked })} />

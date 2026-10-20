@@ -118,7 +118,7 @@
 
   interface Props {
     geometry: BufferGeometry | null;
-    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string } | null;
+    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string; textColor?: string; visible?: boolean; lift?: number } | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
     allLooseTrays?: LooseTrayGeometryData[];

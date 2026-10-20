@@ -1207,8 +1207,8 @@ function createBlankProject(): Project {
     selectedLayeredBoxLayerId: null,
     selectedLayeredBoxSectionId: null,
     globalSettings: {
-      gameContainerWidth: 150,
-      gameContainerDepth: 200,
+      gameContainerWidth: 250,
+      gameContainerDepth: 250,
       gameContainerHeight: null
     }
   };
@@ -3208,8 +3208,8 @@ export function deleteCardSize(id: string): void {
 
 // Default global settings
 export const DEFAULT_GLOBAL_SETTINGS = {
-  gameContainerWidth: 256,
-  gameContainerDepth: 256,
+  gameContainerWidth: 250,
+  gameContainerDepth: 250,
   gameContainerHeight: null as number | null
 };
 

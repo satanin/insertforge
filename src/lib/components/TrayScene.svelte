@@ -7,6 +7,7 @@
   import SceneLighting from './three/SceneLighting.svelte';
   import BoxAssembly from './three/BoxAssembly.svelte';
   import LayerContent from './three/LayerContent.svelte';
+  import DimensionOverlay from './three/DimensionOverlay.svelte';
   import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
 
@@ -128,7 +129,7 @@
 
   interface Props {
     geometry: BufferGeometry | null;
-    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string } | null;
+    cardStorageDetail?: { body: BufferGeometry; lid: BufferGeometry; text: BufferGeometry | null; slideDistance: number; color: string; textColor?: string; visible?: boolean; lift?: number } | null;
     allTrays?: TrayGeometryData[];
     allBoxes?: BoxGeometryData[];
     allLooseTrays?: LooseTrayGeometryData[];
@@ -978,6 +979,14 @@
   // Individual geometry bounds
   let boxBounds = $derived(getGeomBounds(boxGeometry));
   let lidBounds = $derived(getGeomBounds(lidGeometry));
+  let selectedSizeBounds = $derived.by(() => {
+    const body = getGeomBounds(cardStorageDetail?.body ?? geometry);
+    if (!body) return null;
+    const bounds = body.clone();
+    const lid = cardStorageDetail ? getGeomBounds(cardStorageDetail.lid) : null;
+    if (lid) bounds.union(lid);
+    return bounds;
+  });
 
   // Gap between objects in side-by-side view
   const sideGap = 20;
@@ -1427,7 +1436,7 @@
         {selectedLayeredBoxSectionId}
         horizontalExplosion={horizontalPhase * layerMultiplier}
         layerBaseOffset={baseOffset}
-        showSizePreview={false}
+        showSizePreview={showPreviewSizes}
       />
     </T.Group>
   {/each}
@@ -1782,14 +1791,27 @@
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
-{#if !generating && geometry && cardStorageDetail && !showLayerView && !showAllTrays}
-  <T.Group position.x={meshOffset.x} position.z={meshOffset.z - cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
+{#if showPreviewSizes && !generating && selectedSizeBounds && !boxGeometry && !showAllTrays && !showAllBoxes && !showAllLayers && !showLayerView && !visualEditMode}
+  <T.Group position.y={selectedSizeBounds.min.z}>
+    <DimensionOverlay
+      centerX={meshOffset.x + (selectedSizeBounds.min.x + selectedSizeBounds.max.x) / 2}
+      centerZ={meshOffset.z - (selectedSizeBounds.min.y + selectedSizeBounds.max.y) / 2}
+      width={selectedSizeBounds.max.x - selectedSizeBounds.min.x}
+      depth={selectedSizeBounds.max.y - selectedSizeBounds.min.y}
+      height={selectedSizeBounds.max.z - selectedSizeBounds.min.z}
+      {labelQuaternion}
+      {monoFont}
+    />
+  </T.Group>
+{/if}
+{#if !generating && geometry && cardStorageDetail && cardStorageDetail.visible !== false && !showLayerView && !showAllTrays}
+  <T.Group position.x={meshOffset.x} position.y={(cardStorageDetail.lift ?? 0) * Math.min(explosionAmount / 50, 1)} position.z={meshOffset.z - cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
     <T.Mesh geometry={cardStorageDetail.lid}>
       <T.MeshStandardMaterial color={cardStorageDetail.color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
     </T.Mesh>
     {#if cardStorageDetail.text}
       <T.Mesh geometry={cardStorageDetail.text}>
-        <T.MeshStandardMaterial color="#101010" side={THREE.DoubleSide} />
+        <T.MeshStandardMaterial color={cardStorageDetail.textColor ?? '#101010'} side={THREE.DoubleSide} />
       </T.Mesh>
     {/if}
   </T.Group>

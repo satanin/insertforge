@@ -63,12 +63,25 @@ function tryPacking<T>(
   allowPartial: boolean = false
 ): PackingResult<T> | null {
   const packer = new GuillotineBinPack<PackRect<T>>(containerWidth, containerHeight, allowFlip);
+  // rectangle-packer 1.x stores the original input node in usedRectangles,
+  // even after flipping the separate node used to split free space. Capture
+  // that actual placement before the split so returned dimensions agree.
+  const placements = new Map<string, { width: number; height: number }>();
+  const split = packer.SplitFreeRectByHeuristic.bind(packer);
+  packer.SplitFreeRectByHeuristic = (freeRect, placed, method) => {
+    placements.set(`${placed.x},${placed.y}`, { width: placed.width, height: placed.height });
+    return split(freeRect, placed, method);
+  };
 
   // Create fresh rect objects
   const rects = items.map((item) => new PackRect(item));
 
   // Insert all rectangles
   packer.InsertSizes(rects, true, rectChoice, splitMethod);
+  for (const rect of packer.usedRectangles) {
+    const placed = placements.get(`${rect.x},${rect.y}`);
+    if (placed) { rect.width = placed.width; rect.height = placed.height; }
+  }
 
   // Check if all were placed
   if ((!allowPartial && packer.usedRectangles.length !== items.length) || packer.usedRectangles.length === 0) return null;
@@ -102,6 +115,7 @@ function tryPacking<T>(
   for (const rect of packer.usedRectangles) {
     const packRect = rect as PackRect<T>;
     const wasRotated =
+      Math.abs(packRect.originalWidth - packRect.originalHeight) > 0.01 &&
       Math.abs(rect.width - packRect.originalHeight) < 0.01 && Math.abs(rect.height - packRect.originalWidth) < 0.01;
 
     packedItems.push({

@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.20`
+- Version visible actual: `1.2.21`
 
 ## Desarrollo local
 
@@ -261,6 +261,34 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
+- Revisar rendimiento del resto de piezas, prioridad **Card Dividers**: usuario informa lentitud en varias piezas y confirma mejora muy notable en Miniature Tray (2026-10-21). Ver [plan de revisión](docs/plans/geometry-performance.md). Investigación autorizada tras publicar v1.2.21.
+
+- 2026-10-21 rendimiento: caché de 8 layouts y última geometría; preview sin unión extra; cuerpo/tapa preparados en worker, toggle sin reconstrucción. Grabado local por socket y agujeros en suelo antes de unir. Medición orientativa 20 minis grabadas: 19,5 s → 7,6 s al localizar taladros; 12 minis+preview duplicada: 4,3 → 2,2 s con caché. Test de equivalencia del grabado. Pendiente prueba del usuario en equipo antiguo; primera generación sigue costando. Usuario indica resto de cambios funciona bien por ahora.
+
+- Packing 10 Walker + 1 Runner: búsqueda conjunta de ancho/fondo (hasta 64 pares por orientación) evita tiras largas de búsqueda por eje. Regresión reproduce screenshot 119,2 × 192 y acepta ≤119,2 ×155,6 mm con 11 bases/etiquetas. Pendiente validación visual del usuario.
+
+- Placas ajustan ancho al texto real + 1 mm por lado, hasta el máximo permitido por socket/separación. Profundidad conserva unión al socket. Pendiente validación del usuario.
+
+- Placas de etiquetas ensanchadas hasta 1 mm por lado, limitadas por separación transversal/4 y borde interior; sin crecer bandeja ni texto. Recupera margen normal para `Miniature` en peana 26 mm con defaults. Pendiente validación del usuario.
+
+- Etiquetas: default `Mini` para activar sin error en peana 26 mm. `Miniature` cabe con margen lateral reducido (mínimo max(0,25 mm, nozzle/2)), sin reducir altura/trazo ni ampliar placa. Aviso específico; pendiente validación impresa del margen reducido.
+
+- 2026-10-20: usuario confirma robustez impresa de pared/suelo de 1,5 mm; establecidos como defaults de Miniature Tray. Peana 26 mm y postes 8 mm ya confirmados en app. Se conservan espesores guardados.
+
+- Corrección defaults: el rack de raíles también tenía su propio valor 32 mm; unificado a 26 mm y cubierta creación real de ambos accesos en tests del store. Pendiente validación del usuario.
+
+- Defaults locales: proyecto nuevo/reset 250 × 250 mm, altura sin cambios; Miniature Tray nueva con peana 26 mm y postes 8 mm. No modifica medidas guardadas. Pendiente validación del usuario.
+
+- Preview sizes: cotas añadidas a vista individual de trays (con tapa en posición ensamblada aunque esté apartada/oculta) y activadas en vista de todas las capas. Pendiente validación del usuario.
+
+- Compactación por modelos: prueba giros individuales de 90° y compara área exterior con la opción sin giros; solapa/placa/texto y envolvente siguen el giro. Mantiene fill y tamaño fijo completo. Corrige medidas giradas devueltas por rectangle-packer en helper común. Heurística, sin garantía de óptimo global; pendiente validación del usuario.
+
+- Reparto horizontal de slots por fila sobre el ancho existente, respetando envolventes y separaciones mínimas; sin aumentar bandeja. Si un packing irregular impide expandir una fila sin colisiones se conserva su posición. Pendiente validación visual del usuario.
+
+- Preview de tapa de Miniature Tray: checkbox `Preview lid` y slider `Explode` en vista individual; oculta/aparta tapa sin cambiar export. Implementado localmente, pendiente validación del usuario.
+
+- Ajuste de impresión 2026-10-20: usuario informa inserción/extracción ajustada. Nuevos defaults de socket: holgura diametral total 1,4 mm (antes 1) y solapa 1,4 mm (antes 1,6). Se conservan parámetros guardados. Pendiente muestra física, sin versión/commit/push.
+- 2026-10-20: usuario confirma impresión de bandeja con etiquetas bastante bien. Detectado límite de espaciado X/Y de 40 mm; ampliado localmente a 600 mm (coherente con tamaño máximo de rack), conservando defecto 6 mm y validación de cabida. Miniaturas con grandes voladizos deben usar envolvente completa por modelo; offsets asimétricos aún pendientes. Sin versión/commit/push; revisión del nuevo espaciado pendiente.
 - v1.2.20: usuario acepta y autoriza commit/push de modos/color en tapa de miniaturas, con controles compartidos con etiquetas. 3MF solo tapa con cuerpo+texto agrupados comprobado. Relieve incluido en altura total y orientación de impresión adaptada; afecta superficie plana de apoyo. Prueba impresa de tapa con texto prevista el 2026-10-20; mantener Experimental y pendiente validación física. Ver [detalle](docs/plans/miniature-socket-rack.md).
 - v1.2.19: usuario autoriza commit/push del bloque de etiquetas y compactación (2026-10-19) para pruebas impresas el 2026-10-20. Mantener Experimental: comprobar lectura, texto multicolor/relieve, entrada/extracción de peanas, apilado y tapa. Punto de retorno anterior a etiquetas: `f7c84b7`. Ver [seguimiento](docs/plans/miniature-socket-rack.md).
 
