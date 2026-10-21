@@ -81,6 +81,9 @@ import {
   isLooseTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
+import type { InventoryAssignment, InventoryGroup, InventoryKind } from '$lib/types/project';
+import { groupAssignments, inventoryTargets, sleeveThickness, validateAssignments } from '$lib/utils/inventory';
+import { applyInventoryGeometry } from '$lib/utils/inventoryGeometry';
 
 export {
   findTrayLocation,
@@ -885,6 +888,7 @@ function cloneMiniatureRackParamsWithFreshIds(params: MiniatureRackParams): Mini
 }
 
 function cloneTrayWithFreshIds<T extends Tray>(tray: T, name: string = duplicateName(tray.name)): T {
+  tray = { ...tray, inventoryAssignments: undefined };
   if (tray.type === 'cardStorage') return { ...tray, id: generateId(), name,
     params: { ...tray.params, dividers: tray.params.dividers.map(d => ({ ...d, id: generateId() })) } } as T;
   if (isCupTray(tray)) {
@@ -930,6 +934,7 @@ function cloneLayeredBoxSectionWithFreshIds(
 ): LayeredBoxSection {
   return {
     ...section,
+    inventoryAssignments: undefined,
     id: generateId(),
     name,
     counterParams: section.counterParams
@@ -1147,6 +1152,7 @@ function cloneLayeredBoxWithFreshIds(layeredBox: LayeredBox, name: string = dupl
 function cloneBoardWithFreshId(board: Board, name: string = duplicateName(board.name)): Board {
   return {
     ...board,
+    inventoryAssignments: undefined,
     id: generateId(),
     name
   };
@@ -1238,6 +1244,82 @@ export function saveProjectNow(): void {
 // Getters
 export function getProject(): Project {
   return project;
+}
+
+export function addInventoryGroup(kind: InventoryKind, sourceId?: string): InventoryGroup {
+  const source = project.inventory?.find(g => g.id === sourceId);
+  const defaults = project.inventoryCardDefaults;
+  const card = project.cardSizes.find(s => s.id === defaults?.cardSizeId) ?? project.cardSizes[0];
+  const group: InventoryGroup = source ? { ...source, id: generateId(), name: `${source.name} copy`, revision: 1 } : {
+    id: generateId(), name: '', kind, quantity: 1, revision: 1,
+    ...(kind === 'cards' ? { cardSizeId: card?.id, sleeve: defaults?.sleeve ?? 'normal', width: card?.width, depth: card?.length,
+      thickness: defaults?.thickness ?? sleeveThickness[defaults?.sleeve ?? 'normal'] } : {}),
+    ...(kind === 'dice' ? { diceKind: 'd6' as const } : {})
+  };
+  project.inventory ??= [];
+  project.inventory.push(group);
+  if (kind === 'cards' && !project.inventoryCardDefaults) project.inventoryCardDefaults = {
+    cardSizeId: group.cardSizeId ?? '', sleeve: group.sleeve ?? 'normal', thickness: group.thickness
+  };
+  autosave();
+  return group;
+}
+
+export function updateInventoryGroup(id: string, updates: Partial<Omit<InventoryGroup, 'id' | 'revision'>>): string | null {
+  const group = project.inventory?.find(g => g.id === id);
+  if (!group) return 'Component group no longer exists.';
+  if ('width' in updates && ['square', 'circle', 'hex'].includes(updates.baseShape ?? group.baseShape ?? '')) updates.depth = updates.width;
+  if (updates.quantity !== undefined && (!Number.isSafeInteger(updates.quantity) || updates.quantity < 1 ||
+    updates.quantity < groupAssignments(project, id).reduce((n, a) => n + a.quantity, 0))) return 'Quantity must be a positive integer, at least the number already assigned.';
+  if (updates.kind && updates.kind !== group.kind && groupAssignments(project, id).length) return 'Remove this group from its pieces before changing its type.';
+  for (const key of ['width', 'depth', 'thickness', 'height', 'baseDiameter', 'baseThickness'] as const) {
+    if (updates[key] !== undefined && (!Number.isFinite(updates[key]) || updates[key]! <= 0)) return 'Measurements must be positive numbers.';
+  }
+  const geometryChanged = Object.keys(updates).some(key => key !== 'quantity' && key !== 'name' && group[key as keyof InventoryGroup] !== updates[key as keyof typeof updates]);
+  Object.assign(group, updates, { revision: group.revision + (geometryChanged ? 1 : 0) });
+  if (group.kind === 'cards' && project.inventory?.find(g => g.kind === 'cards')?.id === id) {
+    project.inventoryCardDefaults = { cardSizeId: group.cardSizeId ?? '', sleeve: group.sleeve ?? 'normal', thickness: group.thickness };
+  }
+  autosave();
+  return null;
+}
+
+export function deleteInventoryGroup(id: string): string | null {
+  if (groupAssignments(project, id).length) return 'Remove this group from its pieces before deleting it.';
+  project.inventory = (project.inventory ?? []).filter(g => g.id !== id);
+  autosave();
+  return null;
+}
+
+export function setInventoryContent(targetId: string, requested: InventoryAssignment[]): string | null {
+  const target = inventoryTargets(project).find(t => t.item.id === targetId);
+  if (!target) return 'Piece no longer exists.';
+  const error = validateAssignments(project, target, requested);
+  if (error) return error;
+  // Work on a plain copy so invalid geometry or fixed-box bounds cannot partially update the project.
+  const candidate: Project = JSON.parse(JSON.stringify(project));
+  const next = inventoryTargets(candidate).find(t => t.item.id === targetId)!;
+  const assignments = requested.map(a => ({ ...a, revision: project.inventory!.find(g => g.id === a.groupId)!.revision }));
+  try { applyInventoryGeometry(candidate, next, assignments); } catch (e) { return e instanceof Error ? e.message : 'Cannot apply inventory content.'; }
+  next.item.inventoryAssignments = assignments;
+  if (next.internalLayerId && next.boxId) {
+    const previousSizes = project.cardSizes;
+    const previousShapes = project.counterShapes;
+    project.cardSizes = candidate.cardSizes;
+    project.counterShapes = candidate.counterShapes;
+    const { id: _id, type: _type, ...updates } = next.item as LayeredBoxSection;
+    if (!updateLayeredBoxSection(next.boxId, next.internalLayerId, targetId, updates)) {
+      project.cardSizes = previousSizes;
+      project.counterShapes = previousShapes;
+      return 'This content does not fit the fixed layered box. Adjust its dimensions first.';
+    }
+  } else {
+    project.cardSizes = candidate.cardSizes;
+    project.counterShapes = candidate.counterShapes;
+    Object.assign(target.item, next.item);
+  }
+  autosave();
+  return null;
 }
 
 export function getProjectName(): string {
@@ -2166,6 +2248,7 @@ export function updateLayeredBoxSection(
     const section = boxLayer.sections.find((entry) => entry.id === sectionId);
     if (!section) continue;
     const previous = {
+      inventoryAssignments: section.inventoryAssignments,
       name: section.name,
       color: section.color,
       counterParams: section.counterParams,
@@ -2280,6 +2363,7 @@ export function convertLayeredBoxSectionToLooseTray(
     const section = internalLayer.sections[sectionIndex];
     const tray = createTrayFromLayeredBoxSection(section, { preserveId: false });
     if (!tray) return false;
+    tray.inventoryAssignments = section.inventoryAssignments;
 
     internalLayer.sections.splice(sectionIndex, 1);
     internalLayer.manualLayout = internalLayer.manualLayout?.filter((placement) => placement.trayId !== sectionId);

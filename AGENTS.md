@@ -43,6 +43,9 @@
 
 ## Current product constraints
 
+- El inventario del juego vive a nivel de `Project`, independiente de `Layer`. Las piezas referencian grupos y cantidades; duplicar piezas no debe duplicar asignaciones ni existencias.
+- Aplicar contenido del inventario es explicito y usa snapshots de medidas; editar el inventario no debe redimensionar silenciosamente las piezas existentes.
+
 - `Miniature Rack` sigue siendo `loose tray` por ahora.
 - `Card Storage` es `loose tray` con piezas dependientes (separadores/tapa); su altura maxima incluye todo el conjunto y no debe crecer por `autoHeight`.
 - `Layered Box` debe seguir alineandose funcional y visualmente con `Box`.

@@ -17,6 +17,8 @@
   import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronUp } from '@tabler/icons-svelte';
   import NavigationMenu from '$lib/components/NavigationMenu.svelte';
   import EditorPanel from '$lib/components/EditorPanel.svelte';
+  import InventoryPanel from '$lib/components/InventoryPanel.svelte';
+  import { inventoryUi } from '$lib/stores/inventoryUi.svelte';
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
   import { createCardDrawTray, getCardDrawPositions, type CardStack } from '$lib/models/cardTray';
   import { createCardDividerTray, getCardDividerPositions } from '$lib/models/cardDividerTray';
@@ -3071,6 +3073,8 @@
     content="Design and 3D print custom inserts for board game boxes to organize your components. Create trays for cards, tokens, and miniatures with adjustable layouts."
   />
 </svelte:head>
+
+<InventoryPanel bind:open={inventoryUi.open} />
 
 {#if isMobile}
   <!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->

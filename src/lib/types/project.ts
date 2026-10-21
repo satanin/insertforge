@@ -35,6 +35,7 @@ export interface CardSize {
 
 // Base tray interface shared by all tray types
 interface BaseTray {
+  inventoryAssignments?: InventoryAssignment[];
   id: string;
   name: string;
   color: string;
@@ -45,6 +46,7 @@ interface BaseTray {
 
 // Visual-only board item for layer planning
 export interface Board {
+  inventoryAssignments?: InventoryAssignment[];
   id: string;
   name: string;
   color: string;
@@ -65,6 +67,7 @@ export interface LayeredBoxLayer {
 export type LayeredBoxSectionType = 'counter' | 'cardDraw' | 'cardDivider' | 'cardWell' | 'cup' | 'playerBoard';
 
 export interface LayeredBoxSection {
+  inventoryAssignments?: InventoryAssignment[];
   id: string;
   type: LayeredBoxSectionType;
   name: string;
@@ -289,6 +292,8 @@ export interface GlobalSettings {
 }
 
 export interface Project {
+  inventory?: InventoryGroup[];
+  inventoryCardDefaults?: { cardSizeId: string; sleeve: CardSleeve; thickness?: number };
   schemaVersion: number;
   appVersion: string;
   version?: number; // Legacy Counter Slayer format marker (2 = layers format)
@@ -305,6 +310,36 @@ export interface Project {
   selectedTrayId: string | null;
   selectedBoardId?: string | null;
   globalSettings?: GlobalSettings;
+}
+
+export type InventoryKind = 'cards' | 'tokens' | 'dice' | 'boards' | 'miniatures' | 'other';
+export type CardSleeve = 'none' | 'normal' | 'premium' | 'manual';
+export type DiceKind = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
+export interface InventoryGroup {
+  id: string;
+  name: string;
+  kind: InventoryKind;
+  quantity: number;
+  revision: number;
+  cardSizeId?: string;
+  sleeve?: CardSleeve;
+  shapeId?: string;
+  baseShape?: CounterBaseShape;
+  pointyTop?: boolean;
+  diceKind?: DiceKind;
+  width?: number;
+  depth?: number;
+  thickness?: number;
+  height?: number;
+  baseDiameter?: number;
+  baseThickness?: number;
+}
+export interface InventoryAssignment {
+  loading?: 'top' | 'edge';
+  edgeOrientation?: 'lengthwise' | 'crosswise';
+  groupId: string;
+  quantity: number;
+  revision: number;
 }
 
 // Legacy project format (pre-layers)

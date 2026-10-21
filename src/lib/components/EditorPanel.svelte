@@ -2,6 +2,7 @@
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
+  import InventoryContent from './InventoryContent.svelte';
   import ElementExport from './ElementExport.svelte';
   import BoxesPanel from './BoxesPanel.svelte';
   import TraysPanel from './TraysPanel.svelte';
@@ -631,6 +632,13 @@
     </div>
     <!-- Content -->
     <div class="panelContent">
+      {#if !isLayoutEditMode && selectionType === 'tray' && selectedTray}
+        {#key selectedTray.id}<InventoryContent targetId={selectedTray.id} />{/key}
+      {:else if !isLayoutEditMode && selectionType === 'layeredBoxSection' && selectedLayeredBoxSection}
+        {#key selectedLayeredBoxSection.id}<InventoryContent targetId={selectedLayeredBoxSection.id} />{/key}
+      {:else if !isLayoutEditMode && selectionType === 'board' && selectedBoard}
+        {#key selectedBoard.id}<InventoryContent targetId={selectedBoard.id} />{/key}
+      {/if}
       {#if isLayoutEditMode}
           <div class="layoutEditMessage">
             <p class="hint">Drag trays to reposition. Save or cancel to continue editing.</p>

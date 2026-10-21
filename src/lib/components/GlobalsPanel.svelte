@@ -62,11 +62,11 @@
   let activeTab = $state<'project' | 'counters' | 'cards' | 'tiles' | 'boards'>('project');
 
   // Get shapes and card sizes from project level
-  let counterShapes = $derived(getCounterShapes());
+  let counterShapes = $derived(getCounterShapes().filter(s => !s.id.startsWith('inventory-')));
   let counterTokenShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'counter'));
   let playerBoardShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'playerBoard'));
   let tileShapes = $derived(counterShapes.filter((s) => (s.category ?? 'counter') === 'tile'));
-  let cardSizes = $derived(getCardSizes());
+  let cardSizes = $derived(getCardSizes().filter(s => !s.id.startsWith('inventory-')));
 
   // Get the shape icon component for a base shape
   function getShapeIcon(baseShape: CounterBaseShape) {
@@ -130,7 +130,7 @@
       length: category === 'playerBoard' ? 280 : category === 'tile' ? 30 : 30,
       thickness: category === 'tile' ? 2 : DEFAULT_COUNTER_THICKNESS
     });
-    const newShapes = getCounterShapes().filter((s) => (s.category ?? 'counter') === category);
+    const newShapes = getCounterShapes().filter((s) => !s.id.startsWith('inventory-') && (s.category ?? 'counter') === category);
     const newIndex = newShapes.findIndex((s) => s.id === newShape.id);
     if (category === 'playerBoard') {
       expandedPlayerBoardIndex = newIndex;
@@ -247,7 +247,7 @@
       thickness: 0.5
     });
     // Find the index of the newly added card size
-    const newIndex = getCardSizes().findIndex((s) => s.id === newCardSize.id);
+    const newIndex = getCardSizes().filter(s => !s.id.startsWith('inventory-')).findIndex((s) => s.id === newCardSize.id);
     expandedCardIndex = newIndex;
   }
 

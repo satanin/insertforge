@@ -6,6 +6,7 @@
   import { computePosition, offset, flip, shift } from '@floating-ui/dom';
   import { tick } from 'svelte';
   import TrayTypePreview from './TrayTypePreview.svelte';
+  import { inventoryUi } from '$lib/stores/inventoryUi.svelte';
   import {
     getProject,
     getSelectedBox,
@@ -418,6 +419,10 @@
 </script>
 
 <Panel class="navMenu {isMobile ? 'navMenu--mobile' : ''}">
+  <button class="navItem navItem--dimensions" onclick={() => inventoryUi.open = true}>
+    <span class="navItemIcon"><Icon Icon={IconPackage} size="1rem" /></span>
+    Game components ({project.inventory?.length ?? 0})
+  </button>
   <!-- Dimensions (Globals) -->
   <button
     class="navItem navItem--dimensions {selectionType === 'dimensions' ? 'navItem--selected' : ''}"

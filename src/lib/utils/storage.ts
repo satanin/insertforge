@@ -657,6 +657,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
   return {
     ...project,
     version: undefined,
+    inventory: project.inventory ?? [],
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     name: projectName,
