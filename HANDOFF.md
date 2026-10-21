@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.23`
+- Version visible actual: `1.2.24`
 
 ## Desarrollo local
 
@@ -260,6 +260,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.24 Card Well: usuario valida el bloque y autoriza commit (2026-10-22). Mínimos exteriores, cotas, giro de vista individual, canales de extracción, esquinas redondeadas y nombres/etiquetas de pilas. Validación física pendiente; sin push autorizado. Ver [detalle y pruebas](docs/plans/card-well-refinements.md).
 
 - v1.2.23 inventario: usuario confirma buen funcionamiento y autoriza commit (2026-10-21). Incluye tabla editable, asignación parcial desde piezas, snapshots de medidas, persistencia, creación manual y tokens Top/Edge-loaded. Sin push autorizado. Ver [diseño y alcance](docs/plans/project-inventory.md).
 

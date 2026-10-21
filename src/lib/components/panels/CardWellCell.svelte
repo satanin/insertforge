@@ -13,6 +13,7 @@
     cavityHeight: number; // Actual card cavity height in pixels
     selected: boolean;
     cardSizeName?: string; // Card size name if stack assigned
+    stackLabel?: string;
     onSelect: (id: CellId) => void;
   }
 
@@ -28,6 +29,7 @@
     cavityHeight,
     selected,
     cardSizeName,
+    stackLabel,
     onSelect
   }: Props = $props();
 
@@ -63,6 +65,7 @@
     style="left: {cavityOffsetX}px; bottom: {cavityOffsetY}px; width: {cavityWidth}px; height: {cavityHeight}px;"
   >
     <span class="cardWellCell__refNumber">{trayLetter}{refNumber}</span>
+    {#if stackLabel}<span class="stackLabel">{stackLabel}</span>{/if}
     {#if cardSizeName}
       <span class="cardWellCell__cardSize">{cardSizeName}</span>
     {:else}
@@ -72,6 +75,13 @@
 </button>
 
 <style>
+  .stackLabel {
+    max-width: 100%;
+    padding: 0 0.25rem;
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .cardWellCell {
     position: absolute;
     background: transparent;

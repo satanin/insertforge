@@ -130,6 +130,16 @@ describe('project inventory', () => {
     if (applied.type !== 'cardDivider') throw new Error('Wrong tray');
     expect(applied.params.stacks).toHaveLength(2);
   });
+  it('uses inventory group names as Card Well stack labels and persists them', () => {
+    const group = addInventoryGroup('cards');
+    updateInventoryGroup(group.id, { name: 'Starting cards' });
+    const tray = addLooseTray(undefined, 'cardWell')!;
+    expect(setInventoryContent(tray.id, content(group.id, 1))).toBeNull();
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    const well = restored.layers[0].looseTrays.find((t) => t.id === tray.id)!;
+    if (well.type !== 'cardWell') throw new Error('Wrong tray');
+    expect(well.params.stacks[0].label).toBe('Starting cards');
+  });
   it('rolls back assignments and generated definitions when a fixed layered box rejects content', () => {
     const group = tokens();
     const box = addLayeredBox(undefined, 'counter')!;

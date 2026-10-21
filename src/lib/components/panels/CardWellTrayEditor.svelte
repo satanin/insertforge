@@ -2,7 +2,13 @@
   import { Input, InputCheckbox, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
   import type { CardWellTray } from '$lib/types/project';
-  import { type CardWellTrayParams, getCardWellTrayDimensions, syncStacksWithLayout } from '$lib/models/cardWellTray';
+  import {
+    type CardWellTrayParams,
+    getCardWellTrayDimensions,
+    getCardWellGripRadius,
+    getCardWellCornerRadius,
+    syncStacksWithLayout
+  } from '$lib/models/cardWellTray';
   import { getAllCellIds, type CardWellLayout } from '$lib/types/cardWellLayout';
   import { getCardSizes, getProjectDefaultCardSizeId } from '$lib/stores/project.svelte';
   import CardWellLayoutEditor from './CardWellLayoutEditor.svelte';
@@ -39,6 +45,11 @@
   function updateParam<K extends keyof CardWellTrayParams>(key: K, value: CardWellTrayParams[K]) {
     onUpdateParams({ ...tray.params, [key]: value });
   }
+  const minimumFields = [
+    { key: 'trayWidthOverride', label: 'Minimum width', dimension: 'width', axis: 'X' },
+    { key: 'trayDepthOverride', label: 'Minimum length', dimension: 'depth', axis: 'Y' },
+    { key: 'minimumHeight', label: 'Minimum height', dimension: 'height', axis: 'Z' }
+  ] as const;
 
   // Layout update handler - syncs stacks when layout changes (adds/removes as needed)
   function handleLayoutUpdate(layout: CardWellLayout) {
@@ -47,7 +58,7 @@
   }
 
   // Stack handlers
-  function updateStack(index: number, field: 'cardSizeId' | 'count' | 'rotation', value: string | number) {
+  function updateStack(index: number, field: 'cardSizeId' | 'count' | 'rotation' | 'label', value: string | number) {
     const newStacks = [...tray.params.stacks];
     const current = newStacks[index];
     if (field === 'cardSizeId') {
@@ -56,6 +67,8 @@
       newStacks[index] = { ...current, count: value as number };
     } else if (field === 'rotation') {
       newStacks[index] = { ...current, rotation: value as 0 | 90 };
+    } else if (field === 'label') {
+      newStacks[index] = { ...current, label: value as string };
     }
     onUpdateParams({ ...tray.params, stacks: newStacks });
   }
@@ -90,6 +103,7 @@
       trayDepth={dimensions.depth}
       clearance={tray.params.clearance}
       wallThickness={tray.params.wallThickness}
+      gripInset={getCardWellGripRadius(tray.params)}
       onUpdateLayout={handleLayoutUpdate}
     />
   </section>
@@ -103,36 +117,59 @@
       {#each sortedStacks as stack (stack.id)}
         {@const stackIndex = tray.params.stacks.findIndex((s) => s.id === stack.id)}
         {@const rotation = stack.rotation ?? 0}
-        <div class="stackRow">
-          <span class="cellRef">{trayLetter}{getCellRefNumber(stack.cellId)}</span>
-          <div class="stackCardSelect">
-            <Select
-              selected={[stack.cardSizeId]}
-              options={getCardSizes().map((s) => ({
-                value: s.id,
-                label: s.name
-              }))}
-              onSelectedChange={(selected) => updateStack(stackIndex, 'cardSizeId', selected[0])}
+        <div class="stackItem">
+          <div class="stackRow">
+            <span class="cellRef">{trayLetter}{getCellRefNumber(stack.cellId)}</span>
+            <div class="stackCardSelect">
+              <Select
+                selected={[stack.cardSizeId]}
+                options={getCardSizes().map((s) => ({
+                  value: s.id,
+                  label: s.name
+                }))}
+                onSelectedChange={(selected) => updateStack(stackIndex, 'cardSizeId', selected[0])}
+              />
+            </div>
+            <Input
+              type="number"
+              min="1"
+              value={stack.count}
+              onchange={(e) => updateStack(stackIndex, 'count', parseInt(e.currentTarget.value))}
+              style="width: 3.5rem;"
             />
+            <IconButton
+              variant="ghost"
+              onclick={() => toggleRotation(stackIndex)}
+              title={rotation === 0 ? 'Rotate 90°' : 'Rotate 0°'}
+              color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'}
+            >
+              <Icon Icon={IconRotate2} color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'} />
+            </IconButton>
           </div>
-          <Input
-            type="number"
-            min="1"
-            value={stack.count}
-            onchange={(e) => updateStack(stackIndex, 'count', parseInt(e.currentTarget.value))}
-            style="width: 3.5rem;"
-          />
-          <IconButton
-            variant="ghost"
-            onclick={() => toggleRotation(stackIndex)}
-            title={rotation === 0 ? 'Rotate 90°' : 'Rotate 0°'}
-            color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'}
-          >
-            <Icon Icon={IconRotate2} color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'} />
-          </IconButton>
+          <FormControl label="Stack name" name={`stackLabel-${stack.id}`}>
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="text"
+                aria-label={`Stack name ${trayLetter}${getCellRefNumber(stack.cellId)}`}
+                placeholder="Optional name"
+                value={stack.label ?? ''}
+                onchange={(e) => updateStack(stackIndex, 'label', e.currentTarget.value)}
+              />
+            {/snippet}
+          </FormControl>
         </div>
       {/each}
     </div>
+    <Spacer size="0.5rem" />
+    <InputCheckbox
+      label="Engrave stack labels"
+      checked={tray.params.engraveStackLabels ?? true}
+      onchange={(e) => updateParam('engraveStackLabels', e.currentTarget.checked)}
+    />
+    <p class="minimumHint">
+      Names are engraved in each well floor, away from the finger hole. Long names are scaled to fit.
+    </p>
   </section>
 
   <Spacer size="0.5rem" />
@@ -197,6 +234,90 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
+    <Spacer size="1rem" />
+    <FormControl label="Outer corner radius" name="outerCornerRadius">
+      {#snippet input({ inputProps })}
+        <Input
+          {...inputProps}
+          type="number"
+          min="0"
+          step="0.5"
+          value={tray.params.outerCornerRadius ?? 0}
+          onchange={(e) => {
+            const value = Number(e.currentTarget.value);
+            updateParam('outerCornerRadius', Number.isFinite(value) && value > 0 ? value : 0);
+          }}
+        />
+      {/snippet}
+      {#snippet end()}mm{/snippet}
+    </FormControl>
+    <p class="minimumHint">
+      0 keeps square corners. Applied radius: {getCardWellCornerRadius(tray.params, getCardSizes()).toFixed(1)} mm, limited
+      to protect the wells and extraction notches. Top and bottom stay flat for stacking.
+    </p>
+    <Spacer size="1rem" />
+    <h3 class="sectionTitle">Minimum exterior dimensions</h3>
+    <div class="formGrid">
+      {#each minimumFields as field (field.key)}
+        <div class="minimumField">
+          <FormControl label={field.label} name={field.key}>
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="Auto"
+                value={tray.params[field.key] ?? ''}
+                onchange={(e) => {
+                  const value = Number(e.currentTarget.value);
+                  updateParam(field.key, Number.isFinite(value) && value > 0 ? value : null);
+                }}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+          <small class="currentDimension">
+            Current {field.label.replace('Minimum ', '')} ({field.axis}): {dimensions[field.dimension].toFixed(1)} mm
+          </small>
+        </div>
+      {/each}
+    </div>
+    <p class="minimumHint">
+      Empty or 0 keeps automatic sizing. Smaller values never reduce card space. Extra width and length are shared
+      between outer margins and internal dividers; extra height raises the well floors.
+    </p>
+    <Spacer size="1rem" />
+    <InputCheckbox
+      label="Extraction notches"
+      checked={tray.params.extractionNotches ?? false}
+      onchange={(e) => updateParam('extractionNotches', e.currentTarget.checked)}
+    />
+    {#if tray.params.extractionNotches}
+      <Spacer size="0.5rem" />
+      <FormControl label="Notch diameter" name="extractionNotchDiameter">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            min="8"
+            max="40"
+            step="1"
+            value={getCardWellGripRadius(tray.params) * 2}
+            onchange={(e) => {
+              const value = Number(e.currentTarget.value);
+              updateParam('extractionNotchDiameter', Number.isFinite(value) ? Math.max(8, Math.min(40, value)) : 20);
+            }}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <p class="minimumHint">
+        Two centered recesses on the left and right sides (X). The central divider gets priority when both outer columns
+        have several wells; otherwise side margins protect the cards. The recesses pass through the floor so aligned
+        trays form a continuous finger channel when stacked.
+      </p>
+    {/if}
     {#if onUpdateTray}
       <Spacer size="1rem" />
       <InputCheckbox
@@ -209,6 +330,26 @@
 </div>
 
 <style>
+  .stackItem {
+    display: grid;
+    gap: 0.4rem;
+    padding-bottom: 0.75rem;
+    border-bottom: var(--borderThin);
+  }
+  .minimumField {
+    min-width: 0;
+  }
+  .currentDimension {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+  }
+  .minimumHint {
+    font-size: 0.75rem;
+    color: var(--fgMuted);
+    margin-top: 0.5rem;
+  }
   .panelFormSection {
     padding: 0 0.75rem;
   }

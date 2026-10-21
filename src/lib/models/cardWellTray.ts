@@ -4,17 +4,18 @@ import type { CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { getSafeEmbossDepth } from './emboss';
+import { vectorTextWithAccents } from './vectorTextWithAccents';
 
-const { cuboid, cylinder } = jscad.primitives;
+const { cuboid, cylinder, roundedRectangle } = jscad.primitives;
 const { subtract, union } = jscad.booleans;
-const { translate, mirrorY, scale } = jscad.transforms;
+const { translate, mirrorY, scale, rotateZ } = jscad.transforms;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
-import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Card well stack definition - links a cell to a card size and count
 export interface CardWellStack {
+  label?: string;
   id: string; // Unique stack ID
   cellId: CellId; // Links to cell in layout
   cardSizeId: string; // Reference to project.cardSizes[]
@@ -26,8 +27,13 @@ export interface CardWellStack {
 export interface CardWellTrayParams {
   layout: CardWellLayout;
   stacks: CardWellStack[]; // Stack definitions per cell
-  trayWidthOverride: number | null; // null = auto from cards
-  trayDepthOverride: number | null; // null = auto from cards
+  trayWidthOverride: number | null; // Minimum exterior width; null/0 = auto from cards
+  trayDepthOverride: number | null; // Minimum exterior depth; null/0 = auto from cards
+  minimumHeight?: number | null; // 0/null = natural height; never shrinks card cavities
+  extractionNotches?: boolean;
+  extractionNotchDiameter?: number;
+  outerCornerRadius?: number; // 0/absent = square exterior corners
+  engraveStackLabels?: boolean;
   wallThickness: number;
   floorThickness: number;
   clearance: number; // Clearance around cards
@@ -40,6 +46,7 @@ export const defaultCardWellTrayParams: CardWellTrayParams = {
   stacks: [],
   trayWidthOverride: null,
   trayDepthOverride: null,
+  outerCornerRadius: 3,
   wallThickness: 2.0,
   floorThickness: 2.0,
   clearance: 1.0,
@@ -194,19 +201,41 @@ export function computeLayoutSizes(
 }
 
 // Compute cell positions from column layout with vertical centering
+export function getCardWellGripLayout(sizes: LayoutSizeInfo, wall: number, radius: number) {
+  const edgeColumns = [sizes.columns[0], sizes.columns[sizes.columns.length - 1]];
+  const central = radius > 0 && edgeColumns.every((c) => c && c.cellDepths.length >= 2 && c.width >= radius + wall);
+  if (!central) return { sideInset: radius, halfDepth: null, depth: sizes.maxColumnDepth };
+  const halfDepth = Math.max(
+    ...edgeColumns.flatMap((c) => {
+      const split = Math.floor(c.cellDepths.length / 2);
+      return [c.cellDepths.slice(0, split), c.cellDepths.slice(split)].map(
+        (depths) => depths.reduce((sum, depth) => sum + depth, 0) + (depths.length - 1) * wall
+      );
+    })
+  );
+  return { sideInset: 0, halfDepth, depth: Math.max(sizes.maxColumnDepth, 2 * halfDepth + 2 * radius + 2 * wall) };
+}
+
 export function computeCellPositions(
   layout: CardWellLayout,
   stacks: CardWellStack[],
   cardSizes: CardSize[],
   wallThickness: number,
-  clearance: number
+  clearance: number,
+  minimumWidth?: number,
+  minimumDepth?: number,
+  gripInset: number = 0
 ): ComputedCell[] {
   const cells: ComputedCell[] = [];
 
   const layoutSizes = computeLayoutSizes(layout, stacks, cardSizes, clearance, wallThickness);
+  const grip = getCardWellGripLayout(layoutSizes, wallThickness, gripInset);
 
   // Calculate X position for each column
-  let currentX = wallThickness; // Start after outer wall
+  const extraWidth = Math.max(0, (minimumWidth ?? 0) - layoutSizes.totalWidth - 2 * wallThickness - 2 * grip.sideInset);
+  const extraDepth = Math.max(0, (minimumDepth ?? 0) - layoutSizes.maxColumnDepth - 2 * wallThickness);
+  const columnGrowth = extraWidth / (layout.columns.length + 1);
+  let currentX = wallThickness + grip.sideInset + columnGrowth;
 
   for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
     const column = layout.columns[colIndex];
@@ -217,9 +246,17 @@ export function computeCellPositions(
     const verticalOffset = (layoutSizes.maxColumnDepth - columnTotalDepth) / 2;
 
     // Calculate Y position for each cell in the column
-    let currentY = wallThickness + verticalOffset; // Start after outer wall + centering offset
+    const centralGrip = grip.halfDepth !== null && (colIndex === 0 || colIndex === layout.columns.length - 1);
+    const split = Math.floor(column.length / 2);
+    const beforeDepth =
+      columnInfo.cellDepths.slice(0, split).reduce((sum, depth) => sum + depth, 0) + (split - 1) * wallThickness;
+    const cellGrowth = centralGrip ? 0 : extraDepth / (column.length + 1);
+    let currentY = wallThickness + verticalOffset + cellGrowth;
+    if (centralGrip) currentY = wallThickness + grip.halfDepth! - beforeDepth;
 
     for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
+      if (centralGrip && cellIndex === split)
+        currentY = Math.max(minimumDepth ?? 0, grip.depth + 2 * wallThickness) - wallThickness - grip.halfDepth!;
       const cellId = column[cellIndex];
       const cellDepth = columnInfo.cellDepths[cellIndex];
 
@@ -233,10 +270,10 @@ export function computeCellPositions(
         depth: cellDepth
       });
 
-      currentY += cellDepth + wallThickness;
+      currentY += cellDepth + wallThickness + cellGrowth;
     }
 
-    currentX += columnInfo.width + wallThickness;
+    currentX += columnInfo.width + wallThickness + columnGrowth;
   }
 
   return cells;
@@ -257,8 +294,9 @@ export function getCardWellTrayDimensions(
   const layoutSizes = computeLayoutSizes(params.layout, stacks, cardSizes, clearance, wallThickness);
 
   // Auto dimensions: interior + outer walls
-  const autoWidth = layoutSizes.totalWidth + 2 * wallThickness;
-  const autoDepth = layoutSizes.maxColumnDepth + 2 * wallThickness;
+  const grip = getCardWellGripLayout(layoutSizes, wallThickness, getCardWellGripRadius(params));
+  const autoWidth = layoutSizes.totalWidth + 2 * wallThickness + 2 * grip.sideInset;
+  const autoDepth = grip.depth + 2 * wallThickness;
 
   // Calculate max stack height
   let maxStackHeight = 0;
@@ -274,10 +312,57 @@ export function getCardWellTrayDimensions(
   const height = floorThickness + maxStackHeight + rimHeight;
 
   return {
-    width: trayWidthOverride ?? autoWidth,
-    depth: trayDepthOverride ?? autoDepth,
-    height: Math.max(height, floorThickness + rimHeight + 10) // Minimum height
+    width: Math.max(autoWidth, positiveMinimum(trayWidthOverride)),
+    depth: Math.max(autoDepth, positiveMinimum(trayDepthOverride)),
+    height: Math.max(height, floorThickness + rimHeight + 10, positiveMinimum(params.minimumHeight))
   };
+}
+
+export function getCardWellGripRadius(params: CardWellTrayParams): number {
+  if (!params.extractionNotches) return 0;
+  const diameter = params.extractionNotchDiameter;
+  return typeof diameter === 'number' && Number.isFinite(diameter) ? Math.max(8, Math.min(40, diameter)) / 2 : 10;
+}
+
+export function getCardWellCornerRadius(params: CardWellTrayParams, cardSizes: CardSize[]): number {
+  const requested = positiveMinimum(params.outerCornerRadius);
+  if (!requested) return 0;
+  const dims = getCardWellTrayDimensions(params, cardSizes);
+  const grip = getCardWellGripRadius(params);
+  const cells = computeCellPositions(
+    params.layout,
+    params.stacks,
+    cardSizes,
+    params.wallThickness,
+    params.clearance,
+    dims.width,
+    dims.depth,
+    grip
+  );
+  // A corner arc stays outside every cell's bounding rectangle, preserving its wall thickness.
+  const safe = Math.min(
+    dims.width / 2 - 0.001,
+    dims.depth / 2 - 0.001,
+    ...(grip ? [dims.depth / 2 - grip - params.wallThickness] : []),
+    ...cells.flatMap((cell) => {
+      const left = cell.x,
+        right = dims.width - cell.x - cell.width;
+      const front = cell.y,
+        back = dims.depth - cell.y - cell.depth;
+      return [Math.max(left, front), Math.max(left, back), Math.max(right, front), Math.max(right, back)];
+    })
+  );
+  return Math.max(0, Math.min(requested, safe));
+}
+
+function positiveMinimum(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function getHeightIncrease(params: CardWellTrayParams, cardSizes: CardSize[], targetHeight?: number): number {
+  const natural = getCardWellTrayDimensions({ ...params, minimumHeight: null }, cardSizes).height;
+  const height = getCardWellTrayDimensions(params, cardSizes).height;
+  return Math.max(height, positiveMinimum(targetHeight)) - natural;
 }
 
 // Get cell positions for visualization
@@ -292,7 +377,7 @@ export function getCardWellCellPositions(
   const trayHeight = targetHeight && targetHeight > dims.height ? targetHeight : dims.height;
 
   // When tray height is increased, floor is raised to keep cards at proper level
-  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const heightIncrease = getHeightIncrease(params, cardSizes, targetHeight);
   const baseFloorZ = params.floorThickness + spacerOffset + heightIncrease;
 
   const computedCells = computeCellPositions(
@@ -300,7 +385,10 @@ export function getCardWellCellPositions(
     params.stacks,
     cardSizes,
     params.wallThickness,
-    params.clearance
+    params.clearance,
+    dims.width,
+    dims.depth,
+    getCardWellGripRadius(params)
   );
 
   const cellIds = getAllCellIds(params.layout);
@@ -358,22 +446,44 @@ export function createCardWellTray(
   }
 
   // Create tray body
-  const trayBody = cuboid({
-    size: [trayWidth, trayDepth, trayHeight],
-    center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
-  });
+  const cornerRadius = getCardWellCornerRadius(params, cardSizes);
+  const trayBody =
+    cornerRadius > 0
+      ? extrudeLinear(
+          { height: trayHeight },
+          roundedRectangle({
+            size: [trayWidth, trayDepth],
+            center: [trayWidth / 2, trayDepth / 2],
+            roundRadius: cornerRadius,
+            segments: 48
+          })
+        )
+      : cuboid({
+          size: [trayWidth, trayDepth, trayHeight],
+          center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
+        });
 
   // Get computed cell positions
-  const computedCells = computeCellPositions(params.layout, params.stacks, cardSizes, wallThickness, clearance);
+  const computedCells = computeCellPositions(
+    params.layout,
+    params.stacks,
+    cardSizes,
+    wallThickness,
+    clearance,
+    dims.width,
+    dims.depth,
+    getCardWellGripRadius(params)
+  );
 
   // Create cell cavities, finger holes, and wall cutouts
   const cellCuts: Geom3[] = [];
   const fingerHoleCuts: Geom3[] = [];
   const wallCutouts: Geom3[] = [];
+  const stackLabelCuts: Geom3[] = [];
 
   // When tray height is increased (e.g., to match layer height), raise the floor
   // so cards remain at the proper level relative to the top of the tray
-  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const heightIncrease = getHeightIncrease(params, cardSizes, targetHeight);
   const baseFloorZ = floorThickness + spacerHeight + heightIncrease;
 
   // Calculate max stack height to normalize floor levels
@@ -430,6 +540,49 @@ export function createCardWellTray(
     // Create finger hole in the floor
     const smallerDimension = Math.min(cavityWidth, cavityDepth);
     const fingerHoleRadius = Math.min(fingerHoleMax, smallerDimension * fingerHoleRatio);
+
+    const label = stack?.label?.trim();
+    if (label && params.engraveStackLabels !== false) {
+      const safe = getSafeEmbossDepth(cellFloorZ, { preferredDepth: 0.4, thinWallDepth: 0.4 });
+      const margin = 2;
+      const availableWidth = cavityWidth - 2 * margin;
+      const availableHeight = cavityDepth / 2 - (fingerHoleRadius >= 5 ? fingerHoleRadius : 0) - 2 * margin;
+      if (safe.enabled && availableWidth > 0 && availableHeight > 0) {
+        const stroke = 0.9;
+        const segments = vectorTextWithAccents({ height: 4, text: label }).filter((segment) => segment.length >= 2);
+        if (segments.length) {
+          const points = segments.flat();
+          const minX = Math.min(...points.map((p) => p[0])) - stroke / 2;
+          const maxX = Math.max(...points.map((p) => p[0])) + stroke / 2;
+          const minY = Math.min(...points.map((p) => p[1])) - stroke / 2;
+          const maxY = Math.max(...points.map((p) => p[1])) + stroke / 2;
+          const factor = Math.min(1, availableWidth / (maxX - minX), availableHeight / (maxY - minY));
+          const text = union(
+            ...segments.map((segment) =>
+              extrudeLinear(
+                { height: safe.depth + 0.1 },
+                expand(
+                  { delta: stroke / 2, corners: 'round', segments: 24 },
+                  path2.fromPoints({ closed: false }, segment)
+                )
+              )
+            )
+          );
+          let labelCut = translate(
+            [
+              centerX - ((minX + maxX) / 2) * factor,
+              centerY - cavityDepth / 2 + margin - minY * factor,
+              cellFloorZ - safe.depth
+            ],
+            scale([factor, factor, 1], text)
+          );
+          if (centerY > trayDepth / 2 + 0.001) {
+            labelCut = translate([centerX, centerY, 0], rotateZ(Math.PI, translate([-centerX, -centerY, 0], labelCut)));
+          }
+          stackLabelCuts.push(labelCut);
+        }
+      }
+    }
 
     if (fingerHoleRadius >= 5) {
       // Finger hole goes through the floor (including any raised floor section)
@@ -537,6 +690,21 @@ export function createCardWellTray(
 
   if (wallCutouts.length > 0) {
     result = subtract(result, ...wallCutouts);
+  }
+  if (stackLabelCuts.length) result = subtract(result, ...stackLabelCuts);
+
+  const gripRadius = getCardWellGripRadius(params);
+  if (gripRadius > 0) {
+    // Through-cut so aligned trays form a continuous finger channel when stacked.
+    const bottom = -1;
+    const height = trayHeight - bottom + 1;
+    if (height > 0)
+      result = subtract(
+        result,
+        ...[0, trayWidth].map((x) =>
+          cylinder({ radius: gripRadius, height, segments: 48, center: [x, trayDepth / 2, bottom + height / 2] })
+        )
+      );
   }
 
   // Emboss tray name on bottom
@@ -682,7 +850,7 @@ export function getCardWellPositions(
   const spacerOffset = spacerHeight ?? 0;
 
   // When tray height is increased, floor is raised to keep cards at proper level
-  const heightIncrease = targetHeight && targetHeight > dims.height ? targetHeight - dims.height : 0;
+  const heightIncrease = getHeightIncrease(params, cardSizes, targetHeight);
   const baseFloorZ = params.floorThickness + spacerOffset + heightIncrease;
 
   // Calculate max stack height to normalize floor levels (same as in createCardWellTray)
@@ -700,7 +868,10 @@ export function getCardWellPositions(
     params.stacks,
     cardSizes,
     params.wallThickness,
-    params.clearance
+    params.clearance,
+    dims.width,
+    dims.depth,
+    getCardWellGripRadius(params)
   );
 
   const positions: CardWellStackPosition[] = [];
@@ -737,7 +908,7 @@ export function getCardWellPositions(
       length: effectiveDepth,
       thickness: cardSize.thickness,
       count: stack.count,
-      label: cardSize.name,
+      label: stack.label?.trim() || cardSize.name,
       // Inner card dimensions for sleeved rendering (assume 3mm sleeve margin)
       innerWidth: Math.max(effectiveWidth - 3, effectiveWidth * 0.95),
       innerLength: Math.max(effectiveDepth - 3, effectiveDepth * 0.95)

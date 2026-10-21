@@ -2,7 +2,7 @@
   import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
   import { getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
   import type { CardWellStack } from '$lib/models/cardWellTray';
-  import { computeLayoutSizes } from '$lib/models/cardWellTray';
+  import { computeCellPositions } from '$lib/models/cardWellTray';
   import type { CardSize } from '$lib/types/project';
   import CardWellCell from './CardWellCell.svelte';
 
@@ -16,6 +16,7 @@
     trayDepth: number; // Tray depth in mm
     clearance: number; // Clearance in mm
     wallThickness: number; // Wall thickness in mm
+    gripInset?: number;
     onSelectCell: (id: CellId) => void;
   }
 
@@ -29,6 +30,7 @@
     trayDepth,
     clearance,
     wallThickness,
+    gripInset = 0,
     onSelectCell
   }: Props = $props();
 
@@ -59,6 +61,7 @@
     cavityWidth: number;
     cavityHeight: number;
     cardSizeName?: string;
+    stackLabel?: string;
   }
 
   // Get all cell IDs in order for ref number calculation
@@ -89,109 +92,124 @@
       return cells;
     }
 
-    // Get layout sizes in mm
-    const layoutSizes = computeLayoutSizes(layout, stacks, cardSizes, clearance, wallThickness);
-
     // Available pixel space
     const availableWidth = containerWidth - 2 * EDGE_INSET;
     const availableHeight = containerHeight - 2 * EDGE_INSET;
 
     // Scale factors
-    const scaleX = availableWidth / (layoutSizes.totalWidth + 2 * wallThickness);
-    const scaleY = availableHeight / (layoutSizes.maxColumnDepth + 2 * wallThickness);
+    const scaleX = availableWidth / trayWidth;
+    const scaleY = availableHeight / trayDepth;
 
-    // Calculate pixel positions for each column
-    let currentX = wallThickness; // Start after outer wall (in mm)
+    for (const cell of computeCellPositions(
+      layout,
+      stacks,
+      cardSizes,
+      wallThickness,
+      clearance,
+      trayWidth,
+      trayDepth,
+      gripInset
+    )) {
+      const { id: cellId, colIndex, cellIndex, depth: cellDepth, x: currentX, y: currentY } = cell;
+      const columnInfo = { width: cell.width };
+      const refNumber = allCellIds.indexOf(cellId) + 1;
 
-    for (let colIndex = 0; colIndex < layout.columns.length; colIndex++) {
-      const column = layout.columns[colIndex];
-      const columnInfo = layoutSizes.columns[colIndex];
+      // Convert mm to pixels
+      const x = EDGE_INSET + currentX * scaleX;
+      const y = EDGE_INSET + currentY * scaleY;
+      const width = columnInfo.width * scaleX;
+      const height = cellDepth * scaleY;
 
-      // Calculate vertical centering offset for this column
-      const columnTotalDepth = columnInfo.totalDepth;
-      const verticalOffset = (layoutSizes.maxColumnDepth - columnTotalDepth) / 2;
+      // Calculate actual cavity dimensions based on card size
+      const cardSize = getCardSizeForCell(cellId);
+      const stack = getStackForCell(cellId);
+      let cavityWidthMm = columnInfo.width; // Default to full cell width
+      let cavityDepthMm = cellDepth; // Default to full cell depth
 
-      // Calculate Y position for each cell in the column
-      let currentY = wallThickness + verticalOffset; // Start after outer wall + centering offset
-
-      for (let cellIndex = 0; cellIndex < column.length; cellIndex++) {
-        const cellId = column[cellIndex];
-        const cellDepth = columnInfo.cellDepths[cellIndex];
-        const refNumber = allCellIds.indexOf(cellId) + 1;
-
-        // Convert mm to pixels
-        const x = EDGE_INSET + currentX * scaleX;
-        const y = EDGE_INSET + currentY * scaleY;
-        const width = columnInfo.width * scaleX;
-        const height = cellDepth * scaleY;
-
-        // Calculate actual cavity dimensions based on card size
-        const cardSize = getCardSizeForCell(cellId);
-        const stack = getStackForCell(cellId);
-        let cavityWidthMm = columnInfo.width; // Default to full cell width
-        let cavityDepthMm = cellDepth; // Default to full cell depth
-
-        if (cardSize && stack) {
-          // Get effective dimensions based on rotation
-          const rotation = stack.rotation ?? 0;
-          const effectiveWidth = rotation === 90 ? cardSize.length : cardSize.width;
-          const effectiveDepth = rotation === 90 ? cardSize.width : cardSize.length;
-          cavityWidthMm = effectiveWidth + clearance * 2;
-          cavityDepthMm = effectiveDepth + clearance * 2;
-        }
-
-        const cavityWidth = cavityWidthMm * scaleX;
-        const cavityHeight = cavityDepthMm * scaleY;
-
-        cells.push({
-          id: cellId,
-          refNumber,
-          colIndex,
-          cellIndex,
-          x: Math.round(x),
-          y: Math.round(y),
-          width: Math.round(width),
-          height: Math.round(height),
-          cavityWidth: Math.round(cavityWidth),
-          cavityHeight: Math.round(cavityHeight),
-          cardSizeName: cardSize?.name
-        });
-
-        currentY += cellDepth + wallThickness;
+      if (cardSize && stack) {
+        // Get effective dimensions based on rotation
+        const rotation = stack.rotation ?? 0;
+        const effectiveWidth = rotation === 90 ? cardSize.length : cardSize.width;
+        const effectiveDepth = rotation === 90 ? cardSize.width : cardSize.length;
+        cavityWidthMm = effectiveWidth + clearance * 2;
+        cavityDepthMm = effectiveDepth + clearance * 2;
       }
 
-      currentX += columnInfo.width + wallThickness;
+      const cavityWidth = cavityWidthMm * scaleX;
+      const cavityHeight = cavityDepthMm * scaleY;
+
+      cells.push({
+        id: cellId,
+        refNumber,
+        colIndex,
+        cellIndex,
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.round(width),
+        height: Math.round(height),
+        cavityWidth: Math.round(cavityWidth),
+        cavityHeight: Math.round(cavityHeight),
+        cardSizeName: cardSize?.name,
+        stackLabel: stack?.label
+      });
     }
 
     return cells;
   });
 </script>
 
-<div
-  class="cardWellLayoutPreview"
-  style="aspect-ratio: {trayWidth} / {trayDepth}; max-width: {previewMaxWidth}px;"
-  bind:clientWidth={containerWidth}
-  bind:clientHeight={containerHeight}
->
-  {#each renderedCells as cell (cell.id)}
-    <CardWellCell
-      id={cell.id}
-      {trayLetter}
-      refNumber={cell.refNumber}
-      x={cell.x}
-      y={cell.y}
-      width={cell.width}
-      height={cell.height}
-      cavityWidth={cell.cavityWidth}
-      cavityHeight={cell.cavityHeight}
-      selected={selectedCellId === cell.id}
-      cardSizeName={cell.cardSizeName}
-      onSelect={onSelectCell}
-    />
-  {/each}
+<div class="dimensionedPreview" style="max-width: {previewMaxWidth + 28}px;">
+  <div class="widthLabel">↔ Width (X): {trayWidth.toFixed(1)} mm</div>
+  <div class="lengthLabel">↔ Length (Y): {trayDepth.toFixed(1)} mm</div>
+  <div
+    class="cardWellLayoutPreview"
+    style="aspect-ratio: {trayWidth} / {trayDepth}; max-width: {previewMaxWidth}px;"
+    bind:clientWidth={containerWidth}
+    bind:clientHeight={containerHeight}
+  >
+    {#each renderedCells as cell (cell.id)}
+      <CardWellCell
+        id={cell.id}
+        {trayLetter}
+        refNumber={cell.refNumber}
+        x={cell.x}
+        y={cell.y}
+        width={cell.width}
+        height={cell.height}
+        cavityWidth={cell.cavityWidth}
+        cavityHeight={cell.cavityHeight}
+        selected={selectedCellId === cell.id}
+        cardSizeName={cell.cardSizeName}
+        stackLabel={cell.stackLabel}
+        onSelect={onSelectCell}
+      />
+    {/each}
+  </div>
 </div>
 
 <style>
+  .dimensionedPreview {
+    display: grid;
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+    gap: 0.35rem;
+    width: 100%;
+  }
+  .widthLabel,
+  .lengthLabel {
+    color: var(--fgMuted);
+    font-size: 0.75rem;
+    text-align: center;
+  }
+  .widthLabel {
+    grid-column: 2;
+  }
+  .lengthLabel {
+    grid-column: 1;
+    grid-row: 2;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: center;
+  }
   .cardWellLayoutPreview {
     position: relative;
     width: 100%;

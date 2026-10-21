@@ -43,6 +43,8 @@
 
 ## Current product constraints
 
+- `Card Well`: los mínimos exteriores nunca reducen huecos/holguras de cartas. Hendiduras de extracción pasantes y redondeo deben respetar esos huecos; mantener caras de apilado planas. El giro del layout es de presentación y no cambia los ejes de parámetros/export.
+
 - El inventario del juego vive a nivel de `Project`, independiente de `Layer`. Las piezas referencian grupos y cantidades; duplicar piezas no debe duplicar asignaciones ni existencias.
 - Aplicar contenido del inventario es explicito y usa snapshots de medidas; editar el inventario no debe redimensionar silenciosamente las piezas existentes.
 

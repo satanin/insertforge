@@ -93,7 +93,8 @@ export function applyInventoryGeometry(
       cellId: cells[i],
       cardSizeId: cardId(group),
       count: assignment.quantity,
-      rotation: 0
+      rotation: 0,
+      label: group.name
     }));
   } else if (target.type === 'counter' || target.type === 'playerBoard') {
     const params = section ? section.counterParams! : (tray as Extract<Tray, { type: 'counter' }>).params;

@@ -23,11 +23,22 @@
     trayDepth: number;
     clearance: number;
     wallThickness: number;
+    gripInset?: number;
     onUpdateLayout: (layout: CardWellLayout) => void;
   }
 
-  let { layout, stacks, cardSizes, trayLetter, trayWidth, trayDepth, clearance, wallThickness, onUpdateLayout }: Props =
-    $props();
+  let {
+    layout,
+    stacks,
+    cardSizes,
+    trayLetter,
+    trayWidth,
+    trayDepth,
+    clearance,
+    wallThickness,
+    gripInset = 0,
+    onUpdateLayout
+  }: Props = $props();
 
   // Selected cell state
   let selectedCellId = $state<CellId | null>(null);
@@ -109,6 +120,7 @@
     {trayDepth}
     {clearance}
     {wallThickness}
+    {gripInset}
     onSelectCell={handleSelectCell}
   />
 </div>

@@ -10,6 +10,7 @@
   import DimensionOverlay from './three/DimensionOverlay.svelte';
   import LayerLayoutEditorScene from './three/LayerLayoutEditorScene.svelte';
   import { getAlternateColor, getSleeveColors } from '$lib/three/materials';
+  import { getCardWellViewRotation, trayViewRotationMatrix } from '$lib/three/trayViewRotation';
 
   // Enable interactivity for pointer events on 3D objects
   interactivity();
@@ -1111,6 +1112,24 @@
     };
   });
 
+  // Keep the selected Card Well centered while presenting its saved layout orientation.
+  let selectedViewRotation = $derived(!showAllTrays && !showAllBoxes && !showLayerView && !visualEditMode
+    ? getCardWellViewRotation(getProject(), selectedTrayId) : 0);
+  let selectedViewMatrix = $derived(trayViewRotationMatrix(selectedViewRotation,
+    meshOffset.x + (selectedSizeBounds ? (selectedSizeBounds.min.x + selectedSizeBounds.max.x) / 2 : 0),
+    meshOffset.z - (selectedSizeBounds ? (selectedSizeBounds.min.y + selectedSizeBounds.max.y) / 2 : 0)));
+  let orientedSelectedSizeBounds = $derived.by(() => {
+    if (!selectedSizeBounds) return null;
+    const center = selectedSizeBounds.getCenter(new THREE.Vector3());
+    const transform = new THREE.Matrix4().makeTranslation(center.x, center.y, 0)
+      .multiply(new THREE.Matrix4().makeRotationZ(selectedViewRotation * Math.PI / 180))
+      .multiply(new THREE.Matrix4().makeTranslation(-center.x, -center.y, 0));
+    return selectedSizeBounds.clone().applyMatrix4(transform);
+  });
+  function orientSelectedPoint(x: number, y: number, z: number): [number, number, number] {
+    const p = new THREE.Vector3(x, y, z).applyMatrix4(selectedViewMatrix);
+    return [p.x, p.y, p.z];
+  }
   // Edit mode bounds from layout editor (interior size, accounting for walls)
   let editBoundsWidth = $derived(layoutEditorState.boundsWidth);
   let editBoundsDepth = $derived(layoutEditorState.boundsDepth);
@@ -1778,6 +1797,7 @@
     {/each}
   {:else if geometry && !showLayerView}
     <!-- Single selected tray -->
+    <T.Group position.x={selectedViewMatrix.elements[12]} position.z={selectedViewMatrix.elements[14]} rotation.y={selectedViewRotation * Math.PI / 180}>
     <T.Mesh geometry={cardStorageDetail?.body ?? geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
         color={geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
@@ -1787,18 +1807,19 @@
         side={THREE.DoubleSide}
       />
     </T.Mesh>
+    </T.Group>
   {/if}
 {/if}
 
 <!-- Lid geometry (single box view) - hidden during edit mode -->
-{#if showPreviewSizes && !generating && selectedSizeBounds && !boxGeometry && !showAllTrays && !showAllBoxes && !showAllLayers && !showLayerView && !visualEditMode}
-  <T.Group position.y={selectedSizeBounds.min.z}>
+{#if showPreviewSizes && !generating && orientedSelectedSizeBounds && !boxGeometry && !showAllTrays && !showAllBoxes && !showAllLayers && !showLayerView && !visualEditMode}
+  <T.Group position.y={orientedSelectedSizeBounds.min.z}>
     <DimensionOverlay
-      centerX={meshOffset.x + (selectedSizeBounds.min.x + selectedSizeBounds.max.x) / 2}
-      centerZ={meshOffset.z - (selectedSizeBounds.min.y + selectedSizeBounds.max.y) / 2}
-      width={selectedSizeBounds.max.x - selectedSizeBounds.min.x}
-      depth={selectedSizeBounds.max.y - selectedSizeBounds.min.y}
-      height={selectedSizeBounds.max.z - selectedSizeBounds.min.z}
+      centerX={meshOffset.x + (orientedSelectedSizeBounds.min.x + orientedSelectedSizeBounds.max.x) / 2}
+      centerZ={meshOffset.z - (orientedSelectedSizeBounds.min.y + orientedSelectedSizeBounds.max.y) / 2}
+      width={orientedSelectedSizeBounds.max.x - orientedSelectedSizeBounds.min.x}
+      depth={orientedSelectedSizeBounds.max.y - orientedSelectedSizeBounds.min.y}
+      height={orientedSelectedSizeBounds.max.z - orientedSelectedSizeBounds.min.z}
       {labelQuaternion}
       {monoFont}
     />
@@ -1867,6 +1888,7 @@
 
 <!-- Counter preview for single tray view (only when tray geometry is visible, hidden in edit mode) -->
 {#if !generating && effectiveShowCounters && !isLayoutEditMode && !showAllTrays && !showAllBoxes && !showLayerView && geometry && selectedTrayCounters.length > 0}
+  <T.Group position.x={selectedViewMatrix.elements[12]} position.z={selectedViewMatrix.elements[14]} rotation.y={selectedViewRotation * Math.PI / 180}>
   {#each selectedTrayCounters as stack, stackIdx (stackIdx)}
     {#if isCounterStack(stack) && stack.previewEnvelope}
       <T.Mesh position={[meshOffset.x + stack.x, stack.z + stack.previewEnvelope.height / 2, meshOffset.z - stack.y]}>
@@ -1999,6 +2021,7 @@
       {/each}
     {/if}
   {/each}
+  </T.Group>
 {/if}
 
 <!-- Counter preview for all trays view (single box view) - using T.Group so counters rotate with tray (hidden in edit mode) -->
@@ -2195,7 +2218,7 @@
       text={refCode}
       font={monoFont}
       fontSize={4}
-      position={[posX, labelHeight, posZ]}
+      position={orientSelectedPoint(posX, labelHeight, posZ)}
       quaternion={captureMode ? topDownQuaternion : labelQuaternion}
       color={isHovered ? '#ffffff' : '#000000'}
       anchorX="center"
@@ -2203,7 +2226,7 @@
       outlineWidth="8%"
       outlineColor={isHovered ? '#000000' : '#ffffff'}
       onpointerenter={() => {
-        hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+        hoveredLabel = { refCode, text: stackLabel, position: orientSelectedPoint(posX, tooltipHeight, posZ) };
       }}
       onpointerleave={() => {
         hoveredLabel = null;
@@ -2222,7 +2245,7 @@
       text={refCode}
       font={monoFont}
       fontSize={4}
-      position={[posX, labelHeight, posZ]}
+      position={orientSelectedPoint(posX, labelHeight, posZ)}
       quaternion={captureMode ? topDownQuaternion : labelQuaternion}
       color={isHovered ? '#ffffff' : '#000000'}
       anchorX="center"
@@ -2230,7 +2253,7 @@
       outlineWidth="8%"
       outlineColor={isHovered ? '#000000' : '#ffffff'}
       onpointerenter={() => {
-        hoveredLabel = { refCode, text: stackLabel, position: [posX, tooltipHeight, posZ] };
+        hoveredLabel = { refCode, text: stackLabel, position: orientSelectedPoint(posX, tooltipHeight, posZ) };
       }}
       onpointerleave={() => {
         hoveredLabel = null;
