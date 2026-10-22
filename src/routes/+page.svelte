@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getContentPreviewLabel } from '$lib/utils/contentPreviewLabel';
   import { browser } from '$app/environment';
   import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
   import {
@@ -831,6 +832,11 @@
   let selectedTray = $derived(getSelectedTray());
   let socketPreview = $state<GenerationResult['socketPreview']>(null);
   let cardStorageDetail = $derived.by(() => {
+    if (selectedTray?.type === 'dice' && selectedTray.params.lid) {
+      return socketPreview?.trayId === selectedTray.id && socketPreview.name === selectedTray.name &&
+        socketPreview.color === selectedTray.color && socketPreview.paramsKey === JSON.stringify(selectedTray.params)
+        ? { ...socketPreview, lift: selectedTray.params.lidType === 'sliding' ? 0 : 4 } : null;
+    }
     if (selectedTray?.type === 'miniatureRack' && selectedTray.params.variant === 'sockets' && selectedTray.params.sockets?.lid) {
       return socketPreview?.trayId === selectedTray.id && socketPreview.name === selectedTray.name &&
         socketPreview.color === selectedTray.color && socketPreview.paramsKey === JSON.stringify(selectedTray.params.sockets)
@@ -851,13 +857,14 @@
   });
   $effect(() => {
     const detail = cardStorageDetail;
-    if (selectedTray?.type === 'miniatureRack') return; // Owned by the worker result cache.
+    if (selectedTray?.type === 'miniatureRack' || selectedTray?.type === 'dice') return; // Owned by the worker result cache.
     return () => {
       detail?.body.dispose();
       detail?.lid.dispose();
       detail?.text?.dispose();
     };
   });
+  let previewContentLabel = $derived(getContentPreviewLabel(getProject(), viewMode, selectionType));
   let selectedBox = $derived(getSelectedBox());
   let selectedBoard = $derived(getSelectedBoard());
   let selectedLayer = $derived(getSelectedLayer());
@@ -3623,7 +3630,7 @@
                 <InputCheckbox
                   checked={showCounters}
                   onchange={(e) => (showCounters = e.currentTarget.checked)}
-                  label="Preview counters"
+                  label={previewContentLabel}
                 />
                 <InputCheckbox
                   checked={showReferenceLabels}

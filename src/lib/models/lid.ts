@@ -192,7 +192,7 @@ export function createBoxWithLidGrooves(
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = [],
   targetExteriorHeight?: number,
-  fit: { clearance?: number; slideAlong?: 'x' | 'y' } = {}
+  fit: { clearance?: number; slideAlong?: 'x' | 'y'; lockEnabled?: boolean } = {}
 ): Geom3 | null {
   const wall = box.wallThickness;
   const floor = box.floorThickness;
@@ -834,7 +834,7 @@ export function createBoxWithLidGrooves(
     }
 
     // Lock mechanism: either ramp lock or cylindrical detent notch
-    if (rampLockEnabled) {
+    if (rampLockEnabled && fit.lockEnabled !== false) {
       // Ramp lock: add opposing ramps on groove walls near EXIT
       // These mesh with the lid rail ramps when lid is closed
       //
@@ -896,7 +896,7 @@ export function createBoxWithLidGrooves(
 
         result = union(result, leftGrooveRampPositioned, rightGrooveRampPositioned);
       }
-    } else {
+    } else if (fit.lockEnabled !== false) {
       // Cylindrical detent notch at entry wall - legacy behavior
       const detentRadius = snapBumpHeight + 0.1;
       const detentLength = snapBumpWidth * 2;
@@ -1089,7 +1089,7 @@ export function createLid(
   box: Box,
   cardSizes: CardSize[] = [],
   counterShapes: CounterShape[] = [],
-  fit: { clearance?: number; plateThickness?: number; slideAlong?: 'x' | 'y' } = {}
+  fit: { clearance?: number; plateThickness?: number; slideAlong?: 'x' | 'y'; lockEnabled?: boolean } = {}
 ): Geom3 | null {
   const wall = box.wallThickness;
   const clearance = fit.clearance ?? 0.3;
@@ -1333,7 +1333,7 @@ export function createLid(
       lid = union(lid, union(rightRailChamfered, frontRailChamfered, backRailChamfered));
 
       // Lock mechanism: either ramp lock or cylindrical detent
-      if (rampLockEnabled) {
+      if (rampLockEnabled && fit.lockEnabled !== false) {
         // Ramp lock: CUTOUTS on front and back rails near ENTRY (low X)
         // The box has ramp bumps protruding outward from the groove walls.
         // The lid rails need matching cutouts that mesh with those bumps.
@@ -1456,7 +1456,7 @@ export function createLid(
         );
 
         lid = subtract(lid, frontLeadIn, backLeadIn);
-      } else {
+      } else if (fit.lockEnabled !== false) {
         // Cylindrical detent bump at entry (low X) - legacy behavior
         const detentRadius = snapBumpHeight;
         const detentLength = snapBumpWidth * 2;
@@ -1537,7 +1537,7 @@ export function createLid(
       lid = union(lid, union(backRailChamfered, leftRailChamfered, rightRailChamfered));
 
       // Lock mechanism: either ramp lock or cylindrical detent
-      if (rampLockEnabled) {
+      if (rampLockEnabled && fit.lockEnabled !== false) {
         // Ramp lock: CUTOUTS on left and right rails near ENTRY (low Y)
         // The box has ramp bumps protruding outward from the groove walls.
         // The lid rails need matching cutouts that mesh with those bumps.
@@ -1654,7 +1654,7 @@ export function createLid(
         );
 
         lid = subtract(lid, leftLeadIn, rightLeadIn);
-      } else {
+      } else if (fit.lockEnabled !== false) {
         // Cylindrical detent bump at entry (low Y) - legacy behavior
         const detentRadius = snapBumpHeight;
         const detentLength = snapBumpWidth * 2;

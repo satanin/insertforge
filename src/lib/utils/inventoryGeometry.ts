@@ -1,4 +1,5 @@
 import { defaultMiniatureSocketRackParams, normalizeMiniatureSocketRackParams } from '$lib/models/miniatureSocketRack';
+import { validateDiceTray } from '$lib/models/diceTray';
 import type { CupLayoutNode } from '$lib/types/cupLayout';
 import type { InventoryAssignment, InventoryGroup, Project, Tray } from '$lib/types/project';
 import type { InventoryTarget } from './inventory';
@@ -51,7 +52,14 @@ export function applyInventoryGeometry(
   const section = target.internalLayerId ? (item as import('$lib/types/project').LayeredBoxSection) : null;
   const tray = item as Tray;
   const first = entries[0];
-  if (target.type === 'board') {
+  if (target.type === 'dice' && tray.type === 'dice') {
+    const count = entries.reduce((n, e) => n + e.assignment.quantity, 0);
+    if (count > 100) throw new Error('A dice tray supports up to 100 dice.');
+    const params = { ...tray.params, diceKind: first.group.diceKind ?? 'd6', size: first.group.width!, count,
+      groups: entries.map(({ group, assignment }) => ({ id: group.id, diceKind: group.diceKind ?? 'd6' as const, size: group.width!, count: assignment.quantity })) };
+    if (!validateDiceTray(params)) throw new Error('Dice measurements exceed this tray’s supported range.');
+    tray.params = params;
+  } else if (target.type === 'board') {
     if (entries.length !== 1) throw new Error('A planning board can contain one inventory group.');
     Object.assign(item, {
       width: first.group.width,

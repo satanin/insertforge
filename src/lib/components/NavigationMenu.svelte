@@ -404,6 +404,8 @@
     }
     if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getProject().cardSizes).capacity,
       isCardTray: true, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
+    if (tray.type === 'dice') return { stacks: tray.params.count, counters: tray.params.count,
+      isCardTray: false, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
     const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     return {
@@ -531,7 +533,7 @@
                   <button
                     class="navItem navItem--tray {isTraySelected ? 'navItem--selected' : ''}"
                     onclick={() => handleTrayClick(tray, box)}
-                    title="{tray.name} ({letter}: {stats.isCardTray
+                    title="{tray.name} ({letter}: {tray.type === 'dice' ? stats.counters + ' dice' : stats.isCardTray
                       ? stats.counters + ' cards'
                       : stats.isCardDivider
                         ? stats.counters + ' cards/' + stats.stacks + 's'
@@ -852,7 +854,7 @@
             <button
               class="navItem navItem--looseTray {isTraySelected ? 'navItem--selected' : ''}"
               onclick={() => handleTrayClick(tray, null)}
-              title="{tray.name} (Loose {letter}: {stats.isCardTray
+              title="{tray.name} (Loose {letter}: {tray.type === 'dice' ? stats.counters + ' dice' : stats.isCardTray
                 ? stats.counters + ' cards'
                 : stats.isCardDivider
                   ? stats.counters + ' cards/' + stats.stacks + 's'
@@ -1137,6 +1139,16 @@
               >
                 <Text weight={500}>Card Storage</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">One cavity with removable, labelled dividers</Text>
+              </button>
+              <button
+                class="trayTypeOption"
+                onclick={() => {
+                  handleAddLooseTray(layer.id, 'dice');
+                  contentProps.close();
+                }}
+              >
+                <Text weight={500}>Dice Tray <span class="experimentalBadge">Experimental</span></Text>
+                <Text size="0.75rem" color="var(--fgMuted)">Individual pockets or a shared dice compartment</Text>
               </button>
               <button
                 class="trayTypeOption"

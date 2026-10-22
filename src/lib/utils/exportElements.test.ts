@@ -2,6 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { selectExportElements } from './exportElements';
 
 describe('individual exports', () => {
+  it('retains separate body/lid parts when a dice tray is moved into a box', () => {
+    const nested = [{ elementId: 'outer', trays: [{ elementId: 'dice', name: 'Dice Tray', jscadGeom: 42, parts: [{ id: 'body' }, { id: 'lid' }] }] }];
+    const loose = [{ trayName: 'Other', trayGeom: 1, parts: [{ id: 'body' }] }];
+    expect(selectExportElements(nested, loose, [], 'dice').trays[0].parts).toEqual([{ id: 'body' }, { id: 'lid' }]);
+    expect(selectExportElements(nested, loose, [], 'dice', 'lid').trays[0].parts).toEqual([{ id: 'lid' }]);
+    expect(nested[0].trays[0].parts).toHaveLength(2);
+  });
   const boxes = [{ elementId: 'box', trays: [{ elementId: 'inner', name: 'Same name', jscadGeom: 42 }] }];
   const loose = [{ elementId: 'rack', trayName: 'Same name', trayGeom: 1, parts: [{ id: 'body' }, { id: 'lid' }] }];
   const individuals = [{ elementId: 'board', trayName: 'Board', trayGeom: 3, parts: [] }];

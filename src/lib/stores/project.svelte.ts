@@ -82,6 +82,7 @@ import {
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
 import { createDefaultDiceSizes } from '$lib/models/dice';
+import { defaultDiceTrayParams, validateDiceTray, getDiceTrayMinimumWallThickness, type DiceTrayParams } from '$lib/models/diceTray';
 import type { InventoryAssignment, InventoryGroup, InventoryKind } from '$lib/types/project';
 import { groupAssignments, inventoryTargets, sleeveThickness, validateAssignments } from '$lib/utils/inventory';
 import { applyInventoryGeometry } from '$lib/utils/inventoryGeometry';
@@ -2911,6 +2912,7 @@ function getGlobalParamsFromExisting(): Partial<CounterTrayParams> {
 
 // Tray type for addTray function
 export type TrayType =
+  | 'dice'
   | 'cardStorage'
   | 'miniatureRack'
   | 'miniatureTray'
@@ -2934,7 +2936,12 @@ export function addLooseTray(layerId?: string, trayType: TrayType = 'counter'): 
   const color = getNextTrayColor(project.layers);
 
   let tray: Tray;
-  if (trayType === 'cardStorage') {
+  if (trayType === 'dice') {
+    const die = project.diceSizes?.find(d => d.kind === 'd6') ?? project.diceSizes?.[0];
+    tray = { id: generateId(), type: 'dice', name: `Dice Tray ${trayNumber}`, color,
+      autoHeight: false, showEmboss: false, rotationOverride: 'auto',
+      params: { ...defaultDiceTrayParams, ...(die ? { diceKind: die.kind, size: die.size } : {}) } };
+  } else if (trayType === 'cardStorage') {
     tray = { id: generateId(), type: 'cardStorage', name: `Card Storage ${trayNumber}`, color,
       autoHeight: false, showEmboss: false, rotationOverride: 'auto',
       params: { ...defaultCardStorageParams, cardSizeId: getDefaultCardSizeId(project.cardSizes),
@@ -3441,7 +3448,7 @@ export const updateCardTrayParams = updateCardDrawTrayParams;
 // Update card divider tray params
 export function updateCardStorageParams(trayId: string, params: CardStorageParams): void {
   for (const layer of project.layers) {
-    const tray = layer.looseTrays.find(t => t.id === trayId);
+    const tray = [...layer.looseTrays, ...layer.boxes.flatMap(b => b.trays)].find(t => t.id === trayId);
     if (tray?.type === 'cardStorage') {
       rememberDefaultCardSizeId(params.cardSizeId);
       tray.params = params;
@@ -3562,6 +3569,21 @@ export function updateTileTrayParams(trayId: string, params: TileTrayParams): vo
       looseTray.params = params;
       autosave();
       return;
+    }
+  }
+}
+
+export function updateDiceTrayParams(trayId: string, params: DiceTrayParams): void {
+  if (Number.isFinite(params.wallThickness) && params.wallThickness > 0 && params.wallThickness < getDiceTrayMinimumWallThickness(params))
+    params = { ...params, wallThickness: getDiceTrayMinimumWallThickness(params) };
+  if (!validateDiceTray(params)) return;
+  for (const layer of project.layers) {
+    const tray = layer.looseTrays.find(t => t.id === trayId);
+    if (tray?.type === 'dice') {
+      const contentChanged = tray.params.size !== params.size || tray.params.diceKind !== params.diceKind || tray.params.count !== params.count || JSON.stringify(tray.params.groups) !== JSON.stringify(params.groups);
+      tray.params = { ...params };
+      if (contentChanged) tray.inventoryAssignments = undefined;
+      autosave(); return;
     }
   }
 }

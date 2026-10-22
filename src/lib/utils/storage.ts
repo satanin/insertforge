@@ -438,6 +438,7 @@ function migrateTray(
     } as Tray;
   }
 
+  if (trayType === 'dice') return { ...tray, type: 'dice', color, autoHeight: false } as Tray;
   if (trayType === 'tile') {
     return {
       ...tray,

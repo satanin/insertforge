@@ -529,7 +529,10 @@
     let isCards = false;
     let isCups = false;
 
-    if (isCupTray(tray)) {
+    if (tray.type === 'dice') {
+      stacks = tray.params.mode === 'individual' ? tray.params.count : 1;
+      counters = tray.params.count;
+    } else if (isCupTray(tray)) {
       stacks = countCups(tray.params.layout);
       counters = stacks;
       isCups = true;
@@ -624,6 +627,8 @@
             ? `${stats.stacks} cups`
             : isMiniatureRackTray(selectedTray)
               ? `${stats.stacks} slots`
+              : selectedTray.type === 'dice'
+                ? `${stats.counters} dice`
               : isTileTray(selectedTray)
                 ? `${stats.counters} tiles`
             : `${stats.counters} ${stats.isCards ? 'cards' : 'counters'} in ${stats.stacks} stacks`}

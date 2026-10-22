@@ -368,6 +368,7 @@ export function getBoxDimensions(box: Box, cardSizes: CardSize[], counterShapes:
 }
 
 function isLooseTrayAutoHeightEnabled(tray: Tray): boolean {
+  if (tray.type === 'dice') return false;
   if (isMiniatureRackTray(tray) && tray.params.variant === 'sockets') return false;
   if (tray.type === 'cardStorage') return false;
   if (isTileTray(tray)) {

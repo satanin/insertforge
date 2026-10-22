@@ -57,6 +57,7 @@ export function availableQuantity(project: Project, groupId: string, exceptId?: 
   return (group?.quantity ?? 0) - groupAssignments(project, groupId, exceptId).reduce((n, a) => n + a.quantity, 0);
 }
 export function compatibleInventory(type: InventoryTarget['type'], group: InventoryGroup): boolean {
+  if (type === 'dice') return group.kind === 'dice';
   if (['cardStorage', 'cardDraw', 'cardDivider', 'cardWell'].includes(type)) return group.kind === 'cards';
   if (type === 'counter' || type === 'tile') return group.kind === 'tokens';
   if (type === 'playerBoard' || type === 'board') return group.kind === 'boards';

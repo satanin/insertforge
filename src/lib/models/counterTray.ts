@@ -108,6 +108,8 @@ function getEdgeLoadedCounterSpan(count: number, thickness: number, clearance: n
 
 // Counter preview data for visualization
 export interface CounterStack {
+  diceKind?: import('$lib/types/project').DiceKind;
+  dieSize?: number;
   previewEnvelope?: { width: number; depth: number; height: number };
   shape: 'square' | 'hex' | 'circle' | 'triangle' | 'custom';
   shapeId?: string; // The ID of the counter shape from project.counterShapes

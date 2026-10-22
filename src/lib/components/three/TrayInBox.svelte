@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiceMesh from './DiceMesh.svelte';
   /**
    * TrayInBox - Renders a single tray mesh with optional counter previews.
    * Parent provides position/rotation via T.Group wrapping.
@@ -151,7 +152,9 @@
         <T.MeshStandardMaterial color={stack.color} transparent opacity={0.16} depthWrite={false} />
       </T.Mesh>
     {/if}
-    {#if stack.isEdgeLoaded}
+    {#if stack.diceKind && stack.dieSize}
+      <DiceMesh kind={stack.diceKind} size={stack.dieSize} x={stack.x} y={stack.y} z={stack.z} color={stack.color} />
+    {:else if stack.isEdgeLoaded}
       <!-- Edge-loaded: counters standing on edge like books -->
       {#each Array(stack.count) as _, counterIdx (counterIdx)}
         {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}

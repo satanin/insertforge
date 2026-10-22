@@ -8,6 +8,8 @@ import type { CardDividerTray, CardDrawTray, LayeredBox, LayeredBoxSection, Proj
 import {
   addBox,
   addDiceSize,
+  updateDiceTrayParams,
+  setInventoryContent,
   updateDiceSize,
   deleteDiceSize,
   addInventoryGroup,
@@ -75,6 +77,80 @@ describe('project dice sizes', () => {
     }
     for (const die of [...getProject().diceSizes!]) deleteDiceSize(die.id);
     expect(importProjectFromJson(exportProjectToJson(getProject())).diceSizes).toEqual([]);
+  });
+});
+
+describe('dice trays', () => {
+  beforeEach(() => resetProjectToBlank());
+  it('persists sliding lid/text settings and reserves adequate wall thickness for guides', () => {
+    const tray = addLooseTray(undefined, 'dice');
+    if (tray?.type !== 'dice') throw new Error('Missing dice tray');
+    updateDiceTrayParams(tray.id, { ...tray.params, lid: true, asBox: true, lidType: 'sliding', lidTextEnabled: true, lidText: 'Dados', lidTextMode: 'inlay', lidTextColor: '#cc4422' });
+    const loaded = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(loaded.layers[0].looseTrays[0]).toMatchObject({ type: 'dice', params: { lid: true, lidType: 'sliding', wallThickness: 3, lidText: 'Dados', lidTextMode: 'inlay', lidTextColor: '#cc4422' } });
+  });
+  it('preserves rounded corners, enclosing walls and lid parameters through reload', () => {
+    const tray = addLooseTray(undefined, 'dice');
+    if (tray?.type !== 'dice') throw new Error('Missing dice tray');
+    expect(tray.params.outerCornerRadius).toBe(3);
+    updateDiceTrayParams(tray.id, { ...tray.params, exposedPercent: 55, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4 });
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(restored.layers[0].looseTrays[0]).toMatchObject({ type: 'dice', autoHeight: false, params: {
+      exposedPercent: 55, outerCornerRadius: 3, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4
+    } });
+  });
+  it('keeps a project type selected while its copied measurement is customized locally', () => {
+    const tray = addLooseTray(undefined, 'dice');
+    if (tray?.type !== 'dice') throw new Error('Missing dice tray');
+    const type = getProject().diceSizes!.find(d => d.kind === 'd20')!;
+    const group = { id: 'group-custom-size', projectDiceSizeId: type.id, diceKind: type.kind, size: type.size, count: 2 };
+    updateDiceTrayParams(tray.id, { ...tray.params, diceKind: type.kind, size: type.size, count: 2, groups: [group] });
+    const current = getProject().layers[0].looseTrays.find(t => t.id === tray.id)!;
+    if (current.type !== 'dice') throw new Error('Missing dice tray');
+    updateDiceTrayParams(tray.id, { ...current.params, size: 27, groups: [{ ...group, size: 27 }] });
+    expect(getProject().diceSizes!.find(d => d.id === type.id)?.size).toBe(25);
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(restored.layers[0].looseTrays[0]).toMatchObject({ params: { groups: [{ projectDiceSizeId: type.id, diceKind: 'd20', size: 27, count: 2 }] } });
+  });
+  it('mixes inventory groups and preserves their sizes and quantities through reload', () => {
+    const tray = addLooseTray(undefined, 'dice')!;
+    const d6 = addInventoryGroup('dice');
+    const d10 = addInventoryGroup('dice');
+    updateInventoryGroup(d6.id, { quantity: 4, diceKind: 'd6', width: 16 });
+    updateInventoryGroup(d10.id, { quantity: 3, diceKind: 'd10', width: 22 });
+    expect(setInventoryContent(tray.id, [
+      { groupId: d6.id, quantity: 2, revision: d6.revision },
+      { groupId: d10.id, quantity: 3, revision: d10.revision }
+    ])).toBeNull();
+    updateInventoryGroup(d10.id, { width: 26 });
+    const loaded = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(loaded.layers[0].looseTrays[0]).toMatchObject({ type: 'dice', params: { count: 5, groups: [
+      { diceKind: 'd6', size: 16, count: 2 }, { diceKind: 'd10', size: 22, count: 3 }
+    ] } });
+  });
+  it('creates a dice tray from project sizes and preserves its generator after reload', () => {
+    updateDiceSize('dice-d6', { size: 18 });
+    const tray = addLooseTray(undefined, 'dice');
+    if (tray?.type !== 'dice') throw new Error('Missing dice tray');
+    expect(tray.params.size).toBe(18);
+    updateDiceTrayParams(tray.id, { ...tray.params, mode: 'compartment', count: 8 });
+    const loaded = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(loaded.layers[0].looseTrays[0]).toMatchObject({ type: 'dice', autoHeight: false, params: { mode: 'compartment', count: 8, size: 18 } });
+  });
+  it('applies inventory snapshots and releases assignments after manual content changes', () => {
+    const tray = addLooseTray(undefined, 'dice');
+    if (tray?.type !== 'dice') throw new Error('Missing dice tray');
+    const group = addInventoryGroup('dice');
+    updateInventoryGroup(group.id, { quantity: 8, diceKind: 'd20', width: 25 });
+    expect(setInventoryContent(tray.id, [{ groupId: group.id, quantity: 4, revision: group.revision }])).toBeNull();
+    const current = () => getProject().layers[0].looseTrays.find(t => t.id === tray.id)!;
+    expect(current()).toMatchObject({ params: { diceKind: 'd20', size: 25, count: 4 }, inventoryAssignments: [{ groupId: group.id, quantity: 4 }] });
+    updateInventoryGroup(group.id, { width: 28 });
+    expect(current().params).toMatchObject({ size: 25 });
+    const dice = current();
+    if (dice.type !== 'dice') throw new Error('Missing dice tray');
+    updateDiceTrayParams(dice.id, { ...dice.params, count: 3, groups: dice.params.groups?.map(g => ({ ...g, count: 3 })) });
+    expect(current().inventoryAssignments).toBeUndefined();
   });
 });
 

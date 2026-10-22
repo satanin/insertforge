@@ -144,7 +144,12 @@ export interface CardStorageTray extends BaseTray {
 export function isCardStorageTray(tray: Tray): tray is CardStorageTray {
   return tray.type === 'cardStorage';
 }
+export interface DiceTray extends BaseTray {
+  type: 'dice';
+  params: import('$lib/models/diceTray').DiceTrayParams;
+}
 export type Tray =
+  | DiceTray
   | CounterTray
   | CardDrawTray
   | CardDividerTray

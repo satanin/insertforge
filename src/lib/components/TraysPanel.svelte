@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiceTrayEditor from './panels/DiceTrayEditor.svelte';
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import {
     Input,
@@ -317,6 +318,8 @@
     }
     if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getCardSizes()).capacity,
       isCardTray: true, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
+    if (tray.type === 'dice') return { stacks: tray.params.count, counters: tray.params.count,
+      isCardTray: false, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
     // Counter tray
     const topCount = tray.params.topLoadedStacks.reduce((sum, s) => sum + s[1], 0);
     const edgeCount = tray.params.edgeLoadedStacks.reduce((sum, s) => sum + s[1], 0);
@@ -527,7 +530,7 @@
 
             <Spacer size="1rem" />
 
-            {#if selectedTray.type !== 'cardStorage' && !(isMiniatureRackTray(selectedTray) && selectedTray.params.variant === 'sockets')}
+            {#if selectedTray.type !== 'dice' && selectedTray.type !== 'cardStorage' && !(isMiniatureRackTray(selectedTray) && selectedTray.params.variant === 'sockets')}
             <InputCheckbox
               label="Emboss name on tray bottom"
               checked={selectedTray.showEmboss ?? true}
@@ -597,6 +600,8 @@
           displayDimensions={selectedTrayDimensions}
           renderMode={!usesTrayTabs ? 'all' : activeStackedTrayTab === 'tray' ? 'settings' : 'slots'}
         />
+      {:else if selectedTray.type === 'dice'}
+        <DiceTrayEditor tray={selectedTray} />
       {:else if isTileTray(selectedTray) && onUpdateTileTrayParams}
         <TileTrayEditor
           tray={selectedTray as TileTray}

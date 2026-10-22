@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiceMesh from './three/DiceMesh.svelte';
   import { onDestroy, untrack } from 'svelte';
   import { T, useThrelte, useTask } from '@threlte/core';
   import { OrbitControls, Grid, Text, interactivity, type IntersectionEvent } from '@threlte/extras';
@@ -1896,7 +1897,9 @@
         <T.MeshStandardMaterial color={stack.color} transparent opacity={0.2} depthWrite={false} />
       </T.Mesh>
     {/if}
-    {#if !isCounterStack(stack)}
+    {#if isCounterStack(stack) && stack.diceKind && stack.dieSize}
+      <DiceMesh kind={stack.diceKind} size={stack.dieSize} x={meshOffset.x + stack.x} y={stack.y - meshOffset.z} z={stack.z} color={stack.color} />
+    {:else if !isCounterStack(stack)}
       <!-- CardStack: render sleeved cards with transparent sleeve and inner card -->
       {#each Array(stack.count) as _cardItem, cardIdx (cardIdx)}
         {@const cardZ = stack.z + cardIdx * stack.thickness + stack.thickness / 2}
@@ -2040,7 +2043,9 @@
     {@const groupZ = exploded ? meshOffset.z - interiorStartOffset - placement.y : traysGroupDepth - placement.y}
     <T.Group position.x={groupX} position.y={groupY} position.z={groupZ} rotation.y={isRotated ? Math.PI / 2 : 0}>
       {#each trayData.counterStacks as stack, stackIdx (stackIdx)}
-        {#if stack.isEdgeLoaded}
+        {#if stack.diceKind && stack.dieSize}
+          <DiceMesh kind={stack.diceKind} size={stack.dieSize} x={stack.x} y={stack.y} z={stack.z} color={stack.color} />
+        {:else if stack.isEdgeLoaded}
           <!-- Edge-loaded: counters standing on edge like books -->
           {#each Array(stack.count) as _counterItem, counterIdx (counterIdx)}
             {@const effectiveShape = stack.shape === 'custom' ? (stack.customBaseShape ?? 'rectangle') : stack.shape}

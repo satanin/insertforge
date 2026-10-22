@@ -300,7 +300,7 @@
     <details>
       <summary><span>Fit, handling &amp; preview</span><IconChevronDown size={16} aria-hidden="true" /></summary>
       <p class="help">Tilt the base under the tab, then lower it into the socket without pressing. Print a two-base sample first. Retention is not a transport lock.</p>
-      <p class="help">Allow for off-centre arms and weapons. Preview counters shows approximate volumes, which are excluded from exports. Placement and filling may not find the densest layout.</p>
+      <p class="help">Allow for off-centre arms and weapons. Preview miniatures shows approximate volumes, which are excluded from exports. Placement and filling may not find the densest layout.</p>
     </details>
   </section>
 </div>

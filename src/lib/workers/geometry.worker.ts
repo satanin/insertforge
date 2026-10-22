@@ -40,6 +40,7 @@ import { createMiniatureRack, getMiniatureRackPreviewPositions } from '$lib/mode
 import { createMiniatureSocketRackParts, createMiniatureSocketRackPreview, getMiniatureSocketRackLayout } from '$lib/models/miniatureSocketRack';
 import { selectExportElements } from '$lib/utils/exportElements';
 import { createTileTray, getTileTrayPreviewPositions } from '$lib/models/tileTray';
+import { createDiceTray, createDiceTrayParts, getDiceTrayPositions, getDiceTrayDimensions } from '$lib/models/diceTray';
 import type {
   Box,
   CardSize,
@@ -470,7 +471,7 @@ interface CachedBoxData {
   lidGeom: Geom3 | null;
   lidTextInlayGeom: Geom3 | null;
   lidTextInlayColor?: [number, number, number, number];
-  trays: { jscadGeom: Geom3; name: string; elementId?: string }[];
+  trays: { jscadGeom: Geom3; name: string; elementId?: string; parts?: CardStoragePart[] }[];
   extraGeometries?: { jscadGeom: Geom3; name: string; groupKey?: string }[];
 }
 let cachedAllBoxes: CachedBoxData[] = [];
@@ -523,6 +524,7 @@ function buildTrayGeometry(
   spacerHeight: number
 ): Geom3 {
   const showEmboss = tray.showEmboss ?? true;
+  if (tray.type === 'dice') return createDiceTray(tray.params, tray.name, tray.color);
   if (tray.type === 'cardStorage') return createCardStoragePreview(tray.params, cardSizes, tray.color);
   if (isCupTray(tray)) {
     return createCupTray(tray.params, tray.name, maxHeight, spacerHeight, showEmboss);
@@ -557,7 +559,7 @@ function buildTrayGeometry(
 }
 
 function getTrayTargetHeight(tray: Tray, naturalHeight: number, adjustedHeight: number): number {
-  if (tray.type === 'cardStorage') return naturalHeight;
+  if (tray.type === 'dice' || tray.type === 'cardStorage') return naturalHeight;
   const autoHeightEnabled = isTrayAutoHeightEnabled(tray);
 
   if (
@@ -614,6 +616,7 @@ function getTrayPositions(
   maxHeight: number,
   spacerHeight: number
 ): CounterStack[] {
+  if (tray.type === 'dice') return getDiceTrayPositions(tray.params);
   if (tray.type === 'cardStorage') return getCardStoragePositions(tray.params, cardSizes);
   if (isCupTray(tray)) {
     // Cup trays don't have counter previews - the cups themselves are the containers
@@ -1125,6 +1128,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
           ? null
           : createCardStorageParts(tray.params, cardSizes)[0].geometry;
       }
+      if (tray.type === 'dice') cachedSelectedTray = createDiceTrayParts(tray.params, tray.name)[0].geometry;
       cachedAllTrays = cachedSelectedTray ? [{ jscadGeom: cachedSelectedTray, name: tray.name }] : [];
       cachedBox = null;
       cachedLid = null;
@@ -1167,6 +1171,13 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         slideDistance: getMiniatureSocketRackLayout(params).depth + 10,
         color: tray.color, textColor: getMiniatureSocketRackLayout(params).p.lidTextColor
       };
+    }
+
+    if (tray?.type === 'dice' && tray.params.lid) {
+      const parts = createDiceTrayParts(tray.params, tray.name);
+      socketPreview = { trayId: tray.id, paramsKey: JSON.stringify(tray.params), name: tray.name,
+        body: jscadToArrays(parts[0].assembled), lid: jscadToArrays(parts[1].assembled), text: parts[1].assembledText ? jscadToArrays(parts[1].assembledText) : null,
+        slideDistance: getDiceTrayDimensions(tray.params).depth + 10, color: tray.color, textColor: tray.params.lidTextColor ?? '#202020' };
     }
 
     if (scope === 'selected') {
@@ -1293,7 +1304,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         boxTargetLayerHeight > 0 ? Math.max(requiredTrayHeight, maxNaturalTrayHeight) : maxNaturalTrayHeight;
 
       // Cache JSCAD geometries for this box's trays
-      const cachedTraysForBox: { jscadGeom: Geom3; name: string; elementId?: string }[] = [];
+      const cachedTraysForBox: CachedBoxData['trays'] = [];
 
       const trayGeoms: TrayGeometryResult[] = [];
       for (const placement of boxPlacements) {
@@ -1304,7 +1315,8 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
 
         // Cache for STL export
-        cachedTraysForBox.push({ jscadGeom, name: placement.tray.name, elementId: placement.tray.id });
+        cachedTraysForBox.push({ jscadGeom, name: placement.tray.name, elementId: placement.tray.id,
+          ...(placement.tray.type === 'dice' ? { parts: createDiceTrayParts(placement.tray.params, placement.tray.name) } : {}) });
 
         trayGeoms.push({
           trayId: placement.tray.id,
@@ -1488,6 +1500,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
           elementId: looseTray.id,
           trayName: looseTray.name,
           trayGeom: jscadGeom,
+          ...(looseTray.type === 'dice' ? { parts: createDiceTrayParts(looseTray.params, looseTray.name) } : {}),
           ...(looseTray.type === 'miniatureRack' && looseTray.params.variant === 'sockets'
             ? { parts: createMiniatureSocketRackParts(looseTray.params.sockets, looseTray.name) } : {}),
           ...(looseTray.type === 'cardStorage'
@@ -1755,6 +1768,15 @@ async function handleExportAllStls(msg: ExportAllStlsMessage): Promise<void> {
 
       // Export trays in boxes
       for (const tray of boxData.trays) {
+        if (tray.parts) {
+          for (const part of tray.parts) {
+            const printable = part.text ? jscad.booleans.union(part.geometry, part.text) : part.geometry;
+            const buffer = await new Blob(stlSerializer.serialize({ binary: true }, cleanGeometryForExport(printable))).arrayBuffer();
+            files.push({ filename: getUniqueFilename(`${boxPrefix}-${sanitizeExportName(tray.name)}-${sanitizeExportName(part.name)}.stl`, usedFilenames), data: buffer });
+            transferables.push(buffer);
+          }
+          continue;
+        }
         const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
         const stlData = stlSerializer.serialize({ binary: true }, cleanedGeom);
         const blob = new Blob(stlData, { type: 'application/octet-stream' });
@@ -1899,6 +1921,14 @@ async function handleExport3mf(msg: Export3mfMessage): Promise<void> {
 
       // Add trays in boxes
       for (const tray of boxData.trays) {
+        if (tray.parts) {
+          for (const part of tray.parts) {
+            const name = getUniqueName(`${boxPrefix}-${sanitizeExportName(tray.name)}-${sanitizeExportName(part.name)}`);
+            namedGeometries.push({ geom: cleanGeometryForExport(part.geometry), name, groupKey: name });
+            if (part.text) namedGeometries.push({ geom: cleanGeometryForExport(part.text), name: getUniqueName(`${name}-text`), groupKey: name });
+          }
+          continue;
+        }
         const cleanedGeom = cleanGeometryForExport(tray.jscadGeom);
         const trayName = sanitizeExportName(tray.name);
         namedGeometries.push({
