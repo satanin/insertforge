@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.26`
+- Version visible actual: `1.2.27`
 
 ## Desarrollo local
 
@@ -260,6 +260,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.27 rendimiento: usuario acepta el bloque y autoriza commit/push (2026-10-22). Proyecto por defecto 13,4 → 4,9 s, mediana de tres pasadas. Fondos grabados a 24 segmentos (error <0,006 mm), métricas del worker ampliadas; texto de tapa/Card Storage intacto. 209 tests, check y prueba visual correctos; validación impresa pendiente. Ver [mediciones y alcance](docs/plans/geometry-performance.md).
 
 - v1.2.26 Miniature Rack: usuario valida y autoriza commit/push (2026-10-22). `Add slot` hereda medidas, cantidad, ángulo y separaciones del último slot, con etiqueta/ID propios; evita colisión de IDs tras borrar slots intermedios. 10 tests y check correctos.
 

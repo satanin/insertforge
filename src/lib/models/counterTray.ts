@@ -1,6 +1,6 @@
 import { createOuterBody } from './outerCorners';
 import type { CounterBaseShape, CounterShape } from '$lib/types/project';
-import { getSafeEmbossDepth } from './emboss';
+import { FLOOR_TEXT_CURVE_SEGMENTS, getSafeEmbossDepth } from './emboss';
 import jscad from '@jscad/modeling';
 
 const { cuboid, cylinder, sphere, circle, rectangle } = jscad.primitives;
@@ -1628,7 +1628,7 @@ export function createCounterTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: FLOOR_TEXT_CURVE_SEGMENTS }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }

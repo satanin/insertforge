@@ -1,5 +1,6 @@
 import type { Box, CardSize, CounterShape, LidParams } from '$lib/types/project';
 import jscad from '@jscad/modeling';
+import { FLOOR_TEXT_CURVE_SEGMENTS } from './emboss';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { arrangeTrays, calculateMinimumBoxDimensions, getBoxInteriorDimensions } from './box';
 import { createHoneycombUnion, defaultHoneycombParams, type HoneycombExclusion } from './honeycomb';
@@ -998,7 +999,7 @@ export function createBoxWithLidGrooves(
         for (const segment of textSegments) {
           if (segment.length >= 2) {
             const pathObj = path2.fromPoints({ closed: false }, segment);
-            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+            const expanded = expand({ delta: labelStrokeWidth / 2, corners: 'round', segments: FLOOR_TEXT_CURVE_SEGMENTS }, pathObj);
             const extruded = extrudeLinear({ height: labelTextDepth + 0.1 }, expanded);
             textShapes.push(extruded);
           }

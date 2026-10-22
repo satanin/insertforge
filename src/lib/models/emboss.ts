@@ -1,3 +1,7 @@
+// For the 0.5–0.6 mm stroke radii used by floor labels, 24 segments
+// approximate a circle within 0.006 mm, without the CSG cost of 128 facets.
+export const FLOOR_TEXT_CURVE_SEGMENTS = 24;
+
 export interface SafeEmbossOptions {
   preferredDepth?: number;
   thinWallDepth?: number;
@@ -11,10 +15,7 @@ export interface SafeEmbossResult {
   depth: number;
 }
 
-export function getSafeEmbossDepth(
-  materialThickness: number,
-  options: SafeEmbossOptions = {}
-): SafeEmbossResult {
+export function getSafeEmbossDepth(materialThickness: number, options: SafeEmbossOptions = {}): SafeEmbossResult {
   const {
     preferredDepth = 0.6,
     thinWallDepth = 0.4,

@@ -3,7 +3,7 @@ import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from 
 import type { CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
-import { getSafeEmbossDepth } from './emboss';
+import { FLOOR_TEXT_CURVE_SEGMENTS, getSafeEmbossDepth } from './emboss';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 const { cuboid, cylinder, roundedRectangle } = jscad.primitives;
@@ -722,7 +722,7 @@ export function createCardWellTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: FLOOR_TEXT_CURVE_SEGMENTS }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }

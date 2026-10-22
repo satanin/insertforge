@@ -13,7 +13,7 @@ const { extrudeLinear } = jscad.extrusions;
 // Import types from project
 import type { CardSize } from '$lib/types/project';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
-import { getSafeEmbossDepth } from './emboss';
+import { FLOOR_TEXT_CURVE_SEGMENTS, getSafeEmbossDepth } from './emboss';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Re-export for backwards compatibility
@@ -399,7 +399,7 @@ export function createCardDrawTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: FLOOR_TEXT_CURVE_SEGMENTS }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }

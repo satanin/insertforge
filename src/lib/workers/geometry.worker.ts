@@ -515,7 +515,7 @@ function getExportElements(elementId?: string, partId?: string) {
 /**
  * Create tray geometry based on tray type
  */
-function createTrayGeometry(
+function buildTrayGeometry(
   tray: Tray,
   cardSizes: CustomCardSize[],
   counterShapes: CounterShape[],
@@ -759,7 +759,7 @@ function getTrayPositions(
 /**
  * Convert JSCAD geometry to raw position and normal arrays
  */
-function jscadToArrays(jscadGeom: Geom3): GeometryData {
+function convertJscadToArrays(jscadGeom: Geom3): GeometryData {
   const polygons = geom3.toPolygons(jscadGeom);
 
   const positions: number[] = [];
@@ -867,11 +867,25 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
   const { id, project, selectedBoxId, selectedTrayId, selectedLayerId, scope = 'all', selectedView = 'assembly' } = msg;
   cachedIndividualParts = [];
   const timings: { name: string; ms: number }[] = [];
-  const time = (name: string, fn: () => void) => {
+  const generationStarted = performance.now();
+  const time = <T>(name: string, fn: () => T): T => {
     const start = performance.now();
-    fn();
+    const result = fn();
     const elapsed = performance.now() - start;
     timings.push({ name, ms: elapsed });
+    return result;
+  };
+  const createTrayGeometry = (...args: Parameters<typeof buildTrayGeometry>) =>
+    time(`createTray ${args[0].type} (${args[0].name})`, () => buildTrayGeometry(...args));
+  const jscadToArrays = (geometry: Geom3) =>
+    time('mesh conversion', () => convertJscadToArrays(geometry));
+  const reportTimings = () => {
+    const totalMs = performance.now() - generationStarted;
+    console.group(`[Geometry Worker] Generation complete (${totalMs.toFixed(0)}ms total)`);
+    for (const timing of [...timings].sort((a, b) => b.ms - a.ms)) {
+      console.log(`${timing.ms.toFixed(0)}ms (${((timing.ms / totalMs) * 100).toFixed(1)}%) - ${timing.name}`);
+    }
+    console.groupEnd();
   };
 
   try {
@@ -1048,10 +1062,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
           const spacer = spacerInfo.find((s) => s.trayId === placement.tray.id);
           const trayTargetHeight = getTrayTargetHeight(placement.tray, placement.dimensions.height, maxHeight);
           const spacerHeight = getTraySpacerHeight(placement.tray, spacer?.floorSpacerHeight ?? 0);
-          let jscadGeom!: Geom3;
-          time(`createTray (${placement.tray.name})`, () => {
-            jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
-          });
+          const jscadGeom = createTrayGeometry(placement.tray, cardSizes, counterShapes, trayTargetHeight, spacerHeight);
 
           cachedAllTrays.push({ jscadGeom, name: placement.tray.name });
 
@@ -1198,6 +1209,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         allLooseTrayGeometries: []
       };
 
+      reportTimings();
       self.postMessage(result, { transfer: Array.from(transferableSet) });
       return;
     }
@@ -1556,18 +1568,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
 
     const transferables: Transferable[] = Array.from(transferableSet);
 
-    // Log performance timings
-    if (timings.length > 0) {
-      const totalMs = timings.reduce((sum, t) => sum + t.ms, 0);
-      console.group(`[Geometry Worker] Generation complete (${totalMs.toFixed(0)}ms total)`);
-      // Sort by time descending to show slowest first
-      const sorted = [...timings].sort((a, b) => b.ms - a.ms);
-      for (const t of sorted) {
-        const pct = ((t.ms / totalMs) * 100).toFixed(1);
-        console.log(`${t.ms.toFixed(0)}ms (${pct}%) - ${t.name}`);
-      }
-      console.groupEnd();
-    }
+    reportTimings();
 
     const result: GenerateResult = {
       socketPreview,

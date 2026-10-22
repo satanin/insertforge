@@ -1,7 +1,7 @@
 import { createOuterBody } from './outerCorners';
 import type { CupId, CupLayout, CupLayoutNode } from '$lib/types/cupLayout';
 import { generateCupId, isCupLeaf, isCupSplit } from '$lib/types/cupLayout';
-import { getSafeEmbossDepth } from './emboss';
+import { FLOOR_TEXT_CURVE_SEGMENTS, getSafeEmbossDepth } from './emboss';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -317,7 +317,7 @@ export function createCupTray(
       for (const segment of textSegments) {
         if (segment.length >= 2) {
           const pathObj = path2.fromPoints({ closed: false }, segment);
-          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: 128 }, pathObj);
+          const expanded = expand({ delta: strokeWidth / 2, corners: 'round', segments: FLOOR_TEXT_CURVE_SEGMENTS }, pathObj);
           const extruded = extrudeLinear({ height: textDepth + 0.1 }, expanded);
           textShapes.push(extruded);
         }
