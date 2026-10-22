@@ -5,7 +5,7 @@
   import {
     DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
     DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE,
-    createDefaultMiniatureRackSlot,
+    createNextMiniatureRackSlot,
     DEFAULT_MINIATURE_RACK_LIP_ANGLE,
     DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT,
     DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET,
@@ -61,7 +61,7 @@
 
   function addSlot() {
     updateParams({
-      slots: [...tray.params.slots, createDefaultMiniatureRackSlot(tray.params.slots.length + 1)]
+      slots: [...tray.params.slots, createNextMiniatureRackSlot(tray.params.slots)]
     });
   }
 

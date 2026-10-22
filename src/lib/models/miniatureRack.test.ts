@@ -10,6 +10,7 @@ import {
   DEFAULT_MINIATURE_RACK_SIDE_WALL_THICKNESS,
   DEFAULT_MINIATURE_RACK_WALL_THICKNESS,
   createDefaultMiniatureRackSlot,
+  createNextMiniatureRackSlot,
   getMiniatureRackDimensions,
   getMiniatureRackPreviewPositions,
   getMiniatureRackResolvedHeight,
@@ -32,6 +33,37 @@ function createParams(overrides: Partial<MiniatureRackParams> = {}): MiniatureRa
     ...overrides
   };
 }
+
+describe('new miniature rack slots', () => {
+  it('uses normal defaults for the first slot', () => {
+    expect(createNextMiniatureRackSlot([])).toEqual(createDefaultMiniatureRackSlot(1));
+  });
+
+  it('inherits all settings from the last slot and remains independent', () => {
+    const previous = { ...createDefaultMiniatureRackSlot(2), label: 'Boss', baseWidth: 42, baseHeight: 3.5,
+      baseVerticalSize: 28, miniatureHeight: 80, miniatureCount: 4, lipAngle: 35,
+      slotSpacingLeft: 0, slotSpacingRight: 19 };
+    const next = createNextMiniatureRackSlot([createDefaultMiniatureRackSlot(1), previous]);
+    expect(next).toEqual({ ...previous, id: 'slot-3', label: 'S3' });
+    next.baseWidth = 50;
+    expect(previous.baseWidth).toBe(42);
+    // Subsequent additions use the most recent slot, including its edits.
+    expect(createNextMiniatureRackSlot([previous, next]).baseWidth).toBe(50);
+  });
+
+  it('does not reuse an existing ID after a middle slot is deleted', () => {
+    const slots = [createDefaultMiniatureRackSlot(1), createDefaultMiniatureRackSlot(3)];
+    const next = createNextMiniatureRackSlot(slots);
+    expect(next.id).toBe('slot-4');
+    expect(next.label).toBe('S4');
+    expect(slots).toHaveLength(2);
+  });
+
+  it('preserves automatic base size and zero spacing', () => {
+    const previous = { ...createDefaultMiniatureRackSlot(1), baseVerticalSize: null, slotSpacingLeft: 0, slotSpacingRight: 0 };
+    expect(createNextMiniatureRackSlot([previous])).toEqual({ ...previous, id: 'slot-2', label: 'S2' });
+  });
+});
 
 describe('miniature rack dimensions', () => {
   it('uses the tallest base width as automatic rack height by default', () => {

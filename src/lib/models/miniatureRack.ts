@@ -266,6 +266,14 @@ export function createDefaultMiniatureRackSlot(index: number): MiniatureRackSlot
   };
 }
 
+export function createNextMiniatureRackSlot(slots: MiniatureRackSlot[]): MiniatureRackSlot {
+  let index = slots.length + 1;
+  // Deleting a middle slot can leave its next numbered ID in use.
+  while (slots.some((slot) => slot.id === `slot-${index}`)) index++;
+  const defaults = createDefaultMiniatureRackSlot(index);
+  return { ...defaults, ...slots.at(-1), id: defaults.id, label: defaults.label };
+}
+
 function createMiniatureRackSlotLabelGeometry(
   label: string,
   slotCenterX: number,

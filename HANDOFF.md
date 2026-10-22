@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.25`
+- Version visible actual: `1.2.26`
 
 ## Desarrollo local
 
@@ -261,7 +261,9 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
-- v1.2.25 redondeo exterior: usuario autoriza commit (2026-10-22). 197 tests y check correctos; validación impresa pendiente. Sin push autorizado. Ver [detalle](docs/plans/outer-corner-finish.md).
+- v1.2.26 Miniature Rack: usuario valida y autoriza commit/push (2026-10-22). `Add slot` hereda medidas, cantidad, ángulo y separaciones del último slot, con etiqueta/ID propios; evita colisión de IDs tras borrar slots intermedios. 10 tests y check correctos.
+
+- v1.2.25 redondeo exterior: commit `246b578`, usuario autoriza push (2026-10-22). 197 tests y check correctos; validación impresa pendiente. Ver [detalle](docs/plans/outer-corner-finish.md).
 
 - 2026-10-22 Card Storage: añadido radio exterior común para cuerpo/tapa en `Print settings`, 3 mm solicitado en piezas nuevas; limitado a pared sin tapa y al margen exterior del cierre con tapa (1,2 mm con defaults). Proyectos antiguos conservan 0. Pruebas de geometría/persistencia y editor local; pendiente validación visual/impresa del usuario. Sin versión/commit/push. Ver [detalle](docs/plans/outer-corner-finish.md).
 
