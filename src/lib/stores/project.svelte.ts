@@ -81,6 +81,7 @@ import {
   isLooseTray
 } from '$lib/types/project';
 import { loadProject, migrateProjectData } from '$lib/utils/storage';
+import { createDefaultDiceSizes } from '$lib/models/dice';
 import type { InventoryAssignment, InventoryGroup, InventoryKind } from '$lib/types/project';
 import { groupAssignments, inventoryTargets, sleeveThickness, validateAssignments } from '$lib/utils/inventory';
 import { applyInventoryGeometry } from '$lib/utils/inventoryGeometry';
@@ -1169,6 +1170,7 @@ function offsetPlacement<T extends { x: number; y: number }>(placement: T, amoun
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
   project.name = project.name?.trim() || DEFAULT_PROJECT_NAME;
+  project.diceSizes ??= createDefaultDiceSizes();
   const existingCardSizeIds = new Set((project.cardSizes ?? []).map((size) => size.id));
   project.cardSizes = [
     ...(project.cardSizes ?? []),
@@ -1202,6 +1204,7 @@ function createBlankProject(): Project {
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     name: DEFAULT_PROJECT_NAME,
+    diceSizes: createDefaultDiceSizes(),
     layers: [bottomLayer],
     counterShapes: DEFAULT_COUNTER_SHAPES.map((shape) => ({ ...shape })),
     cardSizes: DEFAULT_CARD_SIZES.map((size) => ({ ...size })),
@@ -1244,6 +1247,25 @@ export function saveProjectNow(): void {
 // Getters
 export function getProject(): Project {
   return project;
+}
+
+export function addDiceSize(): void {
+  project.diceSizes ??= [];
+  project.diceSizes.push({ id: crypto.randomUUID(), name: `Dice ${project.diceSizes.length + 1}`, kind: 'd6', size: 16 });
+  autosave();
+}
+
+export function updateDiceSize(id: string, updates: Partial<Pick<import('$lib/types/project').DiceSize, 'name' | 'kind' | 'size'>>): void {
+  const die = project.diceSizes?.find(d => d.id === id);
+  if (!die || (updates.size !== undefined && (!Number.isFinite(updates.size) || updates.size <= 0)) ||
+    (updates.name !== undefined && !updates.name.trim())) return;
+  Object.assign(die, updates);
+  autosave();
+}
+
+export function deleteDiceSize(id: string): void {
+  project.diceSizes = (project.diceSizes ?? []).filter(d => d.id !== id);
+  autosave();
 }
 
 export function addInventoryGroup(kind: InventoryKind, sourceId?: string): InventoryGroup {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiceIcon from './DiceIcon.svelte';
   import { tick } from 'svelte';
   import {
     addInventoryGroup,
@@ -222,7 +223,17 @@
                 {@render measurement(group, 'thickness', 'Thickness')}
               </div>
             {:else if group.kind === 'dice'}
+              <DiceIcon kind={group.diceKind ?? 'd6'} />
               <div class="fields">
+                <label>Project size
+                  <select aria-label="Project dice size" value="" onchange={(e) => {
+                    const die = project.diceSizes?.find(d => d.id === e.currentTarget.value);
+                    if (die) update(group, { diceKind: die.kind, width: die.size });
+                  }}>
+                    <option value="">Copy measurements from…</option>
+                    {#each project.diceSizes ?? [] as die (die.id)}<option value={die.id}>{die.name} ({die.kind}, {die.size} mm)</option>{/each}
+                  </select>
+                </label>
                 <label>
                   Die type
                   <select
@@ -235,9 +246,9 @@
                       </option>{/each}
                   </select>
                 </label>
-                {@render measurement(group, 'width', 'Maximum outer size')}
+                {@render measurement(group, 'width', (group.diceKind ?? 'd6') === 'd6' ? 'Side (face to face)' : 'Maximum outer size')}
               </div>
-              <small>Measure the full envelope, including points.</small>
+              <small>For d6 measure one side, face to face. For other dice measure the greatest distance between points, including tips. Project sizes copy measurements; later edits do not change this group.</small>
             {:else if group.kind === 'miniatures'}
               <div class="fields measurements">
                 {@render measurement(group, 'baseDiameter', 'Base diameter')}{@render measurement(

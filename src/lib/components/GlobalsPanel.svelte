@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DiceIcon from './DiceIcon.svelte';
   import {
     Input,
     InputCheckbox,
@@ -17,6 +18,9 @@
   import type { CounterShape, CounterBaseShape, CardSize, CounterShapeCategory } from '$lib/types/project';
   import {
     getProject,
+    addDiceSize,
+    updateDiceSize,
+    deleteDiceSize,
     isCounterTray,
     isCardDrawTray,
     isCardDividerTray,
@@ -57,9 +61,11 @@
   let expandedCounterIndex: number | null = $state(null);
   let expandedPlayerBoardIndex: number | null = $state(null);
   let expandedTileIndex: number | null = $state(null);
+  let expandedDieId = $state<string | null>(null);
   // Track which card size is expanded (null = none)
   let expandedCardIndex: number | null = $state(null);
-  let activeTab = $state<'project' | 'counters' | 'cards' | 'tiles' | 'boards'>('project');
+  let activeTab = $state<'project' | 'counters' | 'cards' | 'tiles' | 'boards' | 'dice'>('project');
+  let diceSizes = $derived(getProject().diceSizes ?? []);
 
   // Get shapes and card sizes from project level
   let counterShapes = $derived(getCounterShapes().filter(s => !s.id.startsWith('inventory-')));
@@ -336,6 +342,9 @@
     >
       <span class="tabLabel">Tiles</span> <span class="tabCount">{tileShapes.length}</span>
     </button>
+    <button class:active={activeTab === 'dice'} role="tab" aria-selected={activeTab === 'dice'} onclick={() => (activeTab = 'dice')}>
+      <span class="tabLabel">Dice</span> <span class="tabCount">{diceSizes.length}</span>
+    </button>
     <button
       class:active={activeTab === 'boards'}
       role="tab"
@@ -435,6 +444,60 @@
         </Button>
       </section>
     {/if}
+  {:else if activeTab === 'dice'}
+    <section class="section">
+      <h3 class="sectionTitle">Dice</h3>
+      <Spacer size="0.5rem" />
+      <Text size="0.875rem" color="var(--fgMuted)">Default measurements are starting values: measure your dice before use. For d6 measure one side, face to face; for other dice measure the greatest distance between tips.</Text>
+      <Spacer size="0.5rem" />
+      <div class="customShapesList">
+        {#each diceSizes as die (die.id)}
+          {#if expandedDieId === die.id}
+          <Panel class="shapePanel">
+            <div class="shapePanelContent">
+              <div class="shapeFormGrid diceFormGrid">
+                <FormControl label="Name" name="die-name-{die.id}">
+                  {#snippet input({ inputProps })}
+                    <Input {...inputProps} value={die.name} onchange={(e) => updateDiceSize(die.id, { name: e.currentTarget.value })} />
+                  {/snippet}
+                </FormControl>
+                <FormControl label="Die type" name="die-kind-{die.id}">
+                  {#snippet input({ inputProps })}
+                    <Select {...inputProps} selected={[die.kind]} options={['d4', 'd6', 'd8', 'd10', 'd12', 'd20'].map(value => ({ value, label: value.toUpperCase() }))} onSelectedChange={(values) => updateDiceSize(die.id, { kind: values[0] as import('$lib/types/project').DiceKind })} />
+                  {/snippet}
+                </FormControl>
+                <FormControl label={die.kind === 'd6' ? 'Side' : 'Maximum outer size'} name="die-size-{die.id}">
+                  {#snippet input({ inputProps })}
+                    <Input {...inputProps} type="number" min="0.1" step="0.1" value={die.size} onchange={(e) => updateDiceSize(die.id, { size: e.currentTarget.valueAsNumber })} />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+              </div>
+            </div>
+            <Hr />
+            <div class="shapePanelActions">
+              <Button size="sm" onclick={() => (expandedDieId = null)}>Save</Button>
+              <ConfirmActionButton action={() => { deleteDiceSize(die.id); expandedDieId = null; }} actionButtonText="Delete die type">
+                {#snippet trigger({ triggerProps })}<Button {...triggerProps} size="sm" variant="ghost">Delete</Button>{/snippet}
+                {#snippet actionMessage()}<Text>Delete the "{die.name}" die type? Copied inventory measurements are kept.</Text>{/snippet}
+              </ConfirmActionButton>
+            </div>
+          </Panel>
+          {:else}
+            <div class="shapeCard">
+              <button class="shapeSummary" onclick={() => (expandedDieId = die.id)} title="Click to edit {die.name}">
+                <span class="shapeIcon"><DiceIcon kind={die.kind} /></span>
+                <span class="shapeName">{die.name}</span>
+                <span class="shapeSize">{die.kind} · {die.size} mm</span>
+              </button>
+            </div>
+          {/if}
+        {/each}
+      </div>
+      <Spacer />
+      <Link as="button" onclick={() => { addDiceSize(); expandedDieId = getProject().diceSizes?.at(-1)?.id ?? null; }}>+ New die type</Link>
+      <p><small>Icons by Skoll and Delapouite / <a href="https://game-icons.net/" target="_blank" rel="noreferrer">Game-icons.net</a> · <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a></small></p>
+    </section>
   {:else if activeTab === 'counters'}
     <section class="section">
     <h3 class="sectionTitle">Counters</h3>
@@ -1301,6 +1364,10 @@
     display: flex;
     gap: 0.5rem;
     padding: 0.75rem;
+  }
+
+  .diceFormGrid {
+    align-items: end;
   }
 
   .shapeSummary {

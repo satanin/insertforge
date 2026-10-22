@@ -261,6 +261,14 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
 ## Pendientes razonables
 
+- 2026-10-22 editor de dados: controles alineados por su borde inferior cuando una etiqueta ocupa dos líneas. Usuario confirma que ya ve los tipos predefinidos; alineación pendiente de validación visual. Sin versión/commit/push.
+
+- 2026-10-22 tipos de dados: seis tipos predefinidos en proyecto nuevo/vacío y migración de proyectos sin catálogo; conserva catálogos existentes/vacíos. Medidas iniciales orientativas editables. Editor alineado con Counters/Tiles (FormControl/Input/Select, Save y Delete con confirmación, + New die type). Pendiente validación visual del usuario; sin versión/commit/push.
+
+- 2026-10-22 iconos de dados: SVG de Game-icons (Skoll/Delapouite, CC BY 3.0 con atribución), seis tipos en catálogo e inventario; catálogo con resumen compacto y editor desplegable como Counters/Tiles. Pendiente validación visual del usuario.
+
+- 2026-10-22 dados: catálogo `Dice` en Dimensions junto a Counters/Tiles, tamaños con nombre/tipo/medida (lado para d6, distancia máxima para otros). Inventario copia medidas explícitamente sin enlace vivo. Persistencia y validación básica cubiertas por tests; pendiente validación visual del usuario. Sin nueva bandeja, versión/commit/push.
+
 - v1.2.27 rendimiento: usuario acepta el bloque y autoriza commit/push (2026-10-22). Proyecto por defecto 13,4 → 4,9 s, mediana de tres pasadas. Fondos grabados a 24 segmentos (error <0,006 mm), métricas del worker ampliadas; texto de tapa/Card Storage intacto. 209 tests, check y prueba visual correctos; validación impresa pendiente. Ver [mediciones y alcance](docs/plans/geometry-performance.md).
 
 - v1.2.26 Miniature Rack: usuario valida y autoriza commit/push (2026-10-22). `Add slot` hereda medidas, cantidad, ángulo y separaciones del último slot, con etiqueta/ID propios; evita colisión de IDs tras borrar slots intermedios. 10 tests y check correctos.

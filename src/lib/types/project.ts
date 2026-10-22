@@ -292,6 +292,7 @@ export interface GlobalSettings {
 }
 
 export interface Project {
+  diceSizes?: DiceSize[];
   inventory?: InventoryGroup[];
   inventoryCardDefaults?: { cardSizeId: string; sleeve: CardSleeve; thickness?: number };
   schemaVersion: number;
@@ -315,6 +316,12 @@ export interface Project {
 export type InventoryKind = 'cards' | 'tokens' | 'dice' | 'boards' | 'miniatures' | 'other';
 export type CardSleeve = 'none' | 'normal' | 'premium' | 'manual';
 export type DiceKind = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
+export interface DiceSize {
+  id: string;
+  name: string;
+  kind: DiceKind;
+  size: number;
+}
 export interface InventoryGroup {
   id: string;
   name: string;

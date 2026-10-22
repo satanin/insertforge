@@ -7,6 +7,11 @@ import type { CardDividerTray, CardDrawTray, LayeredBox, LayeredBoxSection, Proj
 
 import {
   addBox,
+  addDiceSize,
+  updateDiceSize,
+  deleteDiceSize,
+  addInventoryGroup,
+  updateInventoryGroup,
   addLooseTray,
   addTray,
   duplicateTray,
@@ -31,6 +36,47 @@ import {
   updateTray
 } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
+
+describe('project dice sizes', () => {
+  beforeEach(() => resetProject());
+
+  it('persists sizes without changing inventory measurement snapshots', () => {
+    addDiceSize();
+    const die = getProject().diceSizes!.at(-1)!;
+    updateDiceSize(die.id, { name: 'Large d20', kind: 'd20', size: 24 });
+    const group = addInventoryGroup('dice');
+    updateInventoryGroup(group.id, { diceKind: die.kind, width: die.size });
+    updateDiceSize(die.id, { size: 28 });
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(restored.diceSizes?.find(d => d.id === die.id)?.size).toBe(28);
+    expect(restored.inventory?.find(g => g.id === group.id)?.width).toBe(24);
+    deleteDiceSize(die.id);
+    expect(getProject().diceSizes?.some(d => d.id === die.id)).toBe(false);
+    expect(getProject().inventory?.find(g => g.id === group.id)?.width).toBe(24);
+  });
+
+  it('rejects invalid sizes and accepts projects without a dice catalogue', () => {
+    addDiceSize();
+    const die = getProject().diceSizes!.at(-1)!;
+    for (const size of [0, -1, NaN, Infinity]) updateDiceSize(die.id, { size });
+    expect(die.size).toBe(16);
+    const legacy = JSON.parse(exportProjectToJson(getProject()));
+    delete legacy.diceSizes;
+    expect(importProjectFromJson(JSON.stringify(legacy)).diceSizes?.map(d => d.kind)).toEqual(['d4', 'd6', 'd8', 'd10', 'd12', 'd20']);
+  });
+
+  it('includes six editable types on new projects and preserves an intentionally empty catalogue', () => {
+    for (const reset of [resetProject, resetProjectToBlank]) {
+      reset();
+      expect(getProject().diceSizes?.map(d => d.kind)).toEqual(['d4', 'd6', 'd8', 'd10', 'd12', 'd20']);
+      updateDiceSize('dice-d6', { size: 18 });
+      reset();
+      expect(getProject().diceSizes?.find(d => d.kind === 'd6')?.size).toBe(16);
+    }
+    for (const die of [...getProject().diceSizes!]) deleteDiceSize(die.id);
+    expect(importProjectFromJson(exportProjectToJson(getProject())).diceSizes).toEqual([]);
+  });
+});
 
 describe('exterior corner persistence', () => {
   beforeEach(() => resetProject());

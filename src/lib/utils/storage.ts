@@ -7,6 +7,7 @@ import {
   type TopLoadedStackDef
 } from '$lib/models/counterTray';
 import { APP_VERSION } from '$lib/appInfo';
+import { createDefaultDiceSizes } from '$lib/models/dice';
 import { minimumCardStorageLidWallThickness } from '$lib/models/cardStorageTray';
 import { defaultLidParams } from '$lib/models/lid';
 import {
@@ -659,6 +660,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     ...project,
     version: undefined,
     inventory: project.inventory ?? [],
+    diceSizes: project.diceSizes ?? createDefaultDiceSizes(),
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     name: projectName,
