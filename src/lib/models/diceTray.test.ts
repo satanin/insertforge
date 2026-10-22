@@ -3,9 +3,107 @@ import { measurements, primitives, booleans, transforms, geometries } from '@jsc
 import { createDiceTray, createDiceTrayBody, createDiceTrayParts, defaultDiceTrayParams as defaults, getDiceTrayDimensions, getDiceTrayBaseDimensions, getDiceTrayBodyDimensions, getDicePocketShape, getDiceTrayPositions, getDiceExposure, getDicePocketWallHeight, validateDiceTray } from './diceTray';
 import { getDieMesh, getDieFootprint } from './diceGeometry';
 import { Vector3 } from 'three';
-const defaultDiceTrayParams = { ...defaults, exposedPercent: undefined, minimumExposure: 6, fingerNotchDiameter: 0, outerCornerRadius: 0 };
+import { getDiceTrayMeasuredSpacing } from './diceTray';
+const defaultDiceTrayParams = { ...defaults, diceSpacing: undefined, compactLayout: false, exposedPercent: undefined, minimumExposure: 6, fingerNotchDiameter: 0, outerCornerRadius: 0 };
 
 describe('dice tray geometry', () => {
+  it('distributes spare row width without growing the tray and fills requested outer minima', () => {
+    const p = { ...defaults, asBox: true, columns: 2, count: 4, fingerNotchEnabled: false,
+      groups: [{ id: 'large', diceKind: 'd6' as const, size: 30, count: 2 }, { id: 'small', diceKind: 'd6' as const, size: 12, count: 2 }] };
+    const d = getDiceTrayBaseDimensions(p), positions = getDiceTrayPositions(p);
+    const gap = (a: number, b: number) => positions[b].x - positions[a].x - (positions[b].dieSize! + positions[a].dieSize!) / 2;
+    expect(gap(2, 3)).toBeGreaterThan(gap(0, 1));
+    const edge = (i: number) => positions[i].x + positions[i].dieSize! / 2 + p.clearance / 2;
+    expect(edge(1)).toBeCloseTo(edge(3), 6);
+    const expanded = { ...p, minimumWidth: d.width + 20, minimumDepth: d.depth + 15 };
+    const e = getDiceTrayBaseDimensions(expanded), moved = getDiceTrayPositions(expanded);
+    expect(e.width).toBeCloseTo(d.width + 20, 6);
+    expect(e.depth).toBeCloseTo(d.depth + 15, 6);
+    expect(e.height).toBe(d.height);
+    expect(moved[3].x - positions[3].x).toBeCloseTo(20, 6);
+    expect(moved[3].y - positions[3].y).toBeCloseTo(15, 6);
+    expect(getDiceTrayBaseDimensions({ ...p, minimumWidth: 1, minimumDepth: 1 })).toEqual(d);
+    expect(validateDiceTray({ ...p, minimumWidth: NaN })).toBe(false);
+  });
+  it('keeps boxed pockets and notches 1.5 mm from inner walls and can disable notches without losing diameter', () => {
+    for (const compactLayout of [false, true]) for (const enabled of [false, true]) {
+      const p = { ...defaults, asBox: true, compactLayout, fingerNotchEnabled: enabled, fingerNotchDiameter: 15,
+        groups: [{ id: 'a', diceKind: 'd4' as const, size: 24, count: 1 }, { id: 'b', diceKind: 'd20' as const, size: 30, count: 1 }] };
+      for (const diceSpacing of [undefined, { x: 10, y: 7 }]) {
+        const params = { ...p, diceSpacing }, d = getDiceTrayBaseDimensions(params);
+        for (const pos of getDiceTrayPositions(params)) {
+          const [min, max] = measurements.measureBoundingBox(getDicePocketShape({ ...params, diceKind: pos.diceKind!, size: pos.dieSize! }));
+          expect(pos.x + min[0] - p.wallThickness).toBeGreaterThanOrEqual(1.5 - 1e-6);
+          expect(pos.y + min[1] - p.wallThickness).toBeGreaterThanOrEqual(1.5 - 1e-6);
+          expect(d.width - p.wallThickness - pos.x - max[0]).toBeGreaterThanOrEqual(1.5 - 1e-6);
+          expect(d.depth - p.wallThickness - pos.y - max[1]).toBeGreaterThanOrEqual(1.5 - 1e-6);
+        }
+      }
+    }
+    const p = { ...defaults, fingerNotchDiameter: 15, fingerNotchEnabled: false };
+    expect(measurements.measureArea(getDicePocketShape(p))).toBeCloseTo(measurements.measureArea(getDicePocketShape({ ...p, fingerNotchDiameter: 0 })), 6);
+    expect(measurements.measureArea(getDicePocketShape({ ...p, fingerNotchEnabled: true }))).toBeGreaterThan(measurements.measureArea(getDicePocketShape(p)));
+    expect(p.fingerNotchDiameter).toBe(15);
+  });
+  it('measures and controls actual die-edge gaps, with safe limits for finger recesses', () => {
+    const p = { ...defaultDiceTrayParams, compactLayout: true, count: 4, columns: 2, diceSpacing: { x: 10, y: 7 } };
+    const spacing = getDiceTrayMeasuredSpacing(p);
+    expect(spacing.x).toBeCloseTo(10, 6);
+    expect(spacing.y).toBeCloseTo(7, 6);
+    const notch = { ...p, fingerNotchDiameter: 10, diceSpacing: { x: 0, y: 0 } };
+    expect(getDiceTrayMeasuredSpacing(notch).x).toBeGreaterThan(2);
+    expect(getDiceTrayMeasuredSpacing(notch).y).toBeGreaterThanOrEqual(2);
+    const positions = getDiceTrayPositions(notch);
+    const bounds = positions.map(pos => measurements.measureBoundingBox(getDicePocketShape({ ...notch, size: pos.dieSize!, diceKind: pos.diceKind! })));
+    expect(positions[1].x + bounds[1][0][0] - positions[0].x - bounds[0][1][0]).toBeGreaterThanOrEqual(notch.wallThickness - 1e-6);
+    expect(getDiceTrayMeasuredSpacing({ ...p, count: 1 })).toEqual({ x: null, y: null });
+  });
+  for (const mode of ['individual', 'compartment'] as const) {
+    it(`${mode}: compact mixed layout reduces area and spacing preserves safe pocket envelopes`, () => {
+      const p = { ...defaultDiceTrayParams, mode, compactLayout: true, fingerNotchDiameter: 10, count: 4, columns: 2,
+        groups: [{ id: 'small', diceKind: 'd6' as const, size: 10, count: 3 }, { id: 'large', diceKind: 'd20' as const, size: 30, count: 1 }] };
+      const d = getDiceTrayDimensions(p), uniform = getDiceTrayDimensions({ ...p, compactLayout: false });
+      expect(d.width * d.depth).toBeLessThan(uniform.width * uniform.depth * 0.9);
+      const spaced = { ...p, spacingX: 3, spacingY: 5 };
+      const larger = getDiceTrayDimensions(spaced);
+      expect(larger.width).toBeCloseTo(d.width + 3, 6);
+      expect(larger.depth).toBeCloseTo(d.depth + 5, 6);
+      expect(larger.height).toBe(d.height);
+      const positions = getDiceTrayPositions(spaced);
+      expect(positions.map(pos => pos.z)).toEqual(getDiceTrayPositions(p).map(pos => pos.z));
+      const bounds = positions.map(pos => {
+        const [min, max] = measurements.measureBoundingBox(getDicePocketShape({ ...spaced, diceKind: pos.diceKind!, size: pos.dieSize! }));
+        return { minX: pos.x + min[0], maxX: pos.x + max[0], minY: pos.y + min[1], maxY: pos.y + max[1] };
+      });
+      for (const a of bounds) {
+        expect(a.minX).toBeGreaterThanOrEqual(p.wallThickness - 1e-6);
+        expect(a.minY).toBeGreaterThanOrEqual(p.wallThickness - 1e-6);
+        expect(a.maxX).toBeLessThanOrEqual(larger.width - p.wallThickness + 1e-6);
+        expect(a.maxY).toBeLessThanOrEqual(larger.depth - p.wallThickness + 1e-6);
+      }
+      const divider = mode === 'individual' ? p.wallThickness : 0;
+      for (let i = 0; i < bounds.length; i++) for (let j = i + 1; j < bounds.length; j++) {
+        const a = bounds[i], b = bounds[j];
+        const gapX = Math.max(b.minX - a.maxX, a.minX - b.maxX);
+        const gapY = Math.max(b.minY - a.maxY, a.minY - b.maxY);
+        expect(gapX >= divider + 3 - 1e-6 || gapY >= divider + 5 - 1e-6).toBe(true);
+      }
+      const tray = createDiceTrayBody(spaced);
+      for (const pos of positions) {
+        const mesh = getDieMesh(pos.diceKind!, pos.dieSize!);
+        const die = transforms.translate([pos.x, pos.y, pos.z], primitives.polyhedron({ points: mesh.points, faces: mesh.faces, orientation: 'outward' }));
+        expect(Math.abs(measurements.measureVolume(booleans.intersect(tray, die)))).toBeLessThan(1e-5);
+      }
+    });
+  }
+  it('preserves layouts without compact/spacing fields and rejects invalid spacing', () => {
+    const p: import('./diceTray').DiceTrayParams = { ...defaultDiceTrayParams };
+    delete p.compactLayout;
+    delete p.spacingX;
+    delete p.spacingY;
+    expect(getDiceTrayDimensions(p)).toEqual(getDiceTrayDimensions({ ...p, compactLayout: false, spacingX: 0, spacingY: 0 }));
+    for (const spacingX of [-1, NaN, Infinity, 601]) expect(validateDiceTray({ ...p, spacingX })).toBe(false);
+  });
   it('mixed pockets and their finger notches finish on one flat plane with raised supports below smaller dice', () => {
     const groups = (['d4', 'd6', 'd8', 'd10', 'd12', 'd20'] as const).map((diceKind, i) => ({ id: diceKind, diceKind, size: 14 + 2 * i, count: 1 }));
     const p = { ...defaultDiceTrayParams, groups, count: 6, exposedPercent: 40, fingerNotchDiameter: 10 };
@@ -118,7 +216,12 @@ describe('dice tray geometry', () => {
       const groups = (['d4', 'd6', 'd10', 'd20'] as const).map((diceKind, i) => ({ id: diceKind, diceKind, size: 12 + 4 * i, count: 1 }));
       const p = { ...defaultDiceTrayParams, groups, count: 4, mode, asBox: true, lid: true, outerCornerRadius: 3, stackingClearance: 2 };
       const positions = getDiceTrayPositions(p), bodyDims = getDiceTrayBodyDimensions(p), dims = getDiceTrayDimensions(p);
-      expect(getDiceTrayPositions({ ...p, asBox: false, lid: false })).toEqual(positions);
+      const unboxed = getDiceTrayPositions({ ...p, asBox: false, lid: false });
+      positions.forEach((pos, i) => {
+        expect(pos.z).toBe(unboxed[i].z);
+        expect(pos.x - positions[0].x).toBeCloseTo(unboxed[i].x - unboxed[0].x, 6);
+        expect(pos.y - positions[0].y).toBeCloseTo(unboxed[i].y - unboxed[0].y, 6);
+      });
       expect(bodyDims.height).toBeGreaterThanOrEqual(Math.max(...positions.map(pos => pos.z + pos.thickness)) + 2);
       expect(dims.height).toBeCloseTo(bodyDims.height + 2, 6);
       const parts = createDiceTrayParts(p);

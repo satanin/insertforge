@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.29`
+- Version visible actual: `1.2.30`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.30: usuario acepta mejoras de Dice Tray y autoriza commit/push (2026-10-22). Espaciado mínimo entre bordes (default 1 mm X/Y), reparto sobrante por fila, dimensiones exteriores mínimas, margen interior 1,5 mm y checkbox de notch. Incluye redondeo opcional de Miniature Tray y explode por fases. 116 tests focalizados pasan. Validación física pendiente; extender dimensiones mínimas al resto de piezas sigue pendiente de diseño común. Ver [plan](docs/plans/dice-tray.md).
 
 La app ya no es solo un generador de `counter trays`. Ahora soporta:
 
@@ -260,6 +262,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.30: validar físicamente redondeo/apilado de Miniature Tray (radio limitado para conservar 0,6 mm alrededor de encajes) y cabida/extracción de Dice Tray. Explode extraíble eleva primero (30%) y luego aparta; deslizantes mantienen plano de guías.
 
 - v1.2.29 Dice Tray: usuario autoriza commit/push del bloque (2026-10-22). Dados mixtos con snapshots de proyecto/inventario, cunas con plano superior común y apoyos ajustados por exposición porcentual, rebajes, radio exterior, modo caja, tapas extraíble/deslizante y texto grabado/inlay/relieve. Preview de dados y etiquetas de contenido por tipo/alcance. Mantener pendiente validación física de extracción, ajuste de tapa, texto y apilado. Ver [detalle](docs/plans/dice-tray.md).
 

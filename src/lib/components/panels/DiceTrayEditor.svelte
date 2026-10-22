@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getDiceTrayMeasuredSpacing } from '$lib/models/diceTray';
   import { FormControl, Input, InputCheckbox, Select, Text, Spacer, Button, Hr } from '@tableslayer/ui';
   import { getProject, updateDiceTrayParams } from '$lib/stores/project.svelte';
   import type { DiceTray } from '$lib/types/project';
@@ -7,6 +8,7 @@
   import DiceIcon from '../DiceIcon.svelte';
   let { tray }: { tray: DiceTray } = $props();
   const dimensions = $derived(getDiceTrayDimensions(tray.params));
+  const measuredSpacing = $derived(getDiceTrayMeasuredSpacing(tray.params));
   const groups = $derived(getDiceTrayGroups(tray.params));
   const positions = $derived(getDiceTrayPositions(tray.params));
   const exposedPercent = $derived(tray.params.exposedPercent ?? Math.round(100 * getDiceExposure(tray.params, positions[0].thickness) / positions[0].thickness));
@@ -38,6 +40,13 @@
   <Text size="0.875rem">{dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm</Text>
   <Spacer size="0.5rem" />
   <div class="fields">
+    {#each [['minimumWidth', 'Minimum outer width'], ['minimumDepth', 'Minimum outer depth']] as [field, label]}
+      {@const key = field as 'minimumWidth' | 'minimumDepth'}
+      <FormControl {label} name="dice-{key}">
+        {#snippet input({ inputProps })}<Input {...inputProps} type="number" min="0" max="600" step="0.5" placeholder="Auto" value={tray.params[key] ?? ''} onchange={(e) => update({ [key]: e.currentTarget.value === '' ? undefined : e.currentTarget.valueAsNumber })} />{/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+    {/each}
     <InputCheckbox label="Box walls above dice" checked={tray.params.asBox || tray.params.lid || false} onchange={(e) => update({ asBox: e.currentTarget.checked, ...(!e.currentTarget.checked ? { lid: false } : {}) })} />
     <InputCheckbox label="Add lid" checked={tray.params.lid ?? false} onchange={(e) => update({ lid: e.currentTarget.checked, ...(e.currentTarget.checked ? { asBox: true } : {}) })} />
     <FormControl label="Outer corner radius" name="dice-radius">
@@ -64,6 +73,7 @@
       </FormControl>
     {/if}
   </div>
+  <Text size="0.875rem" color="var(--fgMuted)">Rows share unused width between dice; a single die is centred. Optional outer dimensions fill a larger footprint without shrinking pockets. Smaller values are limited by the space needed for the dice.</Text>
   {#if tray.params.lid}
     {#if tray.params.lidType === 'sliding'}<Text size="0.875rem" color="var(--fgMuted)">Sliding guides require at least {getDiceTrayMinimumWallThickness(tray.params).toFixed(1)} mm walls; wall thickness adjusts when needed. Additional height keeps the guides above the dice.</Text>{/if}
     <InputCheckbox label="Add lid text" checked={tray.params.lidTextEnabled ?? false} onchange={(e) => update({ lidTextEnabled: e.currentTarget.checked })} />
@@ -83,11 +93,21 @@
     <FormControl label="Storage mode" name="dice-mode">
       {#snippet input({ inputProps })}<Select {...inputProps} selected={[tray.params.mode]} options={[{ value: 'individual', label: 'Individual pockets' }, { value: 'compartment', label: 'Shared compartment' }]} onSelectedChange={(v) => update({ mode: v[0] as DiceTrayParams['mode'] })} />{/snippet}
     </FormControl>
-    {#if tray.params.mode === 'individual'}
-      <FormControl label="Finger notch diameter" name="dice-finger-notch">
-        {#snippet input({ inputProps })}<Input {...inputProps} type="number" min="0" max="40" step="0.5" value={tray.params.fingerNotchDiameter ?? 0} onchange={(e) => update({ fingerNotchDiameter: e.currentTarget.valueAsNumber })} />{/snippet}
+    {#each ['x', 'y'] as axis}
+      {@const key = axis as 'x' | 'y'}
+      <FormControl label={axis === 'x' ? 'Die spacing X' : 'Die spacing Y'} name="dice-spacing-{axis}">
+        {#snippet input({ inputProps })}<Input {...inputProps} type="number" min="0" max="600" step="0.5" value={tray.params.diceSpacing?.[key] ?? (measuredSpacing[key] === null ? 0 : Number(measuredSpacing[key]!.toFixed(2)))} onchange={(e) => update({ diceSpacing: { x: tray.params.diceSpacing?.x ?? measuredSpacing.x ?? 0, y: tray.params.diceSpacing?.y ?? measuredSpacing.y ?? 0, [key]: e.currentTarget.valueAsNumber } })} />{/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+    {/each}
+    {#if tray.params.mode === 'individual'}
+      <InputCheckbox label="Finger notch" checked={tray.params.fingerNotchEnabled ?? (tray.params.fingerNotchDiameter ?? 0) > 0} onchange={(e) => update({ fingerNotchEnabled: e.currentTarget.checked, ...(e.currentTarget.checked && !tray.params.fingerNotchDiameter ? { fingerNotchDiameter: 10 } : {}) })} />
+      {#if tray.params.fingerNotchEnabled ?? (tray.params.fingerNotchDiameter ?? 0) > 0}
+      <FormControl label="Finger notch diameter" name="dice-finger-notch">
+        {#snippet input({ inputProps })}<Input {...inputProps} type="number" min="0.5" max="40" step="0.5" value={tray.params.fingerNotchDiameter ?? 10} onchange={(e) => update({ fingerNotchDiameter: e.currentTarget.valueAsNumber })} />{/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      {/if}
     {/if}
     {#each fields as [key, label, min, max, step]}
       <FormControl {label} name="dice-{key}">
@@ -103,7 +123,8 @@
     {/if}
   </div>
   <Hr />
-  {#if tray.params.mode === 'individual'}<Text size="0.875rem" color="var(--fgMuted)">Finger notch: rounded access on the left of each pocket. Set diameter to 0 to disable. Extra space preserves the outer wall and dividers; the recess stops at the pocket floor.</Text>{/if}
+  <Text size="0.875rem" color="var(--fgMuted)">Die spacing is measured edge to edge between the dice, not between their centres and not extra padding. Actual minimum: X {measuredSpacing.x === null ? '—' : `${measuredSpacing.x.toFixed(2)} mm`}, Y {measuredSpacing.y === null ? '—' : `${measuredSpacing.y.toFixed(2)} mm`}. Editing spacing fits the actual die sizes. Finger recesses and material between pockets may require more than the requested gap; — means there are no neighbours on that axis.</Text>
+  {#if tray.params.mode === 'individual'}<Text size="0.875rem" color="var(--fgMuted)">Finger notch: rounded access on the left of each pocket, stopping at the pocket floor. Turning it off preserves its diameter. Boxes leave at least 1.5 mm between each pocket, including its notch, and the inside wall.</Text>{/if}
   {#each groups as group (group.id)}
     {@const source = selectedType(group)}
     <div class="group">

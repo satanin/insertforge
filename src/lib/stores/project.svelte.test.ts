@@ -93,10 +93,10 @@ describe('dice trays', () => {
     const tray = addLooseTray(undefined, 'dice');
     if (tray?.type !== 'dice') throw new Error('Missing dice tray');
     expect(tray.params.outerCornerRadius).toBe(3);
-    updateDiceTrayParams(tray.id, { ...tray.params, exposedPercent: 55, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4 });
+    updateDiceTrayParams(tray.id, { ...tray.params, spacingX: 2, spacingY: 3, compactLayout: true, exposedPercent: 55, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4 });
     const restored = importProjectFromJson(exportProjectToJson(getProject()));
     expect(restored.layers[0].looseTrays[0]).toMatchObject({ type: 'dice', autoHeight: false, params: {
-      exposedPercent: 55, outerCornerRadius: 3, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4
+      spacingX: 2, spacingY: 3, compactLayout: true, exposedPercent: 55, outerCornerRadius: 3, asBox: true, stackingClearance: 3, lid: true, lidThickness: 2.5, lidClearance: 0.4
     } });
   });
   it('keeps a project type selected while its copied measurement is customized locally', () => {
@@ -156,6 +156,21 @@ describe('dice trays', () => {
 
 describe('exterior corner persistence', () => {
   beforeEach(() => resetProject());
+  it('preserves miniature tray radius and keeps old saved trays square', () => {
+    const tray = addLooseTray(undefined, 'miniatureTray');
+    if (tray?.type !== 'miniatureRack' || !tray.params.sockets) throw new Error('Missing miniature tray');
+    expect(tray.params.sockets.outerCornerRadius).toBe(3);
+    const saved = exportProjectToJson(getProject());
+    const restored = importProjectFromJson(saved);
+    const miniature = restored.layers.flatMap(layer => layer.looseTrays).find(item => item.id === tray.id)!;
+    if (miniature.type !== 'miniatureRack' || !miniature.params.sockets) throw new Error('Missing miniature tray');
+    expect(miniature.params.sockets.outerCornerRadius).toBe(3);
+    delete miniature.params.sockets.outerCornerRadius;
+    const legacy = importProjectFromJson(exportProjectToJson(restored));
+    const old = legacy.layers.flatMap(layer => layer.looseTrays).find(item => item.id === tray.id)!;
+    if (old.type !== 'miniatureRack' || !old.params.sockets) throw new Error('Missing miniature tray');
+    expect(old.params.sockets.outerCornerRadius ?? 0).toBe(0);
+  });
 
   for (const type of ['counter', 'cup', 'cardDraw', 'cardDivider', 'tile', 'cardStorage'] as const) {
     it(`${type}: preserves selected radii and keeps old saved trays square`, () => {

@@ -53,28 +53,154 @@ export function getDicePocketShape(p: DiceTrayParams) {
 }
 
 export function getDiceNotchRadius(p: DiceTrayParams, size: number) {
-  return p.mode === 'individual' ? Math.min((p.fingerNotchDiameter ?? 0) / 2, (size + p.clearance) / 2) : 0;
+  return p.mode === 'individual' && p.fingerNotchEnabled !== false ? Math.min((p.fingerNotchDiameter ?? 0) / 2, (size + p.clearance) / 2) : 0;
+}
+
+export function getDiceTrayLayout(p: DiceTrayParams) {
+  const layout = getDiceTrayPackedLayout(p);
+  if (p.mode !== 'individual' || !(p.asBox || p.lid)) return distributeDiceRows(p, layout);
+  // Keep a retaining ledge between every cavity (including its notch) and
+  // the inside face of the enclosing wall, independently of wall thickness.
+  const bounds = layout.items.map(item => {
+    const [min, max] = jscad.measurements.measureBoundingBox(getDicePocketShape({ ...p, diceKind: item.group.diceKind, size: item.group.size }));
+    return { minX: item.x + min[0], maxX: item.x + max[0], minY: item.y + min[1], maxY: item.y + max[1] };
+  });
+  const margin = p.wallThickness + 1.5;
+  const dx = Math.max(0, margin - Math.min(...bounds.map(b => b.minX)));
+  const dy = Math.max(0, margin - Math.min(...bounds.map(b => b.minY)));
+  return distributeDiceRows(p, { width: Math.max(layout.width + dx, Math.max(...bounds.map(b => b.maxX)) + dx + margin),
+    depth: Math.max(layout.depth + dy, Math.max(...bounds.map(b => b.maxY)) + dy + margin),
+    items: layout.items.map(item => ({ ...item, x: item.x + dx, y: item.y + dy })) });
+}
+
+function distributeDiceRows(p: DiceTrayParams, layout: ReturnType<typeof getDiceTrayPackedLayout>) {
+  if (!p.diceSpacing && !p.minimumWidth && !p.minimumDepth) return layout;
+  const width = Math.max(layout.width, p.minimumWidth ?? 0), depth = Math.max(layout.depth, p.minimumDepth ?? 0);
+  const columns = Math.min(p.columns, layout.items.length), rows = Math.ceil(layout.items.length / columns);
+  const margin = p.wallThickness + (p.mode === 'individual' && (p.asBox || p.lid) ? 1.5 : 0);
+  const items = layout.items.map(item => ({ ...item }));
+  for (let start = 0; start < items.length; start += columns) {
+    const row = items.slice(start, start + columns);
+    const bounds = row.map(item => jscad.measurements.measureBoundingBox(getDicePocketShape({ ...p, diceKind: item.group.diceKind, size: item.group.size })));
+    const left = Math.min(...row.map((item, i) => item.x + bounds[i][0][0]));
+    const right = Math.max(...row.map((item, i) => item.x + bounds[i][1][0]));
+    const spare = Math.max(0, width - 2 * margin - (right - left));
+    row.forEach((item, i) => {
+      item.x += margin - left + (row.length === 1 ? spare / 2 : spare * i / (row.length - 1));
+      const extraDepth = depth - layout.depth;
+      item.y += rows === 1 ? extraDepth / 2 : extraDepth * (start / columns) / (rows - 1);
+    });
+  }
+  return { width, depth, items };
+}
+
+function getDiceTrayPackedLayout(p: DiceTrayParams) {
+  if (p.diceSpacing) return getDiceTraySpacedLayout(p);
+  const groups = getDiceTrayGroups(p);
+  const dice = groups.flatMap(group => Array.from({ length: group.count }, () => group));
+  const columns = Math.min(p.columns, dice.length);
+  const gapX = (p.mode === 'individual' ? p.wallThickness : 0) + (p.spacingX ?? 0);
+  const gapY = (p.mode === 'individual' ? p.wallThickness : 0) + (p.spacingY ?? 0);
+  if (!p.compactLayout) {
+    const cell = Math.max(...groups.map(g => g.size)) + p.clearance;
+    const notch = getDiceNotchRadius(p, Math.max(...groups.map(g => g.size)));
+    const rows = Math.ceil(dice.length / columns);
+    return { width: columns * (cell + notch) + (columns - 1) * gapX + 2 * p.wallThickness,
+      depth: rows * cell + (rows - 1) * gapY + 2 * p.wallThickness,
+      items: dice.map((group, i) => ({ group, x: p.wallThickness + notch + cell / 2 + (i % columns) * (cell + notch + gapX),
+        y: p.wallThickness + cell / 2 + Math.floor(i / columns) * (cell + gapY) })) };
+  }
+  const bounds = new Map<string, [[number, number, number], [number, number, number]]>();
+  const footprints = dice.map(group => {
+    const key = `${group.diceKind}:${group.size}`;
+    if (!bounds.has(key)) bounds.set(key, jscad.measurements.measureBoundingBox(getDicePocketShape({ ...p, diceKind: group.diceKind, size: group.size })));
+    const [min, max] = bounds.get(key)!;
+    return { group, min, max, width: max[0] - min[0], depth: max[1] - min[1] };
+  });
+  const items: { group: DiceTrayGroup; x: number; y: number }[] = [];
+  let innerWidth = 0, cursorY = p.wallThickness;
+  for (let start = 0; start < footprints.length; start += columns) {
+    const row = footprints.slice(start, start + columns);
+    const rowDepth = Math.max(...row.map(item => item.depth));
+    let cursorX = p.wallThickness;
+    for (const item of row) {
+      items.push({ group: item.group, x: cursorX - item.min[0], y: cursorY + rowDepth / 2 - (item.min[1] + item.max[1]) / 2 });
+      cursorX += item.width + gapX;
+    }
+    innerWidth = Math.max(innerWidth, cursorX - p.wallThickness - gapX);
+    cursorY += rowDepth + gapY;
+  }
+  return { width: innerWidth + 2 * p.wallThickness, depth: cursorY - gapY + p.wallThickness, items };
+}
+
+function dieBounds(group: DiceTrayGroup) {
+  const points = getDieFootprint(group.diceKind, group.size);
+  return { minX: Math.min(...points.map(p => p[0])), maxX: Math.max(...points.map(p => p[0])),
+    minY: Math.min(...points.map(p => p[1])), maxY: Math.max(...points.map(p => p[1])) };
+}
+
+function getDiceTraySpacedLayout(p: DiceTrayParams) {
+  const dice = getDiceTrayGroups(p).flatMap(group => Array.from({ length: group.count }, () => {
+    const [min, max] = jscad.measurements.measureBoundingBox(getDicePocketShape({ ...p, diceKind: group.diceKind, size: group.size }));
+    return { group, die: dieBounds(group), min, max };
+  }));
+  const columns = Math.min(p.columns, dice.length), wall = p.mode === 'individual' ? p.wallThickness : 0;
+  const items: { group: DiceTrayGroup; x: number; y: number }[] = [];
+  let maxX = p.wallThickness, maxY = p.wallThickness, previousDieY = 0, previousCutY = 0;
+  for (let start = 0; start < dice.length; start += columns) {
+    const row = dice.slice(start, start + columns);
+    const cutMinY = Math.min(...row.map(item => item.min[1])), cutMaxY = Math.max(...row.map(item => item.max[1]));
+    const dieMinY = Math.min(...row.map(item => item.die.minY)), dieMaxY = Math.max(...row.map(item => item.die.maxY));
+    const y = start === 0 ? p.wallThickness - cutMinY : Math.max(previousDieY + p.diceSpacing!.y - dieMinY, previousCutY + wall - cutMinY);
+    let previous: typeof row[number] | null = null, previousX = 0;
+    for (const item of row) {
+      const x = previous ? Math.max(previousX + previous.die.maxX + p.diceSpacing!.x - item.die.minX,
+        previousX + previous.max[0] + wall - item.min[0]) : p.wallThickness - item.min[0];
+      items.push({ group: item.group, x, y });
+      maxX = Math.max(maxX, x + item.max[0]);
+      previous = item; previousX = x;
+    }
+    previousDieY = y + dieMaxY; previousCutY = y + cutMaxY;
+    maxY = Math.max(maxY, previousCutY);
+  }
+  return { width: maxX + p.wallThickness, depth: maxY + p.wallThickness, items };
+}
+
+export function getDiceTrayMeasuredSpacing(p: DiceTrayParams) {
+  const layout = getDiceTrayLayout(p), columns = Math.min(p.columns, layout.items.length);
+  const boxes = layout.items.map(item => ({ ...item, bounds: dieBounds(item.group) }));
+  const xs: number[] = [], ys: number[] = [];
+  let previousRowMax: number | null = null;
+  for (let start = 0; start < boxes.length; start += columns) {
+    const row = boxes.slice(start, start + columns);
+    for (let i = 1; i < row.length; i++) xs.push(row[i].x + row[i].bounds.minX - row[i - 1].x - row[i - 1].bounds.maxX);
+    const min = Math.min(...row.map(item => item.y + item.bounds.minY)), max = Math.max(...row.map(item => item.y + item.bounds.maxY));
+    if (previousRowMax !== null) ys.push(min - previousRowMax);
+    previousRowMax = max;
+  }
+  return { x: xs.length ? Math.min(...xs) : null, y: ys.length ? Math.min(...ys) : null };
 }
 
 export function getDiceTrayPositions(p: DiceTrayParams): CounterStack[] {
-  const groups = getDiceTrayGroups(p);
-  const dice = groups.flatMap(g => Array.from({ length: g.count }, () => g));
-  const columns = Math.min(p.columns, dice.length), cell = Math.max(...groups.map(g => g.size)) + p.clearance;
-  const notchSpace = getDiceNotchRadius(p, Math.max(...groups.map(g => g.size)));
-  const divider = p.mode === 'individual' ? p.wallThickness : 0;
+  const layout = getDiceTrayLayout(p);
   const commonWall = p.mode === 'individual' ? getDiceTrayCommonWallHeight(p) : 0;
-  return dice.map((g, i) => {
+  return layout.items.map(({ group: g, x, y }) => {
     const height = getDieMesh(g.diceKind, g.size).height;
     return {
     diceKind: g.diceKind, dieSize: g.size, shape: 'square',
-    x: p.wallThickness + notchSpace + cell / 2 + (i % columns) * (cell + notchSpace + divider),
-    y: p.wallThickness + cell / 2 + Math.floor(i / columns) * (cell + divider),
+    x, y,
     z: p.floorThickness + (p.mode === 'individual' ? Math.max(0, commonWall - getDicePocketWallHeight(p, height)) : 0), width: g.size, length: g.size, thickness: height,
     count: 1, hexPointyTop: false, color: '#e9c678'
   } as CounterStack; });
 }
 
 export interface DiceTrayParams {
+  minimumWidth?: number;
+  minimumDepth?: number;
+  diceSpacing?: { x: number; y: number };
+  spacingX?: number;
+  spacingY?: number;
+  compactLayout?: boolean;
   lidType?: 'removable' | 'sliding';
   lidTextEnabled?: boolean;
   lidText?: string;
@@ -88,6 +214,7 @@ export interface DiceTrayParams {
   lidThickness?: number;
   lidClearance?: number;
   fingerNotchDiameter?: number; // 0/missing preserves existing pockets
+  fingerNotchEnabled?: boolean;
   groups?: DiceTrayGroup[];
   minimumExposure?: number;
   mode: 'individual' | 'compartment';
@@ -101,6 +228,8 @@ export interface DiceTrayParams {
   pocketDepth: number;
 }
 export const defaultDiceTrayParams: DiceTrayParams = {
+  diceSpacing: { x: 1, y: 1 },
+  spacingX: 0, spacingY: 0, compactLayout: true,
   lidType: 'removable', lidTextEnabled: false, lidTextMode: 'engraved', lidTextColor: '#202020',
   exposedPercent: 40,
   outerCornerRadius: 3, asBox: false, stackingClearance: 2, lid: false, lidThickness: 2, lidClearance: 0.3,
@@ -109,12 +238,8 @@ export const defaultDiceTrayParams: DiceTrayParams = {
   clearance: 1, wallThickness: 2, floorThickness: 2, pocketDepth: 12
 };
 export function getDiceTrayBaseDimensions(p: DiceTrayParams) {
-  const groups = getDiceTrayGroups(p), count = groups.reduce((n, g) => n + g.count, 0);
-  const columns = Math.min(p.columns, count), rows = Math.ceil(count / columns);
-  const cell = Math.max(...groups.map(g => g.size)) + p.clearance, divider = p.mode === 'individual' ? p.wallThickness : 0;
-  const notchSpace = getDiceNotchRadius(p, Math.max(...groups.map(g => g.size)));
-  return { width: columns * (cell + notchSpace) + (columns - 1) * divider + 2 * p.wallThickness,
-    depth: rows * cell + (rows - 1) * divider + 2 * p.wallThickness,
+  const layout = getDiceTrayLayout(p);
+  return { width: layout.width, depth: layout.depth,
     height: p.floorThickness + (p.mode === 'compartment' ? getSharedDepth(p) : getDiceTrayCommonWallHeight(p)) };
 }
 export function getDiceTrayBodyDimensions(p: DiceTrayParams) {
@@ -141,6 +266,9 @@ export function getDiceTrayDimensions(p: DiceTrayParams) {
   return { ...body, height: body.height + (p.lid ? p.lidThickness ?? 2 : 0) + (p.lid && p.lidTextEnabled && p.lidTextMode === 'raised' ? 0.6 : 0) };
 }
 export function validateDiceTray(p: DiceTrayParams): boolean {
+  if ([p.minimumWidth, p.minimumDepth].some(value => value !== undefined && (!Number.isFinite(value) || value < 0 || value > 600))) return false;
+  if (p.diceSpacing && [p.diceSpacing.x, p.diceSpacing.y].some(value => !Number.isFinite(value) || value < 0 || value > 600)) return false;
+  if ([p.spacingX, p.spacingY].some(value => value !== undefined && (!Number.isFinite(value) || value < 0 || value > 600))) return false;
   if ((p.lidType !== undefined && !['removable', 'sliding'].includes(p.lidType)) ||
     (p.lidTextMode !== undefined && !['engraved', 'inlay', 'raised'].includes(p.lidTextMode)) ||
     (p.lidText !== undefined && (typeof p.lidText !== 'string' || p.lidText.length > 100)) ||

@@ -2,7 +2,7 @@
   import { FormControl, Input, InputCheckbox } from '@tableslayer/ui';
   import { IconChevronDown } from '@tabler/icons-svelte';
   import TextStyleControls from './TextStyleControls.svelte';
-  import { getMiniatureSocketRackLayout, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams, type MiniatureRackModel } from '$lib/models/miniatureSocketRack';
+  import { getMiniatureSocketRackLayout, getMiniatureSocketRackCornerRadius, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams, type MiniatureRackModel } from '$lib/models/miniatureSocketRack';
 
   let { params, onUpdate, trayName = '' }: {
     trayName?: string;
@@ -12,6 +12,7 @@
   let layout = $derived(getMiniatureSocketRackLayout(params));
   type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'lidTextMode' | 'lidTextColor' | 'labelTextMode' | 'labelTextColor' | 'labelsEnabled' | 'labelText' | 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
   const fields: { key: NumberKey; label: string; min: number; max: number; step: number; mode?: string }[] = [
+    { key: 'outerCornerRadius', label: 'Outer corner radius', min: 0, max: 100, step: 0.5 },
     { key: 'labelHeight', label: 'Letter height (minimum 4 mm)', min: 4, max: 12, step: 0.5 },
     { key: 'nozzleDiameter', label: 'Nozzle diameter', min: 0.2, max: 0.8, step: 0.1 },
     { key: 'lidThickness', label: 'Lid thickness', min: 2.8, max: 8, step: 0.1 },
@@ -139,7 +140,8 @@
 
   <section class="editorSection" aria-label="Rack structure and stacking">
     <h3>Structure &amp; stacking</h3>
-    {@render numericFields(['floorThickness', 'wallThickness', 'headroom', 'postWidth', 'stackingClearance'])}
+    {@render numericFields(['floorThickness', 'wallThickness', 'outerCornerRadius', 'headroom', 'postWidth', 'stackingClearance'])}
+    <p class="help">Effective outer radius: {getMiniatureSocketRackCornerRadius(layout.p).toFixed(1)} mm. Applies to the base, outer post corners and lid; limited to preserve stacking pockets. Set 0 for square corners.</p>
     <InputCheckbox label="Lighten floor below each base" checked={layout.p.perforated}
       onchange={(e) => update({ perforated: e.currentTarget.checked })} />
     <p class="help">To stack racks, match width, depth, post width and stacking clearance. Each rack can have its own height.</p>

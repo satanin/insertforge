@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getLidExplodeOffset } from '$lib/utils/lidExplode';
   import DiceMesh from './three/DiceMesh.svelte';
   import { onDestroy, untrack } from 'svelte';
   import { T, useThrelte, useTask } from '@threlte/core';
@@ -1146,6 +1147,7 @@
   // Log edit mode center changes
   // Exploded view offsets - lid slides out first, then trays lift
   // Lid slides along longest dimension of box
+  const separateLidOffset = $derived(getLidExplodeOffset(explosionAmount, cardStorageDetail?.lift ?? 0, cardStorageDetail?.slideDistance ?? 0));
   let explodedOffset = $derived.by(() => {
     if (!exploded)
       return {
@@ -1827,7 +1829,7 @@
   </T.Group>
 {/if}
 {#if !generating && geometry && cardStorageDetail && cardStorageDetail.visible !== false && !showLayerView && !showAllTrays}
-  <T.Group position.x={meshOffset.x} position.y={(cardStorageDetail.lift ?? 0) * Math.min(explosionAmount / 50, 1)} position.z={meshOffset.z - cardStorageDetail.slideDistance * Math.min(explosionAmount / 50, 1)} rotation.x={-Math.PI / 2}>
+  <T.Group position.x={meshOffset.x} position.y={separateLidOffset.lift} position.z={meshOffset.z - separateLidOffset.slide} rotation.x={-Math.PI / 2}>
     <T.Mesh geometry={cardStorageDetail.lid}>
       <T.MeshStandardMaterial color={cardStorageDetail.color} roughness={0.6} metalness={0.1} side={THREE.DoubleSide} />
     </T.Mesh>

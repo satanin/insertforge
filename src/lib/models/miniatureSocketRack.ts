@@ -3,6 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
 import { packItems } from '$lib/utils/binPacking';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
+import { createOuterBody, getOuterCornerRadius } from './outerCorners';
 
 export interface MiniatureRackModel {
   label?: string | null;
@@ -18,6 +19,7 @@ export interface MiniatureRackModel {
 
 /** Horizontal bases are tilted under a rigid tab, never snapped into place. */
 export interface MiniatureSocketRackParams {
+  outerCornerRadius?: number;
   labelsEnabled: boolean;
   labelText: string;
   labelHeight: number;
@@ -66,6 +68,7 @@ export interface MiniatureSocketRackParams {
 }
 
 export const defaultMiniatureSocketRackParams: MiniatureSocketRackParams = {
+  outerCornerRadius: 3,
   labelsEnabled: false, labelText: 'Mini', labelHeight: 4, nozzleDiameter: 0.4,
   labelTextMode: 'engraved', labelTextColor: '#ffffff',
   lid: false, lidThickness: 3,
@@ -116,6 +119,7 @@ export function normalizeMiniatureSocketRackParams(input: Partial<MiniatureSocke
     height: Math.max(finite(m.height, 45, 5, 300), finite(m.baseThickness, 3, 1, 15))
   }));
   return {
+    outerCornerRadius: finite(input.outerCornerRadius, 0, 0, 100),
     labelsEnabled: input.labelsEnabled === true,
     labelTextMode: input.labelTextMode === 'inlay' || input.labelTextMode === 'raised' ? input.labelTextMode : 'engraved',
     labelTextColor: typeof input.labelTextColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.labelTextColor) ? input.labelTextColor : '#ffffff',
@@ -535,9 +539,20 @@ export function createMiniatureSocketRackLabelText(input: Partial<MiniatureSocke
   return jscad.colors.colorize([color[0], color[1], color[2], 1], union(...shapes));
 }
 
+export function getMiniatureSocketRackCornerRadius(input: Partial<MiniatureSocketRackParams> = {}): number {
+  const { p, width, depth } = getMiniatureSocketRackLayout(input);
+  const pocketWidth = p.postWidth - 4 + p.stackingClearance * 2;
+  const inset = (p.postWidth - pocketWidth) / 2;
+  // Preserve at least 0.6 mm around the square registration pockets, including
+  // the diagonal corner. Pegs are narrower than their clearance pockets.
+  const safeRadius = Math.max(0, (inset - 0.6) / (1 - 1 / Math.sqrt(2)));
+  return getOuterCornerRadius(p.outerCornerRadius, width, depth, safeRadius);
+}
+
 export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackParams> = {}, includeLabelText = true): Geom3 {
   const { p, width, depth, stackPitch, seats, posts, labels, error } = getMiniatureSocketRackLayout(input);
   if (error) throw new Error(error);
+  const cornerRadius = getMiniatureSocketRackCornerRadius(input);
   const box = (x: number, y: number, z: number, w: number, d: number, h: number) =>
     translate([x, y, z + h / 2], cuboid({ size: [w, d, h] }));
   const round = (x: number, y: number, z: number, r: number, h: number) =>
@@ -561,7 +576,8 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
     ...(p.perforated ? seats.map(({ x, y, baseDiameter }) => round(x, y, -0.1, baseDiameter * 0.28, p.floorThickness + 0.2)) : [])
   ];
   // Drill the simple floor/perimeter before adding detailed engraved sockets.
-  const base = subtract(union(...parts), ...floorCuts);
+  let base = subtract(union(...parts), ...floorCuts);
+  if (cornerRadius > 0) base = intersect(base, createOuterBody(width, depth, p.floorThickness + rimHeight, cornerRadius, cornerRadius));
   parts.splice(0, parts.length, base);
   for (const [index, { x, y, baseDiameter, baseThickness, rotated }] of seats.entries()) {
     const socketParts: Geom3[] = [];
@@ -602,9 +618,11 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
     const socket = union(...socketParts);
     parts.push(labelCuts.length ? subtract(socket, ...labelCuts) : socket);
   }
+  const postBoundary = cornerRadius > 0 ? createOuterBody(width, depth, stackPitch, cornerRadius, cornerRadius) : null;
   for (const { x, y } of posts) {
+    const column = box(x, y, 0, p.postWidth, p.postWidth, stackPitch);
     parts.push(subtract(union(
-      box(x, y, 0, p.postWidth, p.postWidth, stackPitch),
+      postBoundary ? intersect(column, postBoundary) : column,
       box(x, y, stackPitch - 0.1, pegWidth, pegWidth, PEG_HEIGHT + 0.1)
     ), postPocket(x, y)));
   }
@@ -617,8 +635,8 @@ export function createMiniatureSocketRack(input: Partial<MiniatureSocketRackPara
 export function createMiniatureSocketRackLid(input: Partial<MiniatureSocketRackParams> = {}, trayName = '', includeText = true): Geom3 {
   const { p, width, depth, posts, error } = getMiniatureSocketRackLayout(input);
   if (error) throw new Error(error);
-  const plate = translate([width / 2, depth / 2, p.lidThickness / 2],
-    cuboid({ size: [width, depth, p.lidThickness] }));
+  const radius = getMiniatureSocketRackCornerRadius(input);
+  const plate = createOuterBody(width, depth, p.lidThickness, radius, radius);
   const pocketWidth = p.postWidth - 4 + p.stackingClearance * 2;
   const cuts = posts.map(({ x, y }) => translate([x, y, (SOCKET_DEPTH - 0.1) / 2],
     cuboid({ size: [pocketWidth, pocketWidth, SOCKET_DEPTH + 0.1] })));
