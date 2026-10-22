@@ -1,3 +1,4 @@
+import { createOuterBody } from './outerCorners';
 import type { CounterBaseShape, CounterShape } from '$lib/types/project';
 import { getSafeEmbossDepth } from './emboss';
 import jscad from '@jscad/modeling';
@@ -29,6 +30,7 @@ export type CustomShape = import('$lib/types/project').CounterShape;
 export type CustomCardSize = import('$lib/types/project').CardSize;
 
 export interface CounterTrayParams {
+  outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   counterThickness: number;
   clearance: number;
   wallThickness: number;
@@ -70,6 +72,7 @@ export const DEFAULT_CARD_SIZE_IDS = {
 };
 
 export const defaultParams: CounterTrayParams = {
+  outerCornerRadius: 3,
   counterThickness: 1.3,
   clearance: 0.3,
   wallThickness: 2.0,
@@ -1441,10 +1444,7 @@ export function createCounterTray(
   };
 
   // Build the tray
-  const trayBody = cuboid({
-    size: [trayWidth, trayDepth, trayHeight],
-    center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
-  });
+  const trayBody = createOuterBody(trayWidth, trayDepth, trayHeight, params.outerCornerRadius, wallThickness);
 
   const pocketCuts = [];
   const fingerCuts = [];

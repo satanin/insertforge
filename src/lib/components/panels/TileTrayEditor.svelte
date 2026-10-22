@@ -1,4 +1,5 @@
 <script lang="ts">
+  import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, FormControl, Spacer, Select, InputCheckbox } from '@tableslayer/ui';
   import type { TileTray } from '$lib/types/project';
   import { getCounterShapes } from '$lib/stores/project.svelte';
@@ -96,6 +97,8 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
 
+      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
+        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
       <FormControl label="Wall" name="tileWallThickness">
         {#snippet input({ inputProps })}
           <Input

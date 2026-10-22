@@ -5,6 +5,7 @@ import {
   createCardStorageParts,
   createCardStoragePreview,
   defaultCardStorageParams,
+  getCardStorageCornerRadius,
   getCardStoragePositions,
   resolveCardStorage,
   type CardStorageParams
@@ -18,6 +19,51 @@ const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
 });
 
 describe('Card Storage', () => {
+  it.each([false, true])('rounds the body and lid=%s without changing capacity, guides or dividers', (lid) => {
+    const p = params({ lid, lidText: '', maxHeight: 60 });
+    expect(defaultCardStorageParams.outerCornerRadius).toBe(3);
+    const square = createCardStorageParts({ ...p, outerCornerRadius: 0 }, cards);
+    const legacy = createCardStorageParts({ ...p, outerCornerRadius: undefined }, cards);
+    const rounded = createCardStorageParts(p, cards);
+    expect(getCardStorageCornerRadius(p, cards)).toBeCloseTo(lid ? 1.2 : 3);
+    expect(getCardStorageCornerRadius({ ...p, outerCornerRadius: 1000 }, cards)).toBeCloseTo(lid ? 1.2 : 3);
+    expect(resolveCardStorage(p, cards)).toEqual(resolveCardStorage({ ...p, outerCornerRadius: 0 }, cards));
+    expect(getCardStoragePositions(p, cards)).toEqual(getCardStoragePositions({ ...p, outerCornerRadius: 0 }, cards));
+    rounded.forEach((part, i) => {
+      const volume = jscad.measurements.measureVolume;
+      expect(volume(legacy[i].geometry)).toBeCloseTo(volume(square[i].geometry), 6);
+      const bounds = jscad.measurements.measureBoundingBox(square[i].geometry).flat();
+      jscad.measurements
+        .measureBoundingBox(part.geometry)
+        .flat()
+        .forEach((v, j) => expect(v).toBeCloseTo(bounds[j], 5));
+      if (part.id === 'body' || part.id === 'lid') {
+        expect(volume(part.geometry)).toBeLessThan(volume(square[i].geometry));
+        expect(volume(jscad.booleans.subtract(part.geometry, square[i].geometry))).toBeCloseTo(0, 5);
+      } else {
+        expect(part.geometry).toEqual(square[i].geometry);
+      }
+    });
+    if (lid) {
+      const r = resolveCardStorage(p, cards);
+      // All material inside the square closure band remains exactly the same,
+      // including the grooves, rails and locking ramps, for body and lid.
+      const margin = p.wallThickness / 2 - p.lidClearance;
+      const protectedRegion = jscad.primitives.cuboid({
+        size: [r.width - 2 * margin, r.depth - 2 * margin, r.height + 1],
+        center: [r.width / 2, r.depth / 2, (r.height + 1) / 2]
+      });
+      for (const id of ['body', 'lid']) {
+        const before = square.find((part) => part.id === id)!.assembled;
+        const after = rounded.find((part) => part.id === id)!.assembled;
+        expect(
+          jscad.measurements.measureVolume(
+            jscad.booleans.intersect(jscad.booleans.subtract(before, after), protectedRegion)
+          )
+        ).toBeCloseTo(0, 5);
+      }
+    }
+  });
   it('excludes the lid from the static body used by the animated detail view', () => {
     const p = params({ lid: true, lidText: '', dividers: [] });
     const body = createCardStorageParts(p, cards).find((part) => part.id === 'body')!;

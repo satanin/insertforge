@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.24`
+- Version visible actual: `1.2.25`
 
 ## Desarrollo local
 
@@ -260,6 +260,12 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- v1.2.25 redondeo exterior: usuario autoriza commit (2026-10-22). 197 tests y check correctos; validación impresa pendiente. Sin push autorizado. Ver [detalle](docs/plans/outer-corner-finish.md).
+
+- 2026-10-22 Card Storage: añadido radio exterior común para cuerpo/tapa en `Print settings`, 3 mm solicitado en piezas nuevas; limitado a pared sin tapa y al margen exterior del cierre con tapa (1,2 mm con defaults). Proyectos antiguos conservan 0. Pruebas de geometría/persistencia y editor local; pendiente validación visual/impresa del usuario. Sin versión/commit/push. Ver [detalle](docs/plans/outer-corner-finish.md).
+
+- 2026-10-22 acabado exterior: opción de radio 3 mm en nuevas Counter/Player Board, Cup, Card Draw, Card Divider y Tile Tray; 0/ausente conserva piezas anteriores. Radio efectivo limitado y visible; sin modificar huecos. Pendiente validación visual/impresa del usuario; sin versión/commit/push. Ver [alcance y pruebas](docs/plans/outer-corner-finish.md).
 
 - v1.2.24 Card Well: usuario valida el bloque y autoriza commit (2026-10-22). Mínimos exteriores, cotas, giro de vista individual, canales de extracción, esquinas redondeadas y nombres/etiquetas de pilas. Validación física pendiente; sin push autorizado. Ver [detalle y pruebas](docs/plans/card-well-refinements.md).
 

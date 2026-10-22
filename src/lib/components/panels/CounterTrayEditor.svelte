@@ -1,4 +1,5 @@
 <script lang="ts">
+  import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon, addToast } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CounterTray, CounterShapeCategory } from '$lib/types/project';
@@ -375,6 +376,8 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
+        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
       <FormControl label="Wall" name="wallThickness">
         {#snippet input({ inputProps })}
           <Input

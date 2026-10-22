@@ -1,3 +1,4 @@
+import { createOuterBody } from './outerCorners';
 import type { CupId, CupLayout, CupLayoutNode } from '$lib/types/cupLayout';
 import { generateCupId, isCupLeaf, isCupSplit } from '$lib/types/cupLayout';
 import { getSafeEmbossDepth } from './emboss';
@@ -14,6 +15,7 @@ const { extrudeLinear } = jscad.extrusions;
 
 // Cup tray parameters
 export interface CupTrayParams {
+  outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   layout: CupLayout; // Split-based layout tree (replaces rows/columns)
   trayWidth: number; // Total tray X dimension in mm
   trayDepth: number; // Total tray Y dimension in mm
@@ -50,6 +52,7 @@ function createDefault3CupLayout(): CupLayout {
 
 // Default parameters
 export const defaultCupTrayParams: CupTrayParams = {
+  outerCornerRadius: 3,
   layout: createDefault3CupLayout(),
   trayWidth: 89,
   trayDepth: 89,
@@ -263,10 +266,7 @@ export function createCupTray(
   const trayDepth = dims.depth;
 
   // Create tray body
-  const trayBody = cuboid({
-    size: [trayWidth, trayDepth, trayHeight],
-    center: [trayWidth / 2, trayDepth / 2, trayHeight / 2]
-  });
+  const trayBody = createOuterBody(trayWidth, trayDepth, trayHeight, params.outerCornerRadius, wallThickness);
 
   // Create cup cavities from computed positions
   const cupCuts: Geom3[] = [];

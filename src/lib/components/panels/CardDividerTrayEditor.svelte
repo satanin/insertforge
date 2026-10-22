@@ -1,4 +1,5 @@
 <script lang="ts">
+  import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CardDividerTray } from '$lib/types/project';
@@ -273,6 +274,8 @@
     </div>
     <Spacer size="0.5rem" />
     <div class="formGrid">
+      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
+        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
       <FormControl label="Wall" name="wallThickness">
         {#snippet input({ inputProps })}
           <Input

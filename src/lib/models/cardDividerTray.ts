@@ -1,3 +1,4 @@
+import { createOuterBody } from './outerCorners';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
@@ -25,6 +26,7 @@ export interface CardDividerStack {
 }
 
 export interface CardDividerTrayParams {
+  outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   stacks: CardDividerStack[];
   orientation: 'vertical' | 'horizontal'; // Card orientation for entire tray
   stackDirection: 'sideBySide' | 'frontToBack'; // How stacks are arranged in the tray
@@ -36,6 +38,7 @@ export interface CardDividerTrayParams {
 }
 
 export const defaultCardDividerTrayParams: CardDividerTrayParams = {
+  outerCornerRadius: 3,
   stacks: [
     { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined },
     { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: undefined }
@@ -637,10 +640,7 @@ function buildCardDividerTray(
   const trayDepth = dims.depth;
 
   // Create outer solid box
-  const outerBox = translate(
-    [trayWidth / 2, trayDepth / 2, trayHeight / 2],
-    cuboid({ size: [trayWidth, trayDepth, trayHeight] })
-  );
+  const outerBox = createOuterBody(trayWidth, trayDepth, trayHeight, params.outerCornerRadius, wallThickness);
 
   // Calculate effective floor height - if tray is extended, raise the card floor
   // so cards are accessible from the top

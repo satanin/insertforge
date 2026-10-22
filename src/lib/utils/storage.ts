@@ -91,6 +91,7 @@ interface LegacyCardTrayParams {
 
 // Legacy cup tray params (old format with individual cup dimensions or rows/columns)
 interface LegacyCupTrayParams {
+  outerCornerRadius?: number;
   cupWidth?: number;
   cupDepth?: number;
   cupHeight?: number;
@@ -200,7 +201,7 @@ function migrateCounterTrayParams(
   params: CounterTrayParams & LegacyTrayParams,
   shapeIdMapping: Map<string, string>
 ): CounterTrayParams {
-  const migrated = { ...defaultParams, ...params };
+  const migrated = { ...defaultParams, ...params, outerCornerRadius: params.outerCornerRadius ?? 0 };
 
   // Handle migration from old 'stacks' field to 'topLoadedStacks'
   if (params.stacks && !params.topLoadedStacks) {
@@ -401,7 +402,7 @@ function migrateTray(
       ...tray,
       type: 'cup',
       color,
-      params: migrateCupTrayParams(legacyParams)
+      params: { ...migrateCupTrayParams(legacyParams), outerCornerRadius: legacyParams.outerCornerRadius ?? 0 }
     } as Tray;
   }
 

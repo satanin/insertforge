@@ -3,12 +3,14 @@
   import { getCardSizes, updateCardStorageParams } from '$lib/stores/project.svelte';
   import {
     DEFAULT_STORAGE_DIVIDER_COLOR,
+    getCardStorageCornerMargin,
     minimumCardStorageLidWallThickness,
     resolveCardStorage,
     type CardStorageParams,
     type StorageDivider
   } from '$lib/models/cardStorageTray';
   import { ColorPicker, ColorPickerSwatch, FormControl, Input, Popover } from '@tableslayer/ui';
+  import OuterCornerControls from './OuterCornerControls.svelte';
   let { tray }: { tray: CardStorageTray } = $props();
   let result = $derived(resolveCardStorage(tray.params, getCardSizes()));
   let selectedPart = $state('all');
@@ -174,11 +176,7 @@
       </Popover>
     {/snippet}
     {#snippet input({ inputProps })}
-      <Input
-        {...inputProps}
-        value={dividerColor()}
-        oninput={(e) => update('dividerColor', e.currentTarget.value)}
-      />
+      <Input {...inputProps} value={dividerColor()} oninput={(e) => update('dividerColor', e.currentTarget.value)} />
     {/snippet}
   </FormControl>
   <p class="hint">Positions are illustrative. Move the printed dividers freely between cards.</p>
@@ -266,6 +264,13 @@
   </button>
   <details>
     <summary>Print settings</summary>
+    <OuterCornerControls
+      value={tray.params.outerCornerRadius}
+      width={result.width}
+      depth={result.depth}
+      margin={getCardStorageCornerMargin(tray.params)}
+      onchange={(value) => update('outerCornerRadius', value)}
+    />
     {#each [['wallThickness', 'Wall'], ['floorThickness', 'Floor'], ['clearance', 'Card clearance'], ['dividerThickness', 'Divider thickness'], ['tabHeight', 'Tab height'], ...(tray.params.lid ? [['lidThickness', 'Lid thickness'], ['lidClearance', 'Lid clearance']] : [])] as [key, label]}
       <label>
         {label} (mm)

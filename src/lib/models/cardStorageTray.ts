@@ -3,10 +3,11 @@ import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CounterStack } from './counterTray';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay, defaultLidParams } from './lid';
+import { createOuterBody, getOuterCornerRadius } from './outerCorners';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 const { cuboid, polygon } = jscad.primitives;
-const { union, subtract } = jscad.booleans;
+const { union, subtract, intersect } = jscad.booleans;
 const { translate, rotateX, rotateY, scale } = jscad.transforms;
 const { path2 } = jscad.geometries;
 const { expand } = jscad.expansions;
@@ -62,6 +63,7 @@ export interface StorageDivider {
   color?: string;
 }
 export interface CardStorageParams {
+  outerCornerRadius?: number;
   cardSizeId: string;
   orientation: 'vertical' | 'horizontal';
   sizing: 'count' | 'length';
@@ -82,6 +84,7 @@ export interface CardStorageParams {
   dividers: StorageDivider[];
 }
 export const defaultCardStorageParams: CardStorageParams = {
+  outerCornerRadius: 3,
   cardSizeId: 'standard',
   orientation: 'horizontal',
   sizing: 'count',
@@ -195,6 +198,17 @@ export interface CardStoragePart {
   assembledText?: Geom3;
 }
 
+// With a lid, its cavity extends into the outer half of the wall. Keep
+// rounding entirely in that exterior band so the square guides still fit.
+export function getCardStorageCornerMargin(p: CardStorageParams): number {
+  return p.lid ? Math.max(0, p.wallThickness / 2 - p.lidClearance) : p.wallThickness;
+}
+
+export function getCardStorageCornerRadius(p: CardStorageParams, cards: CardSize[]): number {
+  const r = resolveCardStorage(p, cards);
+  return getOuterCornerRadius(p.outerCornerRadius, r.width, r.depth, getCardStorageCornerMargin(p));
+}
+
 function storageSequence(p: CardStorageParams, r: ReturnType<typeof resolveCardStorage>) {
   let remaining = r.capacity,
     cursor = 0;
@@ -217,6 +231,7 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
   const r = resolveCardStorage(p, cards);
   if (!r.valid) throw new Error(r.errors.join(' '));
   const { width: W, depth: D, wallHeight: H } = r;
+  const cornerRadius = getCardStorageCornerRadius(p, cards);
   const w = p.wallThickness,
     f = p.floorThickness,
     c = p.clearance;
@@ -261,9 +276,15 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
     const support = translate([W - w, D - w - c - lean, f], rotateY(-Math.PI / 2, wedge));
     body = union(body, support);
   }
+  // Trim after adding the tilted rear support, keeping a single exterior
+  // contour. Skip the Boolean for old projects and explicit square corners.
+  if (cornerRadius > 0) body = intersect(body, createOuterBody(W, D, H, cornerRadius, cornerRadius));
   const parts: CardStoragePart[] = [];
   if (p.lid) {
-    const lid = createLid(box, [], [], fit)!;
+    let lid = createLid(box, [], [], fit)!;
+    if (cornerRadius > 0) {
+      lid = intersect(lid, createOuterBody(W, D, w + p.lidThickness, cornerRadius, cornerRadius));
+    }
     const text = createLidTextInlay(box) ?? undefined;
     // Turn the printable lid over around its Y sliding axis, keeping the entry side.
     const pose = (g: Geom3) => translate([W, 0, H + p.lidThickness], rotateY(Math.PI, g));

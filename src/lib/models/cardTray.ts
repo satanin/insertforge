@@ -1,8 +1,9 @@
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
+import { createOuterBody } from './outerCorners';
 
 const { cuboid, cylinder } = jscad.primitives;
-const { subtract, union } = jscad.booleans;
+const { subtract, union, intersect } = jscad.booleans;
 const { translate, rotateY, scale, mirrorY } = jscad.transforms;
 const { hull } = jscad.hulls;
 const { path2 } = jscad.geometries;
@@ -11,14 +12,15 @@ const { extrudeLinear } = jscad.extrusions;
 
 // Import types from project
 import type { CardSize } from '$lib/types/project';
-import { getSafeEmbossDepth } from './emboss';
 import { DEFAULT_CARD_SIZE_IDS } from './counterTray';
+import { getSafeEmbossDepth } from './emboss';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
 
 // Re-export for backwards compatibility
 export type CustomCardSize = CardSize;
 
 export interface CardDrawTrayParams {
+  outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   cardSizeId: string; // Reference to a CardSize by ID
   cardCount: number;
   wallThickness: number;
@@ -33,6 +35,7 @@ export interface CardDrawTrayParams {
 export type CardTrayParams = CardDrawTrayParams;
 
 export const defaultCardDrawTrayParams: CardDrawTrayParams = {
+  outerCornerRadius: 3,
   cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
   cardCount: 50,
   wallThickness: 4.0,
@@ -213,9 +216,12 @@ export function createCardDrawTray(
 
   // === OPEN-TOP BOX WITH OPEN FRONT ===
   // Outer solid box
-  const outerBox = translate(
-    [trayWidth / 2, trayDepth / 2, trayHeight / 2],
-    cuboid({ size: [trayWidth, trayDepth, trayHeight] })
+  const outerBox = createOuterBody(
+    trayWidth,
+    trayDepth,
+    trayHeight,
+    params.outerCornerRadius,
+    Math.min(wallThickness, 2)
   );
 
   // Inner cavity - extends to front edge (Y=0) to remove front wall
@@ -290,7 +296,18 @@ export function createCardDrawTray(
   tray = subtract(tray, leftWallCutout, rightWallCutout);
 
   // Add wedge after side wall cutouts so it's not removed by them
-  tray = union(tray, slopeWedge);
+  // The wedge historically extends 0.05 mm past each end. Preserve that
+  // envelope while rounding it too, so it cannot refill the body's corners.
+  const finishedWedge = params.outerCornerRadius
+    ? intersect(
+        slopeWedge,
+        translate(
+          [0, -0.05, 0],
+          createOuterBody(trayWidth, trayDepth + 0.1, trayHeight, params.outerCornerRadius, Math.min(wallThickness, 2))
+        )
+      )
+    : slopeWedge;
+  tray = union(tray, finishedWedge);
 
   // Subtract finger cutout after wedge so it cuts through wedge too
   tray = subtract(tray, fingerCutout);

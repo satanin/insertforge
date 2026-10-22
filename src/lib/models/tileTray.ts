@@ -1,3 +1,4 @@
+import { createOuterBody } from './outerCorners';
 import type { CounterShape } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -14,6 +15,7 @@ const { extrudeLinear } = jscad.extrusions;
 const { hull } = jscad.hulls;
 
 export interface TileTrayParams {
+  outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   tileShapeId: string;
   count: number;
   orientation: 'vertical' | 'horizontal';
@@ -47,6 +49,7 @@ const DEFAULT_TILE_RIM_HEIGHT = 2.0;
 const DEFAULT_TILE_CUTOUT_WIDTH = 20;
 const DEFAULT_TILE_CUTOUT_DEPTH = 8;
 export const defaultTileTrayParams: TileTrayParams = {
+  outerCornerRadius: 3,
   tileShapeId: DEFAULT_SHAPE_IDS.square,
   count: 10,
   orientation: 'vertical',
@@ -403,7 +406,7 @@ export function createTileTray(
   const trayHeight = trayHeightWithoutSpacer + spacerHeight;
   const heightIncrease = trayHeightWithoutSpacer > dims.height ? trayHeightWithoutSpacer - dims.height : 0;
   const cavityFloorZ = params.floorThickness + spacerHeight + heightIncrease;
-  const outerBox = translate([dims.width / 2, dims.depth / 2, trayHeight / 2], cuboid({ size: [dims.width, dims.depth, trayHeight] }));
+  const outerBox = createOuterBody(dims.width, dims.depth, trayHeight, params.outerCornerRadius, params.wallThickness);
 
   const cavityHeight = Math.min(core.cavityHeight, trayHeight - cavityFloorZ) + 0.1;
   const cavityShape =

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer } from '@tableslayer/ui';
   import type { CupTray } from '$lib/types/project';
   import type { CupLayout } from '$lib/types/cupLayout';
@@ -173,6 +174,8 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
+      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
+        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
       <FormControl label="Wall" name="wallThickness">
         {#snippet input({ inputProps })}
           <Input

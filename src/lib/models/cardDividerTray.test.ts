@@ -44,7 +44,7 @@ describe('card divider tray angled height limits', () => {
   });
 
   it('keeps the labelled reference tray close to the original high-resolution solid', () => {
-    const p = { ...defaultCardDividerTrayParams, stacks: Array.from({ length: 4 }, (_, i) => ({
+    const p = { ...defaultCardDividerTrayParams, outerCornerRadius: 0, stacks: Array.from({ length: 4 }, (_, i) => ({
       cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30, label: `Deck ${i + 1}`
     })) };
     const geometry = createCardDividerTray(p, cardSizes, 'Cards');

@@ -32,6 +32,31 @@ import {
 } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 
+describe('exterior corner persistence', () => {
+  beforeEach(() => resetProject());
+
+  for (const type of ['counter', 'cup', 'cardDraw', 'cardDivider', 'tile', 'cardStorage'] as const) {
+    it(`${type}: preserves selected radii and keeps old saved trays square`, () => {
+      const tray = addLooseTray(undefined, type);
+      if (!tray) throw new Error('Missing tray');
+      const params = getProject().layers.flatMap(layer => layer.looseTrays).find(item => item.id === tray.id)!.params as
+        { outerCornerRadius?: number };
+      expect(params.outerCornerRadius).toBe(3);
+      const restore = () => {
+        const project = importProjectFromJson(exportProjectToJson(getProject()));
+        return project.layers.flatMap(layer => layer.looseTrays).find(item => item.id === tray.id)?.params as
+          { outerCornerRadius?: number };
+      };
+      params.outerCornerRadius = 1.5;
+      expect(restore().outerCornerRadius).toBe(1.5);
+      params.outerCornerRadius = 0;
+      expect(restore().outerCornerRadius).toBe(0);
+      delete params.outerCornerRadius;
+      expect(restore().outerCornerRadius ?? 0).toBe(0);
+    });
+  }
+});
+
 describe('miniature tray menu entry', () => {
   beforeEach(() => resetProject());
   it('creates and persists sockets directly while keeping the rail entry unchanged', () => {
