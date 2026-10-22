@@ -604,7 +604,7 @@
   const layerGeometryCache = new Map<string, GenerationResult>();
   let pendingRegenerateTimeout: ReturnType<typeof setTimeout> | null = null;
   let jsonFileInput = $state<HTMLInputElement | null>(null);
-  let explosionAmount = $state(50);
+  let explosionAmount = $state(100);
   let allLayersExplosionAmount = $state(50); // Default to current behavior (20mm separation)
   let showCounters = $state(false);
   let communityProjects = $state<CommunityProject[]>([]);

@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.30`
+- Version visible actual: `1.2.31`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.31 (2026-10-23): usuario acepta y autoriza commit/push de Explode inicial al 100%, con tapas apartadas. Slider sigue editable; separación entre capas conserva su default independiente. Check sin errores ni avisos.
 
 - v1.2.30: usuario acepta mejoras de Dice Tray y autoriza commit/push (2026-10-22). Espaciado mínimo entre bordes (default 1 mm X/Y), reparto sobrante por fila, dimensiones exteriores mínimas, margen interior 1,5 mm y checkbox de notch. Incluye redondeo opcional de Miniature Tray y explode por fases. 116 tests focalizados pasan. Validación física pendiente; extender dimensiones mínimas al resto de piezas sigue pendiente de diseño común. Ver [plan](docs/plans/dice-tray.md).
 
