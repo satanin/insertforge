@@ -10,6 +10,11 @@ test('inventory entry, inheritance and assigning card content to a piece', async
   const inventory = page.locator('dialog[open]');
   await inventory.getByRole('button', { name: '+ Cards', exact: true }).click();
   const rows = inventory.locator('[data-group]');
+  await expect(rows.first().getByRole('button', { name: /Decrease quantity/ })).toBeDisabled();
+  await rows.first().getByRole('button', { name: /Increase quantity/ }).click();
+  await expect(rows.first().getByLabel('Group quantity')).toHaveValue('2');
+  await rows.first().getByRole('button', { name: /Decrease quantity/ }).click();
+  await expect(rows.first().getByLabel('Group quantity')).toHaveValue('1');
   await rows.first().getByRole('textbox', { name: 'Group name', exact: true }).fill('Starting cards');
   await rows.first().getByLabel('Group quantity').fill('128');
   await rows.first().getByLabel('Group quantity').press('Tab');
@@ -20,15 +25,19 @@ test('inventory entry, inheritance and assigning card content to a piece', async
   await rows.nth(1).getByLabel('Sleeves', { exact: true }).selectOption('manual');
   await rows.nth(1).getByLabel('Thickness per card', { exact: true }).first().fill('0.6');
   await rows.nth(1).getByLabel('Thickness per card', { exact: true }).first().press('Tab');
-  await inventory.getByRole('button', { name: '+ Tokens / tiles', exact: true }).click();
+  await inventory.getByRole('button', { name: '+ Tokens', exact: true }).click();
   await rows.nth(2).getByRole('textbox', { name: 'Group name', exact: true }).fill('Health tokens');
   await rows.nth(2).getByLabel('Project shape', { exact: true }).selectOption('shape-square');
   await rows.nth(2).getByLabel('Width', { exact: true }).fill('20');
   await rows.nth(2).getByLabel('Width', { exact: true }).press('Tab');
   await inventory.getByRole('button', { name: '+ Dice', exact: true }).click();
-  await rows.nth(3).getByLabel('Die type', { exact: true }).selectOption('d10');
+  const projectDie = rows.nth(3).getByLabel('Project dice size', { exact: true });
+  const d10Id = await projectDie.locator('option').filter({ hasText: /\(d10,/ }).first().getAttribute('value');
+  await projectDie.selectOption(d10Id!);
+  await expect(rows.nth(3).getByRole('combobox')).toHaveCount(2); // Component type + project die.
   await rows.nth(3).getByLabel('Maximum outer size', { exact: true }).fill('16');
   await rows.nth(3).getByLabel('Maximum outer size', { exact: true }).press('Tab');
+  await expect(projectDie).toHaveValue(d10Id!);
   await inventory.getByRole('button', { name: 'Close inventory' }).click();
   await page.getByRole('button', { name: '+ Add loose tray', exact: true }).first().click();
   await page.getByRole('button', { name: 'Card Storage One cavity with removable, labelled dividers' }).click();
@@ -61,5 +70,8 @@ test('inventory entry, inheritance and assigning card content to a piece', async
     page.locator('dialog[open] [data-group]').first().getByRole('textbox', { name: 'Group name', exact: true })
   ).toHaveValue('Starting cards');
   await expect(page.locator('dialog[open] [data-group]').first().locator('.assignments')).toContainText('64 / 128');
+  const restoredDice = page.locator('dialog[open] [data-group]').nth(3);
+  await expect(restoredDice.getByLabel('Project dice size')).toHaveValue(d10Id!);
+  await expect(restoredDice.getByLabel('Maximum outer size', { exact: true })).toHaveValue('16');
   expect(errors).toEqual([]);
 });

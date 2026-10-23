@@ -125,7 +125,7 @@ export function applyInventoryGeometry(
     const params = section ? section.cupParams! : (tray as Extract<Tray, { type: 'cup' }>).params;
     const cells = entries.map(({ group: g, assignment: a }) => {
       const columns = Math.ceil(Math.sqrt(a.quantity));
-      const hex = g.baseShape === 'hex' && g.kind === 'tokens';
+      const hex = g.baseShape === 'hex' && (g.kind === 'tokens' || g.kind === 'tiles');
       const width = hex && !g.pointyTop ? g.width! / Math.cos(Math.PI / 6) : g.width!;
       const depth = g.kind === 'dice' ? g.width! : hex && g.pointyTop ? g.width! / Math.cos(Math.PI / 6) : g.depth!;
       return {
@@ -135,7 +135,7 @@ export function applyInventoryGeometry(
         height:
           (g.kind === 'dice'
             ? g.width
-            : g.kind === 'cards' || g.kind === 'tokens' || g.kind === 'boards'
+            : g.kind === 'cards' || g.kind === 'tokens' || g.kind === 'tiles' || g.kind === 'boards'
               ? g.thickness
               : g.height)! + 2
       };

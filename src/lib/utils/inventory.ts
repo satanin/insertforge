@@ -2,7 +2,8 @@ import type { Board, InventoryAssignment, InventoryGroup, LayeredBoxSection, Pro
 
 export const inventoryKinds = [
   { value: 'cards', label: 'Cards' },
-  { value: 'tokens', label: 'Tokens / tiles' },
+  { value: 'tokens', label: 'Tokens' },
+  { value: 'tiles', label: 'Tiles' },
   { value: 'dice', label: 'Dice' },
   { value: 'boards', label: 'Boards' },
   { value: 'miniatures', label: 'Miniatures' },
@@ -12,7 +13,7 @@ export const sleeveOptions = [
   { value: 'none', label: 'No sleeves' },
   { value: 'normal', label: 'Normal sleeves' },
   { value: 'premium', label: 'Premium sleeves' },
-  { value: 'manual', label: 'Manual thickness' }
+  { value: 'manual', label: 'Custom thickness' }
 ] as const;
 // Estimates only: measured thickness remains editable, including sleeved cards.
 export const sleeveThickness = { none: 0.3, normal: 0.5, premium: 0.8, manual: undefined };
@@ -59,7 +60,7 @@ export function availableQuantity(project: Project, groupId: string, exceptId?: 
 export function compatibleInventory(type: InventoryTarget['type'], group: InventoryGroup): boolean {
   if (type === 'dice') return group.kind === 'dice';
   if (['cardStorage', 'cardDraw', 'cardDivider', 'cardWell'].includes(type)) return group.kind === 'cards';
-  if (type === 'counter' || type === 'tile') return group.kind === 'tokens';
+  if (type === 'counter' || type === 'tile') return group.kind === 'tokens' || group.kind === 'tiles';
   if (type === 'playerBoard' || type === 'board') return group.kind === 'boards';
   if (type === 'miniatureRack') return group.kind === 'miniatures';
   return type === 'cup';
@@ -84,7 +85,7 @@ export function validateAssignments(
 }
 export function missingMeasurements(group: InventoryGroup): string | null {
   const keys: (keyof InventoryGroup)[] =
-    group.kind === 'cards' || group.kind === 'tokens' || group.kind === 'boards'
+    group.kind === 'cards' || group.kind === 'tokens' || group.kind === 'tiles' || group.kind === 'boards'
       ? ['width', 'depth', 'thickness']
       : group.kind === 'dice'
         ? ['width']

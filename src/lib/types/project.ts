@@ -318,7 +318,7 @@ export interface Project {
   globalSettings?: GlobalSettings;
 }
 
-export type InventoryKind = 'cards' | 'tokens' | 'dice' | 'boards' | 'miniatures' | 'other';
+export type InventoryKind = 'cards' | 'tokens' | 'tiles' | 'dice' | 'boards' | 'miniatures' | 'other';
 export type CardSleeve = 'none' | 'normal' | 'premium' | 'manual';
 export type DiceKind = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
 export interface DiceSize {
@@ -339,6 +339,7 @@ export interface InventoryGroup {
   baseShape?: CounterBaseShape;
   pointyTop?: boolean;
   diceKind?: DiceKind;
+  projectDiceSizeId?: string;
   width?: number;
   depth?: number;
   thickness?: number;

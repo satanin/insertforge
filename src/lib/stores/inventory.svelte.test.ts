@@ -17,6 +17,19 @@ import {
 
 describe('project inventory', () => {
   beforeEach(resetProjectToBlank);
+  it('keeps tiles distinct from tokens and applies their measurement snapshots', () => {
+    const group = addInventoryGroup('tiles');
+    updateInventoryGroup(group.id, { name: 'Map tiles', quantity: 12, width: 40, depth: 50, thickness: 3 });
+    const tray = addLooseTray(undefined, 'tile')!;
+    expect(setInventoryContent(tray.id, [{ groupId: group.id, quantity: 6, revision: 0 }])).toBeNull();
+    expect(availableQuantity(getProject(), group.id)).toBe(6);
+    updateInventoryGroup(group.id, { width: 45 });
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    expect(getProject().inventory!.find(g => g.id === group.id)).toMatchObject({ kind: 'tiles', width: 45 });
+    const restored = getProject().layers[0].looseTrays.find(t => t.id === tray.id)!;
+    if (restored.type !== 'tile') throw new Error('Wrong tray');
+    expect(getProject().counterShapes.find(s => s.id === restored.params.tileShapeId)).toMatchObject({ width: 40, length: 50, thickness: 3 });
+  });
   it('keeps top/edge loading and edge orientation per group through save and reapply', () => {
     const top = tokens();
     const edge = addInventoryGroup('tokens', top.id);

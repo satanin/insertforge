@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.31`
+- Version visible actual: `1.2.32`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.32: usuario acepta y autoriza commit del bloque de inventario. Mejora de legibilidad y alineación, ayudas adaptativas, controles superiores fijos y cabecera sticky. Dados con selector único y tamaño snapshot editable; cartas con medidas custom visibles y resúmenes de formato/fundas; cantidades con −/+; Tokens y Tiles separados sin reclasificar grupos antiguos. Tests de inventario, medidas custom, ayudas y scroll verificados durante la iteración. Push no solicitado.
 
 - v1.2.31 (2026-10-23): usuario acepta y autoriza commit/push de Explode inicial al 100%, con tapas apartadas. Slider sigue editable; separación entre capas conserva su default independiente. Check sin errores ni avisos.
 

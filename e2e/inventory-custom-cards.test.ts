@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+test('custom card dimensions and sleeve thickness are visible and persist', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Game components/ }).click();
+  const dialog = page.locator('dialog[open]');
+  await dialog.getByRole('button', { name: '+ Cards', exact: true }).click();
+  const row = dialog.locator('[data-group]').last();
+  await row.getByLabel('Card format', { exact: true }).selectOption('');
+  const width = row.getByLabel('Width incl. sleeve', { exact: true });
+  const length = row.getByLabel('Length incl. sleeve', { exact: true });
+  await expect(width).toBeVisible();
+  await width.fill('67');
+  await length.fill('92');
+  await length.press('Tab');
+  await expect(row.locator('.formatSummary').first()).toHaveText('67 × 92 mm');
+  await row.getByLabel('Sleeves', { exact: true }).selectOption({ label: 'Custom thickness' });
+  const thickness = row.getByLabel('Thickness per card', { exact: true });
+  await expect(thickness).toBeVisible();
+  await thickness.fill('0.72');
+  await thickness.press('Tab');
+  await expect(row.locator('.formatSummary').last()).toHaveText('0.72 mm / card');
+  await dialog.getByRole('button', { name: 'Close inventory' }).click();
+  await page.reload();
+  await page.getByRole('button', { name: /Game components/ }).click();
+  await expect(width).toBeVisible();
+  await expect(width).toHaveValue('67');
+  await expect(length).toHaveValue('92');
+  await expect(thickness).toHaveValue('0.72');
+});
