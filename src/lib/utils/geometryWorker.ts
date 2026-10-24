@@ -1,3 +1,4 @@
+import { getProjectCardSizes } from '$lib/utils/projectCards';
 /**
  * Manager for the geometry generation Web Worker
  * Provides a promise-based API for communicating with the worker
@@ -317,7 +318,7 @@ export class GeometryWorkerManager {
         JSON.stringify({
           name: project.name,
           layers: project.layers,
-          cardSizes: project.cardSizes,
+          cardSizes: getProjectCardSizes(project),
           counterShapes: project.counterShapes,
           globalSettings: project.globalSettings
         })

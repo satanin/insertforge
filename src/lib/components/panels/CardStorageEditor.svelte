@@ -1,4 +1,8 @@
 <script lang="ts">
+  import CardSleeveControl from '../CardSleeveControl.svelte';
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import type { CardStorageTray } from '$lib/types/project';
   import { getCardSizes, updateCardStorageParams } from '$lib/stores/project.svelte';
   import {
@@ -24,7 +28,7 @@
     if (!exists) selectedPart = 'all';
   });
   function update<K extends keyof CardStorageParams>(key: K, value: CardStorageParams[K]) {
-    updateCardStorageParams(tray.id, { ...tray.params, [key]: value });
+    updateCardStorageParams(tray.id, { ...tray.params, [key]: value, ...(key === 'cardSizeId' ? { cardThicknessOverride: undefined } : {}) });
   }
   function setClosure(lid: boolean) {
     updateCardStorageParams(tray.id, {
@@ -67,6 +71,7 @@
 </script>
 
 <section class="storageEditor">
+  <EditorSection title="Content, dimensions and lid">
   <h3>Card Storage</h3>
   <label>
     Card size
@@ -74,6 +79,7 @@
       {#each getCardSizes() as card}<option value={card.id}>{card.name}</option>{/each}
     </select>
   </label>
+  <CardSleeveControl selection={tray.params} onChange={(value) => updateCardStorageParams(tray.id, { ...tray.params, ...value })} />
   <label>
     Orientation
     <select
@@ -93,12 +99,10 @@
   </label>
   {#if tray.params.sizing === 'count'}
     <label>
-      Number of cards <input
-        type="number"
-        min="1"
-        step="1"
+      Number of cards <QuantityInput
+        label="Number of cards"
         value={tray.params.count}
-        onchange={(e) => update('count', e.currentTarget.valueAsNumber)}
+        onChange={(value) => update('count', value)}
       />
     </label>
   {:else}
@@ -161,6 +165,8 @@
     Capacity: {result.capacity} cards · Tilt: {((result.angle * 180) / Math.PI).toFixed(1)}° from upright
   </p>
   {#each result.errors as error}<p class="error" role="alert">{error}</p>{/each}
+  </EditorSection>
+  <EditorSection title="Removable dividers" summary={`${tray.params.dividers.length} dividers`}>
   <h3>Removable dividers</h3>
   <FormControl label="Default divider colour" name="defaultDividerColor">
     {#snippet start()}
@@ -262,7 +268,9 @@
   >
     Add divider
   </button>
-  <details>
+  </EditorSection>
+  <EditorSection title="Manufacturing" open={false}>
+  <details open={interfaceUi.mode === 'modern'}>
     <summary>Print settings</summary>
     <OuterCornerControls
       value={tray.params.outerCornerRadius}
@@ -286,6 +294,8 @@
       </label>
     {/each}
   </details>
+  </EditorSection>
+  <EditorSection title="Export parts">
   <h3>Export parts</h3>
   <label>
     Parts
@@ -305,6 +315,7 @@
   </div>
   <p class="hint">Use 3MF to assign a separate colour to the text. Dividers export flat for printing.</p>
   {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
+  </EditorSection>
 </section>
 
 <style>

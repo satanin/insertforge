@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getProjectCardSizes } from '$lib/utils/projectCards';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import { getContentPreviewLabel } from '$lib/utils/contentPreviewLabel';
   import { browser } from '$app/environment';
   import { PaneGroup, Pane, PaneResizer, type PaneAPI } from 'paneforge';
@@ -392,7 +394,7 @@
   let allLayeredBoxGeometries = $derived.by(() => {
     const project = getProject();
     const counterShapes = project.counterShapes || [];
-    const cardSizes = project.cardSizes || [];
+    const cardSizes = getProjectCardSizes(project) || [];
     const geometries: LayeredBoxGeometryData[] = [];
     const shouldRenderAllLayeredBoxes = renderedViewMode === 'all-no-lid';
     const selectedLayeredBoxId = project.selectedLayeredBoxId ?? null;
@@ -587,7 +589,7 @@
   let lidTextInlayGeometry = $derived.by(() => {
     if (!selectedBox) return null;
     const project = getProject();
-    const jscadGeom = createLidTextInlay(selectedBox, project.cardSizes ?? [], project.counterShapes ?? []);
+    const jscadGeom = createLidTextInlay(selectedBox, getProjectCardSizes(project) ?? [], project.counterShapes ?? []);
     return jscadGeom ? jscadToBufferGeometry(jscadGeom) : null;
   });
   let generating = $state(false);
@@ -843,7 +845,7 @@
         ? { ...socketPreview, lift: 4 } : null;
     }
     if (selectedTray?.type !== 'cardStorage' || !selectedTray.params.lid) return null;
-    const cards = getProject().cardSizes;
+    const cards = getProjectCardSizes(getProject());
     const dimensions = resolveCardStorage(selectedTray.params, cards);
     if (!dimensions.valid) return null;
     const lid = createCardStorageParts(selectedTray.params, cards).find((part) => part.id === 'lid')!;
@@ -880,7 +882,7 @@
       (total, layer) =>
         total +
         calculateLayerHeight(layer, {
-          cardSizes: project.cardSizes || [],
+          cardSizes: getProjectCardSizes(project) || [],
           counterShapes: project.counterShapes || []
         }),
       0
@@ -893,14 +895,14 @@
   }
   let layerViewContainerWidth = $derived.by(() => {
     if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {
-      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProject().cardSizes ?? [], getProject().counterShapes ?? []);
+      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProjectCardSizes(getProject()) ?? [], getProject().counterShapes ?? []);
       return Math.max(dims.width - selectedLayeredBox.wallThickness * 2 - selectedLayeredBox.tolerance * 2, 1);
     }
     return gameContainerWidth;
   });
   let layerViewContainerDepth = $derived.by(() => {
     if ((selectionType === 'layeredBoxLayer' || selectionType === 'layeredBoxSection') && selectedLayeredBox) {
-      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProject().cardSizes ?? [], getProject().counterShapes ?? []);
+      const dims = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProjectCardSizes(getProject()) ?? [], getProject().counterShapes ?? []);
       return Math.max(dims.depth - selectedLayeredBox.wallThickness * 2 - selectedLayeredBox.tolerance * 2, 1);
     }
     return gameContainerDepth;
@@ -972,7 +974,7 @@
     return arrangeLayerContents(selectedLayer, {
       gameContainerWidth,
       gameContainerDepth,
-      cardSizes: project.cardSizes || [],
+      cardSizes: getProjectCardSizes(project) || [],
       counterShapes: project.counterShapes || []
     });
   });
@@ -986,7 +988,7 @@
       arrangement: arrangeLayerContents(layer, {
         gameContainerWidth,
         gameContainerDepth,
-        cardSizes: project.cardSizes || [],
+        cardSizes: getProjectCardSizes(project) || [],
         counterShapes: project.counterShapes || []
       })
     }));
@@ -1326,7 +1328,7 @@
     allTrayGeometries = result.allTrayGeometries;
     if (selectedTray?.type === 'cardStorage') {
       selectedTrayGeometry = jscadToBufferGeometry(
-        createCardStoragePreview(selectedTray.params, getProject().cardSizes, selectedTray.color, 'sideBySide')
+        createCardStoragePreview(selectedTray.params, getProjectCardSizes(getProject()), selectedTray.color, 'sideBySide')
       );
       allTrayGeometries = allTrayGeometries.map((item) =>
         item.trayId === selectedTray.id ? { ...item, geometry: selectedTrayGeometry! } : item
@@ -1493,7 +1495,7 @@
           selectedTrayGeometry = cachedLooseTray.geometry;
           if (selectedTray.type === 'cardStorage') {
             selectedTrayGeometry = jscadToBufferGeometry(
-              createCardStoragePreview(selectedTray.params, project.cardSizes, selectedTray.color, 'sideBySide')
+              createCardStoragePreview(selectedTray.params, getProjectCardSizes(project), selectedTray.color, 'sideBySide')
             );
           }
           selectedTrayCounters = cachedLooseTray.counterStacks;
@@ -1718,7 +1720,7 @@
         arrangeLayerContents(layer, {
           gameContainerWidth,
           gameContainerDepth,
-          cardSizes: project.cardSizes || [],
+          cardSizes: getProjectCardSizes(project) || [],
           counterShapes: project.counterShapes || []
         })
       );
@@ -1955,7 +1957,7 @@
       hidePrintBed = true;
 
       // Get global card sizes and counter shapes from project
-      const cardSizes = project.cardSizes;
+      const cardSizes = getProjectCardSizes(project);
       const counterShapes = project.counterShapes;
 
       // Capture each tray
@@ -2388,7 +2390,7 @@
         arrangeLayerContents(layer, {
           gameContainerWidth,
           gameContainerDepth,
-          cardSizes: project.cardSizes || [],
+          cardSizes: getProjectCardSizes(project) || [],
           counterShapes: project.counterShapes || []
         })
       );
@@ -2729,7 +2731,7 @@
     if (!box) return;
 
     const project = getProject();
-    const cardSizes = project.cardSizes ?? [];
+    const cardSizes = getProjectCardSizes(project) ?? [];
     const counterShapes = project.counterShapes ?? [];
 
     // Get current placements (either from manual layout or auto)
@@ -2839,7 +2841,7 @@
 
   function handleEnterLayerLayoutEdit() {
     const project = getProject();
-    const cardSizes = project.cardSizes ?? [];
+    const cardSizes = getProjectCardSizes(project) ?? [];
     const counterShapes = project.counterShapes ?? [];
 
     if (selectionType === 'layeredBoxLayer' && selectedLayeredBox && selectedLayeredBoxLayer) {
@@ -3624,6 +3626,9 @@
             </Popover>
             {#if !isLayoutEditMode && !isLayerLayoutEditMode}
               <div class="toolbarRight">
+                {#if interfaceUi.mode === 'modern'}
+                  <span class="generationState" aria-live="polite">{generating ? 'Generating geometry…' : isDirty ? 'Changes pending' : 'View up to date'}</span>
+                {/if}
                 {#if viewMode === 'tray' && selectedTray?.type === 'miniatureRack' && cardStorageDetail}
                   <InputCheckbox checked={showLidPreview} onchange={(e) => (showLidPreview = e.currentTarget.checked)} label="Preview lid" />
                 {/if}

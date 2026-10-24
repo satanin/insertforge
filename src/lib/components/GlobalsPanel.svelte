@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getCardSleeveThicknesses, projectSleeveOptions } from '$lib/utils/projectCards';
+  import { updateCardSleeveThickness } from '$lib/stores/project.svelte';
   import DiceIcon from './DiceIcon.svelte';
   import {
     Input,
@@ -1094,8 +1096,22 @@
   </section>
   {:else if activeTab === 'cards'}
     <section class="section">
-    <h3 class="sectionTitle">Card Sizes (Sleeved)</h3>
-    <p class="sectionHint">Default thickness is for regular sleeves, change it to 0.75~0.8 for premium sleeves.</p>
+    <h3 class="sectionTitle">Card thickness</h3>
+    <p class="sectionHint">Total thickness per card. Changes update pieces using these sleeves; inventory measurements stay unchanged.</p>
+    <div class="shapeFormGrid">
+      {#each projectSleeveOptions as option}
+        <FormControl label={option.label} name={`cardSleeve-${option.value}`}>
+          {#snippet input({ inputProps })}
+            <Input {...inputProps} type="number" min="0.01" step="0.01"
+              value={getCardSleeveThicknesses(getProject())[option.value]}
+              onchange={(e) => { updateCardSleeveThickness(option.value, Number(e.currentTarget.value)); e.currentTarget.value = String(getCardSleeveThicknesses(getProject())[option.value]); }} />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+      {/each}
+    </div>
+    <Spacer />
+    <h3 class="sectionTitle">Card formats</h3>
     <Spacer size="0.5rem" />
     <div class="customShapesList">
       {#each cardSizes as cardSize, index (cardSize.id)}
@@ -1138,20 +1154,6 @@
                       min="10"
                       value={cardSize.length}
                       onchange={(e) => handleUpdateCardSize(cardSize.id, 'length', parseFloat(e.currentTarget.value))}
-                    />
-                  {/snippet}
-                  {#snippet end()}mm{/snippet}
-                </FormControl>
-                <FormControl label="Thickness" name="cardThickness-{index}">
-                  {#snippet input({ inputProps })}
-                    <Input
-                      {...inputProps}
-                      type="number"
-                      step="0.05"
-                      min="0.1"
-                      value={cardSize.thickness}
-                      onchange={(e) =>
-                        handleUpdateCardSize(cardSize.id, 'thickness', parseFloat(e.currentTarget.value))}
                     />
                   {/snippet}
                   {#snippet end()}mm{/snippet}

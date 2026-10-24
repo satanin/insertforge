@@ -260,7 +260,7 @@ describe('Card Storage persistence and placement', () => {
     const result = restored.layers.flatMap(l => l.looseTrays).find(t => t.id === tray.id);
     expect(result?.type).toBe('cardStorage');
     if (result?.type !== 'cardStorage') throw new Error('Wrong restored type');
-    expect(result.params).toEqual({ ...tray.params, sizing:'length', exteriorLength:120,
+    expect(result.params).toEqual({ ...tray.params, sleeve: 'normal', sizing:'length', exteriorLength:120,
       dividers:[{id:'label',label:'Acción',tab:'right'}] });
     expect(result.autoHeight).toBe(false);
   });
@@ -513,6 +513,27 @@ describe('project store blank reset', () => {
   });
 });
 
+describe('project counter size defaults', () => {
+  it('uses 16 mm counters in both empty and sample projects', () => {
+    for (const reset of [resetProjectToBlank, resetProject]) {
+      reset();
+      const counters = getProject().counterShapes.filter(shape => shape.category === 'counter');
+      expect(counters).toHaveLength(4);
+      expect(counters.map(shape => [shape.width, shape.length])).toEqual(Array.from({ length: 4 }, () => [16, 16]));
+    }
+  });
+
+  it('preserves saved counter measurements rather than resizing existing pieces', () => {
+    resetProjectToBlank();
+    const saved = JSON.parse(exportProjectToJson(getProject()));
+    saved.counterShapes[0].width = 15.9;
+    saved.counterShapes[0].length = 15.9;
+    importProject(importProjectFromJson(JSON.stringify(saved)));
+    expect(getProject().counterShapes[0].width).toBe(15.9);
+    expect(getProject().counterShapes[0].length).toBe(15.9);
+  });
+});
+
 describe('project store card size defaults', () => {
   beforeEach(() => {
     resetProjectToBlank();
@@ -523,14 +544,14 @@ describe('project store card size defaults', () => {
 
     updateCardDrawTrayParams(firstTray.id, {
       ...firstTray.params,
-      cardSizeId: DEFAULT_CARD_SIZE_IDS.miniAmericanPremium
+      cardSizeId: DEFAULT_CARD_SIZE_IDS.miniAmerican
     });
 
     const box = addBox(undefined, 'counter');
     const nextTray = addTray(box.id, 'cardDraw') as CardDrawTray;
 
-    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.miniAmericanPremium);
-    expect(nextTray.params.cardSizeId).toBe(DEFAULT_CARD_SIZE_IDS.miniAmericanPremium);
+    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.miniAmerican);
+    expect(nextTray.params.cardSizeId).toBe(DEFAULT_CARD_SIZE_IDS.miniAmerican);
   });
 
   it('uses the last selected card size for new card divider trays', () => {
@@ -540,14 +561,14 @@ describe('project store card size defaults', () => {
       ...firstTray.params,
       stacks: firstTray.params.stacks.map((stack, index) => ({
         ...stack,
-        cardSizeId: index === 0 ? DEFAULT_CARD_SIZE_IDS.tarotPremium : stack.cardSizeId
+        cardSizeId: index === 0 ? DEFAULT_CARD_SIZE_IDS.tarot : stack.cardSizeId
       }))
     });
 
     const nextTray = addLooseTray(undefined, 'cardDivider') as CardDividerTray;
 
-    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.tarotPremium);
-    expect(nextTray.params.stacks.every((stack) => stack.cardSizeId === DEFAULT_CARD_SIZE_IDS.tarotPremium)).toBe(true);
+    expect(getProjectDefaultCardSizeId()).toBe(DEFAULT_CARD_SIZE_IDS.tarot);
+    expect(nextTray.params.stacks.every((stack) => stack.cardSizeId === DEFAULT_CARD_SIZE_IDS.tarot)).toBe(true);
   });
 });
 

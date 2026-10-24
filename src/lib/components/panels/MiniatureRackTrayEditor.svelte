@@ -1,4 +1,7 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import { FormControl, Input, InputCheckbox, Link, Spacer, Text, IconButton, Icon, Select } from '@tableslayer/ui';
   import { IconX } from '@tabler/icons-svelte';
 
@@ -113,6 +116,7 @@
 {:else}
 {#if renderMode === 'all' || renderMode === 'settings'}
 <div class="panelFormSection">
+  <EditorSection title="Structure and dimensions">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Rack Settings</h3>
@@ -277,6 +281,7 @@
       Rack Base Depth controls how far the lower shelf extends forward. Its minimum follows the tallest mini height so the rack keeps enough support.
     </Text>
   </section>
+  </EditorSection>
 </div>
 {/if}
 
@@ -286,6 +291,7 @@
   <Spacer size="0.5rem" />
   {/if}
 
+  <EditorSection title="Content · slots">
   <section class="section">
     <h3 class="sectionTitle">Slots</h3>
     <Spacer size="0.5rem" />
@@ -297,6 +303,9 @@
               <span class="slotTitle">Slot {index + 1}</span>
               <div class="slotCountControl">
                 <span class="slotCountLabel">Miniatures</span>
+                {#if interfaceUi.mode === 'modern'}
+                  <QuantityInput label={`Miniatures in slot ${index + 1}`} max={MAX_MINIATURES_IN_SLOT} value={slot.miniatureCount ?? 1} onChange={(value) => updateSlot(slot.id, { miniatureCount: value })} />
+                {:else}
                 <Select
                   selected={[String(slot.miniatureCount ?? 1)]}
                   options={Array.from({ length: MAX_MINIATURES_IN_SLOT }, (_, optionIndex) => {
@@ -308,6 +317,7 @@
                     updateSlot(slot.id, { miniatureCount: Number.isFinite(count) ? count : 1 });
                   }}
                 />
+                {/if}
               </div>
             </div>
             <IconButton
@@ -445,6 +455,7 @@
       <Link as="button" onclick={addSlot}>Add slot</Link>
     </div>
   </section>
+  </EditorSection>
 </div>
 {/if}
 

@@ -1,3 +1,5 @@
+import type { CardSleeveSelection } from '$lib/types/project';
+import { effectiveCardSize } from '$lib/utils/projectCards';
 import type { CardWellLayout, CellId } from '$lib/types/cardWellLayout';
 import { createDefaultCardWellLayout, getAllCellIds, getLayoutDimensions } from '$lib/types/cardWellLayout';
 import type { CardSize } from '$lib/types/project';
@@ -14,7 +16,7 @@ const { expand } = jscad.expansions;
 const { extrudeLinear } = jscad.extrusions;
 
 // Card well stack definition - links a cell to a card size and count
-export interface CardWellStack {
+export interface CardWellStack extends CardSleeveSelection {
   label?: string;
   id: string; // Unique stack ID
   cellId: CellId; // Links to cell in layout
@@ -159,7 +161,7 @@ export function computeLayoutSizes(
       let effectiveDepth = defaultCardLength;
 
       if (stack) {
-        const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+        const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
         if (cardSize) {
           const dims = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
           effectiveWidth = dims.effectiveWidth;
@@ -301,7 +303,7 @@ export function getCardWellTrayDimensions(
   // Calculate max stack height
   let maxStackHeight = 0;
   for (const stack of stacks) {
-    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
     if (cardSize) {
       const stackHeight = stack.count * cardSize.thickness;
       maxStackHeight = Math.max(maxStackHeight, stackHeight);
@@ -396,7 +398,7 @@ export function getCardWellCellPositions(
   return computedCells.map((cell) => {
     const refNumber = cellIds.indexOf(cell.id) + 1;
     const stack = params.stacks.find((s) => s.cellId === cell.id);
-    const cardSize = stack ? getCardSize(cardSizes, stack.cardSizeId) : undefined;
+    const cardSize = stack ? effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack) : undefined;
 
     // Calculate cell cavity height
     let cavityHeight = trayHeight - baseFloorZ;
@@ -489,7 +491,7 @@ export function createCardWellTray(
   // Calculate max stack height to normalize floor levels
   let maxStackHeight = 0;
   for (const stack of params.stacks) {
-    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
     if (cardSize) {
       const stackHeight = stack.count * cardSize.thickness;
       maxStackHeight = Math.max(maxStackHeight, stackHeight);
@@ -503,7 +505,7 @@ export function createCardWellTray(
   for (const cell of computedCells) {
     // Get stack for this cell to determine cavity dimensions
     const stack = params.stacks.find((s) => s.cellId === cell.id);
-    const cardSize = stack ? getCardSize(cardSizes, stack.cardSizeId) : undefined;
+    const cardSize = stack ? effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack) : undefined;
 
     // Calculate cavity dimensions
     let cavityWidth = cell.width;
@@ -755,7 +757,7 @@ export function createCardWellTray(
         for (const cell of computedCells) {
           const stack = params.stacks.find((s) => s.cellId === cell.id);
           if (stack) {
-            const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+            const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
             if (cardSize) {
               const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);
               const cavityWidth = Math.min(cell.width, effectiveWidth + clearance * 2);
@@ -856,7 +858,7 @@ export function getCardWellPositions(
   // Calculate max stack height to normalize floor levels (same as in createCardWellTray)
   let maxStackHeight = 0;
   for (const stack of params.stacks) {
-    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
     if (cardSize) {
       const stackHeight = stack.count * cardSize.thickness;
       maxStackHeight = Math.max(maxStackHeight, stackHeight);
@@ -880,7 +882,7 @@ export function getCardWellPositions(
     const stack = params.stacks.find((s) => s.cellId === cell.id);
     if (!stack) continue;
 
-    const cardSize = getCardSize(cardSizes, stack.cardSizeId);
+    const cardSize = effectiveCardSize(getCardSize(cardSizes, stack.cardSizeId), stack);
     if (!cardSize) continue;
 
     const { effectiveWidth, effectiveDepth } = getEffectiveCardDimensions(cardSize, stack.rotation ?? 0);

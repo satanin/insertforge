@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import DiceTrayEditor from './panels/DiceTrayEditor.svelte';
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import {
@@ -101,7 +102,7 @@
 
   let activeStackedTrayTab = $state<'tray' | 'contents'>('tray');
   let isSocketRack = $derived(!!selectedTray && isMiniatureRackTray(selectedTray) && selectedTray.params.variant === 'sockets');
-  let usesTrayTabs = $derived(!!selectedTray && (isCounterTray(selectedTray) || isCardDividerTray(selectedTray)
+  let usesTrayTabs = $derived(interfaceUi.mode !== 'modern' && !!selectedTray && (isCounterTray(selectedTray) || isCardDividerTray(selectedTray)
     || (isMiniatureRackTray(selectedTray) && selectedTray.params.variant !== 'sockets')));
 
   // Get the tray letter based on cumulative position across all layers
@@ -452,7 +453,7 @@
       {/if}
 
       {#if !usesTrayTabs || activeStackedTrayTab === 'tray'}
-        <details class="trayIdentity" class:socketIdentity={isSocketRack} open={!isSocketRack}>
+        <details class="trayIdentity" class:socketIdentity={isSocketRack} open={interfaceUi.mode === 'classic' && !isSocketRack}>
           <summary><span>Name, location &amp; appearance</span><IconChevronDown size={16} aria-hidden="true" /></summary>
         <div class="panelFormSection trayForm">
           <section class="traySection">
@@ -554,7 +555,7 @@
           {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
-          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'counters'}
+          renderMode={interfaceUi.mode === 'modern' ? 'all' : activeStackedTrayTab === 'tray' ? 'settings' : 'counters'}
         />
       {:else if isCardDividerTray(selectedTray) && onUpdateCardDividerParams}
         <CardDividerTrayEditor
@@ -564,7 +565,7 @@
           {onUpdateTray}
           actualHeight={maxTrayHeight}
           displayDimensions={selectedTrayDimensions}
-          renderMode={activeStackedTrayTab === 'tray' ? 'settings' : 'stacks'}
+          renderMode={interfaceUi.mode === 'modern' ? 'all' : activeStackedTrayTab === 'tray' ? 'settings' : 'stacks'}
         />
       {:else if isCardTray(selectedTray) && onUpdateCardParams}
         <CardDrawTrayEditor

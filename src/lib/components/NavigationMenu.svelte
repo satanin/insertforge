@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getProjectCardSizes } from '$lib/utils/projectCards';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import { getMiniatureRackSlotCount } from '$lib/models/miniatureRack';
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { IconButton, Icon, ConfirmActionButton, Hr, Panel, Popover, Text, addToast } from '@tableslayer/ui';
@@ -402,7 +404,7 @@
         isTileTray: true
       };
     }
-    if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getProject().cardSizes).capacity,
+    if (tray.type === 'cardStorage') return { stacks: tray.params.dividers.length, counters: resolveCardStorage(tray.params, getProjectCardSizes(getProject())).capacity,
       isCardTray: true, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
     if (tray.type === 'dice') return { stacks: tray.params.count, counters: tray.params.count,
       isCardTray: false, isCardDivider: false, isCardWell: false, isCupTray: false, isTileTray: false };
@@ -420,7 +422,11 @@
   }
 </script>
 
-<Panel class="navMenu {isMobile ? 'navMenu--mobile' : ''}">
+{#if interfaceUi.mode === 'modern' && !isMobile}
+  <button class="projectNavigationToggle" type="button" aria-expanded={interfaceUi.projectOpen} aria-controls="project-navigation" onclick={() => interfaceUi.projectOpen = !interfaceUi.projectOpen}>Project {interfaceUi.projectOpen ? '▴' : '▾'}</button>
+{/if}
+<div id="project-navigation" hidden={interfaceUi.mode === 'modern' && !isMobile && !interfaceUi.projectOpen}>
+<Panel class="navMenu {isMobile ? 'navMenu--mobile' : ''} {interfaceUi.mode === 'modern' ? 'navMenu--modern' : ''}">
   <button class="navItem navItem--dimensions" onclick={() => inventoryUi.open = true}>
     <span class="navItemIcon"><Icon Icon={IconPackage} size="1rem" /></span>
     Game components ({project.inventory?.length ?? 0})
@@ -1267,6 +1273,8 @@
     <TrayTypePreview trayType={hoveredTrayType} />
   </div>
 {/if}
+
+</div>
 
 <style>
   .experimentalBadge { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.35rem; border: 1px solid #d99522; border-radius: 0.25rem; background: rgb(217 149 34 / 12%); color: var(--fg); font-size: 0.65rem; font-weight: 600; vertical-align: middle; }

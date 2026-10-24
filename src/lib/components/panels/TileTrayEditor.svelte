@@ -1,4 +1,6 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, FormControl, Spacer, Select, InputCheckbox } from '@tableslayer/ui';
   import type { TileTray } from '$lib/types/project';
@@ -35,6 +37,7 @@
 </script>
 
 <div class="panelFormSection">
+  <EditorSection title="Content and dimensions">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle">Tile Tray</h3>
@@ -57,13 +60,11 @@
 
       <FormControl label="Count" name="tileCount">
         {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="1"
-            step="1"
+          <QuantityInput
+            id={inputProps.id}
+            label="Tile count"
             value={tray.params.count}
-            onchange={(e) => updateParam('count', parseInt(e.currentTarget.value))}
+            onChange={(value) => updateParam('count', value)}
           />
         {/snippet}
       </FormControl>
@@ -150,6 +151,7 @@
       />
     {/if}
   </section>
+  </EditorSection>
 </div>
 
 <style>

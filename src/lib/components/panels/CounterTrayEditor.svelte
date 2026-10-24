@@ -1,4 +1,6 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon, addToast } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
@@ -209,6 +211,7 @@
 {#if renderMode === 'all' || renderMode === 'counters'}
   <div class="panelFormSection">
   <!-- Top-Loaded Stacks -->
+  <EditorSection title="Content · top-loaded stacks">
   <section class="section">
     <h3 class="sectionTitle">Top-Loaded Stacks</h3>
     <Spacer size="0.5rem" />
@@ -254,13 +257,7 @@
               onSelectedChange={(selected) => updateTopLoadedStack(index, 'shape', selected[0])}
             />
           </div>
-          <Input
-            type="number"
-            min="1"
-            value={stack[1]}
-            onchange={(e) => updateTopLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-            style="width: 3.5rem;"
-          />
+          <QuantityInput label={`Counters in stack ${index + 1}`} legacyStyle="width: 3.5rem;" value={stack[1]} onChange={(value) => updateTopLoadedStack(index, 'count', value)} />
           <IconButton
             variant="ghost"
             onclick={() => removeTopLoadedStack(index)}
@@ -275,10 +272,12 @@
       <Link as="button" onclick={addTopLoadedStack}>Add top-loaded stack</Link>
     </div>
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
   <!-- Edge-Loaded Stacks -->
+  <EditorSection title="Content · edge-loaded stacks">
   <section class="section">
     <h3 class="sectionTitle">Edge-Loaded Stacks</h3>
     <Spacer size="0.5rem" />
@@ -324,13 +323,7 @@
               onSelectedChange={(selected) => updateEdgeLoadedStack(index, 'shape', selected[0])}
             />
           </div>
-          <Input
-            type="number"
-            min="1"
-            value={stack[1]}
-            onchange={(e) => updateEdgeLoadedStack(index, 'count', parseInt(e.currentTarget.value))}
-            style="width: 3rem;"
-          />
+          <QuantityInput label={`Counters in stack ${index + 1}`} legacyStyle="width: 3rem;" value={stack[1]} onChange={(value) => updateEdgeLoadedStack(index, 'count', value)} />
           <div class="stackSelectSmall">
             <Select
               selected={[stack[2] ?? 'lengthwise']}
@@ -347,12 +340,14 @@
       <Link as="button" onclick={addEdgeLoadedStack}>Add edge-loaded stack</Link>
     </div>
   </section>
+  </EditorSection>
 </div>
 {/if}
 
 {#if renderMode === 'all' || renderMode === 'settings'}
   <div class="panelFormSection">
   <!-- Tray Settings -->
+  <EditorSection title="Manufacturing">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
@@ -461,10 +456,12 @@
       />
     {/if}
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
   <!-- Custom Width -->
+  <EditorSection title="Dimensions">
   <section class="section">
     <h3 class="sectionTitle">Custom width</h3>
     <Spacer size="0.5rem" />
@@ -497,6 +494,7 @@
       </FormControl>
     </div>
   </section>
+  </EditorSection>
 </div>
 {/if}
 

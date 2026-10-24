@@ -1,4 +1,6 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import { getDiceTrayMeasuredSpacing } from '$lib/models/diceTray';
   import { FormControl, Input, InputCheckbox, Select, Text, Spacer, Button, Hr } from '@tableslayer/ui';
   import { getProject, updateDiceTrayParams } from '$lib/stores/project.svelte';
@@ -39,6 +41,7 @@
   <Text weight={600}>Dice Tray · Experimental</Text>
   <Text size="0.875rem">{dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm</Text>
   <Spacer size="0.5rem" />
+  <EditorSection title="Dimensions, lid and finish" summary={`${dimensions.width.toFixed(1)} × ${dimensions.depth.toFixed(1)} × ${dimensions.height.toFixed(1)} mm`}>
   <div class="fields">
     {#each [['minimumWidth', 'Minimum outer width'], ['minimumDepth', 'Minimum outer depth']] as [field, label]}
       {@const key = field as 'minimumWidth' | 'minimumDepth'}
@@ -88,6 +91,8 @@
     {/if}
   {/if}
   <Text size="0.875rem" color="var(--fgMuted)">Effective corner radius: {effectiveRadius.toFixed(1)} mm, limited to preserve cavities. {tray.params.asBox || tray.params.lid ? `Box rim is ${(bodyDimensions.height - Math.max(...positions.map(p => p.z + p.thickness))).toFixed(1)} mm above the highest die. Flat rim supports a flat item placed above.` : ''} {tray.params.lid ? 'Use Explode to open the lid in the preview. Body and lid export as separate printable parts.' : ''}</Text>
+  </EditorSection>
+  <EditorSection title="Distribution and manufacturing" summary={`${tray.params.columns} columns · wall ${tray.params.wallThickness} mm`}>
   <Spacer size="0.5rem" />
   <div class="fields">
     <FormControl label="Storage mode" name="dice-mode">
@@ -125,6 +130,8 @@
   <Hr />
   <Text size="0.875rem" color="var(--fgMuted)">Die spacing is measured edge to edge between the dice, not between their centres and not extra padding. Actual minimum: X {measuredSpacing.x === null ? '—' : `${measuredSpacing.x.toFixed(2)} mm`}, Y {measuredSpacing.y === null ? '—' : `${measuredSpacing.y.toFixed(2)} mm`}. Editing spacing fits the actual die sizes. Finger recesses and material between pockets may require more than the requested gap; — means there are no neighbours on that axis.</Text>
   {#if tray.params.mode === 'individual'}<Text size="0.875rem" color="var(--fgMuted)">Finger notch: rounded access on the left of each pocket, stopping at the pocket floor. Turning it off preserves its diameter. Boxes leave at least 1.5 mm between each pocket, including its notch, and the inside wall.</Text>{/if}
+  </EditorSection>
+  <EditorSection title="Content" summary={`${tray.params.count} dice in ${groups.length} groups`}>
   {#each groups as group (group.id)}
     {@const source = selectedType(group)}
     <div class="group">
@@ -141,7 +148,7 @@
           {#snippet end()}mm{/snippet}
         </FormControl>
         <FormControl label="Dice count" name="dice-count-{group.id}">
-          {#snippet input({ inputProps })}<Input {...inputProps} type="number" min="1" max="100" step="1" value={group.count} onchange={(e) => changeGroup(group.id, { count: e.currentTarget.valueAsNumber })} />{/snippet}
+          {#snippet input({ inputProps })}<QuantityInput id={inputProps.id} label="Dice count" max={100} value={group.count} onChange={(count) => changeGroup(group.id, { count })} />{/snippet}
         </FormControl>
       </div>
       <Text size="0.875rem" color="var(--fgMuted)">{group.diceKind === 'd6' ? 'Measure one side, face to face.' : 'Measure the maximum distance between tips.'} Die size is editable for this group.{source ? ` Project measurement: ${source.size} mm.` : ''} {source && group.size !== source.size ? 'Using a custom measurement.' : ''} Selecting a project type copies its measurement; editing Die size keeps the project unchanged.</Text>
@@ -155,6 +162,7 @@
   {#if projectTypes.length === 0}<Text size="0.875rem">Add a die type in Project &amp; dimensions → Dice to create new groups.</Text>{/if}
   <Spacer size="0.5rem" />
   <Text size="0.875rem" color="var(--fgMuted)">Individual pockets share one flat upper surface. Smaller dice have raised supports so each die keeps the requested exposure above that surface. For example, 40% exposed leaves 60% of each die’s oriented height inside its pocket. The structural floor, box dimensions and lid stay fixed when exposure changes; support heights may adjust. {tray.params.mode === 'compartment' && (tray.params.asBox || tray.params.lid) ? 'A shared box has only the enclosing walls, with no individual retaining walls to adjust.' : `Lowest exposure above retaining walls: ${Math.min(...positions.map(pos => 100 * (pos.thickness - getDicePocketWallHeight(tray.params, pos.thickness)) / pos.thickness)).toFixed(0)}%.`} Enable Preview dice to inspect the fit.</Text>
+  </EditorSection>
 </section>
 
 <style>

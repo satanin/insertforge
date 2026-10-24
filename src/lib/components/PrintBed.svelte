@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getSceneAppearance } from '$lib/utils/sceneAppearance.svelte';
+  const appearance = $derived(getSceneAppearance());
   import { T } from '@threlte/core';
   import { Text } from '@threlte/extras';
   import * as THREE from 'three';
@@ -148,20 +150,20 @@
 <!-- Print bed surface with noise texture (reacts to lighting) -->
 <T.Mesh position={[posX, posY + 0.01, posZ]} rotation.x={-Math.PI / 2}>
   <T.PlaneGeometry args={[bedWidth, bedDepth]} />
-  <T.MeshStandardMaterial map={noiseTexture} color="#3a3a3a" roughness={0.8} metalness={0.05} />
+  <T.MeshStandardMaterial map={noiseTexture} color={appearance.bed} roughness={0.8} metalness={0.05} />
 </T.Mesh>
 
 <!-- Cell grid lines -->
 {#if cellGeometry}
   <T.LineSegments geometry={cellGeometry}>
-    <T.LineBasicMaterial color="#4a4a4a" />
+    <T.LineBasicMaterial color={appearance.cell} />
   </T.LineSegments>
 {/if}
 
 <!-- Section grid lines -->
 {#if sectionGeometry}
   <T.LineSegments geometry={sectionGeometry}>
-    <T.LineBasicMaterial color="#6a6a6a" />
+    <T.LineBasicMaterial color={appearance.bedSection} />
   </T.LineSegments>
 {/if}
 
@@ -189,7 +191,7 @@
       ]}
     />
   </T.BufferGeometry>
-  <T.LineBasicMaterial color="#c9503c" linewidth={2} />
+  <T.LineBasicMaterial color={appearance.outline} linewidth={2} />
 </T.LineLoop>
 
 <!-- Title label - bottom left corner (outside bed) -->
@@ -199,7 +201,7 @@
     fontSize={10}
     position={titleLabelPos}
     rotation={[-Math.PI / 2, 0, 0]}
-    color="#ffffff"
+    color={appearance.text}
     anchorX="left"
     anchorY="top"
   />
@@ -211,7 +213,7 @@
   fontSize={5}
   position={containerSizeLabelPos}
   rotation={[-Math.PI / 2, 0, 0]}
-  color="#c9503c"
+  color={appearance.outline}
   anchorX="right"
   anchorY="top"
 />

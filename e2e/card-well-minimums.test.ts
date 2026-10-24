@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test';
 
 test('Card Well minimum dimensions are editable and persist without shrinking the card layout', async ({ page }) => {
   test.setTimeout(60_000);
+  // This regression exercises the original always-visible controls.
+  // New Beta's collapsible sections are covered by interface-mode.test.ts.
+  await page.addInitScript(() => localStorage.setItem('insertforge-interface', 'classic'));
   await page.goto('/');
   await page.getByRole('button', { name: /Card well.*loose/ }).click();
   await page

@@ -1,3 +1,4 @@
+import { migrateProjectCards } from '$lib/utils/projectCards';
 import {
   DEFAULT_CARD_SIZE_IDS,
   DEFAULT_SHAPE_IDS,
@@ -349,17 +350,17 @@ function migrateCardDividerStacks(
   return stacks.map((stack) => {
     // If already has cardSizeId, keep it
     if (stack.cardSizeId) {
-      return { cardSizeId: stack.cardSizeId, count: stack.count, label: stack.label };
+      return { ...stack, cardSizeId: stack.cardSizeId, count: stack.count, label: stack.label };
     }
     // Migrate from cardSizeName
     if (stack.cardSizeName) {
       const id = cardSizeIdMapping.get(stack.cardSizeName);
       if (id) {
-        return { cardSizeId: id, count: stack.count, label: stack.label };
+        return { ...stack, cardSizeId: id, count: stack.count, label: stack.label };
       }
     }
     // Fallback to Standard
-    return { cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: stack.count, label: stack.label };
+    return { ...stack, cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: stack.count, label: stack.label };
   });
 }
 
@@ -657,7 +658,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     };
   });
 
-  return {
+  return migrateProjectCards({
     ...project,
     version: undefined,
     inventory: project.inventory ?? [],
@@ -673,7 +674,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
     selectedLayeredBoxSectionId: project.selectedLayeredBoxSectionId ?? null,
     selectedBoardId: project.selectedBoardId ?? null,
     globalSettings
-  };
+  });
 }
 
 export function loadProject(): Project | null {

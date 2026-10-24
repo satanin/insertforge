@@ -43,10 +43,13 @@
 
 ## Current product constraints
 
+- `New · Beta` es la opción predeterminada; Classic sigue disponible y se respeta su preferencia guardada. Ambas comparten estado de proyecto, geometría y visor. El modo es una preferencia del navegador, fuera del JSON del proyecto. Cambiar el aspecto no debe remontar el canvas, cambiar cámara ni reducir su tamaño/reparto inicial (75/25 en desktop). La adopción de otra librería UI queda aplazada por decisión del usuario.
+
 - `Card Well`: los mínimos exteriores nunca reducen huecos/holguras de cartas. Hendiduras de extracción pasantes y redondeo deben respetar esos huecos; mantener caras de apilado planas. El giro del layout es de presentación y no cambia los ejes de parámetros/export.
 
 - El inventario del juego vive a nivel de `Project`, independiente de `Layer`. Las piezas referencian grupos y cantidades; duplicar piezas no debe duplicar asignaciones ni existencias.
 - Aplicar contenido del inventario es explicito y usa snapshots de medidas; editar el inventario no debe redimensionar silenciosamente las piezas existentes.
+- Los formatos de carta del proyecto no duplican variantes Premium. La funda se elige por pieza/pila; `Project.cardSleeveThicknesses` configura 0,3/0,5/0,8 mm por defecto. Geometría y exports deben recibir `getProjectCardSizes(project)` (proyección con grosores), sin guardar esa proyección en el catálogo. Las referencias `inventory-*` conservan su grosor snapshot; los grosores históricos personalizados usan una excepción explícita hasta elegir un preset.
 
 - `Miniature Rack` sigue siendo `loose tray` por ahora.
 - `Card Storage` es `loose tray` con piezas dependientes (separadores/tapa); su altura maxima incluye todo el conjunto y no debe crecer por `autoHeight`.

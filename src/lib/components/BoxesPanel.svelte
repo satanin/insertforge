@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EditorSection from './EditorSection.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
   import type { Box } from '$lib/types/project';
@@ -182,6 +183,7 @@
   {#if selectedBox}
     <div class="panelForm">
       <div class="panelFormSection boxForm">
+        <EditorSection title="Identity">
         <section class="boxSection">
           <div class="sectionHeader">
             <h4 class="sectionTitle">Details</h4>
@@ -213,9 +215,11 @@
             {/snippet}
           </FormControl>
         </section>
+        </EditorSection>
 
         <Hr class="boxDivider" />
 
+        <EditorSection title="Dimensions and lid">
         <section class="boxSection">
           <div class="sectionHeader">
             <h4 class="sectionTitle">Options</h4>
@@ -353,9 +357,11 @@
             {/if}
           </div>
         </section>
+        </EditorSection>
 
         <Hr class="boxDivider" />
 
+        <EditorSection title="Manufacturing">
         <section class="boxSection">
           <div class="sectionHeader">
             <h4 class="sectionTitle">Print options</h4>
@@ -422,11 +428,13 @@
             </Text>
           {/if}
         </section>
+        </EditorSection>
 
         {#if onDuplicateBox}
           <Hr class="boxDivider" />
 
-          <section class="boxSection">
+          <EditorSection title="Actions">
+        <section class="boxSection">
             <div class="buttonRow">
               <button
                 class="secondaryButton boxActionButton boxActionButton--info"
@@ -437,6 +445,7 @@
               </button>
             </div>
           </section>
+        </EditorSection>
         {/if}
       </div>
     </div>

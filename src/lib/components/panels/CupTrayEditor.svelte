@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer } from '@tableslayer/ui';
   import type { CupTray } from '$lib/types/project';
@@ -78,6 +79,7 @@
 
 <div class="panelFormSection">
   <!-- Tray Dimensions (Primary Controls) -->
+  <EditorSection title="Dimensions">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Tray Dimensions</h3>
@@ -115,10 +117,12 @@
       </FormControl>
     </div>
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
   <!-- Cup Layout -->
+  <EditorSection title="Distribution">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle">Cup Layout</h3>
@@ -140,10 +144,12 @@
       {/each}
     {/if}
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
   <!-- Cup Cavity and Wall Settings -->
+  <EditorSection title="Manufacturing">
   <section class="section">
     <div class="formGrid">
       <FormControl label="Cavity height" name="cupCavityHeight">
@@ -210,6 +216,7 @@
       />
     {/if}
   </section>
+  </EditorSection>
 </div>
 
 <style>

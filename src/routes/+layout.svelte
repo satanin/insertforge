@@ -1,5 +1,8 @@
 <script lang="ts">
   import './layout.css';
+  import './modern.css';
+  import { onMount } from 'svelte';
+  import { interfaceUi, loadInterfacePreference, setInterfaceMode, type InterfaceMode } from '$lib/stores/interface.svelte';
   import { dev } from '$app/environment';
   import { resolve } from '$app/paths';
   import { Link, IconButton, Icon, Popover, Toast } from '@tableslayer/ui';
@@ -9,6 +12,7 @@
   import { setContext } from 'svelte';
 
   let { children } = $props();
+  onMount(loadInterfacePreference);
 
   // Set context for child components
   setContext('theme', {
@@ -25,7 +29,7 @@
   <link rel="icon" type="image/svg+xml" href={dev ? '/favicon-dev.svg' : '/favicon.svg'} />
 </svelte:head>
 
-<div class="appContainer" class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
+<div class="appContainer" class:ui-modern={interfaceUi.mode === 'modern'} class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
   <!-- Header -->
   <div class="appHeader">
     <div class="headerBrand">
@@ -46,6 +50,13 @@
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <label class="interfacePicker">
+        <span>Interface</span>
+        <select aria-label="Interface" value={interfaceUi.mode} onchange={(e) => setInterfaceMode(e.currentTarget.value as InterfaceMode)}>
+          <option value="classic">Classic</option>
+          <option value="modern">New · Beta</option>
+        </select>
+      </label>
       <div class="headerLinks">
         <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
         <Link href={APP_LINKS.license} color="fg">License</Link>
@@ -65,7 +76,7 @@
           {/snippet}
         </Popover>
       </div>
-      <IconButton variant="ghost" onclick={toggleMode} size="sm">
+      <IconButton variant="ghost" onclick={toggleMode} size="sm" aria-label={mode.current === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
         <Icon Icon={mode.current === 'dark' ? IconSun : IconMoon} />
       </IconButton>
     </div>
@@ -78,6 +89,9 @@
 </div>
 
 <style>
+  .interfacePicker { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; font-size: 0.75rem; }
+  .interfacePicker select { font: inherit; color: var(--fg); background: var(--inputBg); border: var(--borderThin); border-radius: var(--radius-2); padding: 0.2rem 0.4rem; }
+  @media (max-width: 768px) { .interfacePicker > span { display: none; } }
   .appContainer {
     --header-height: 2.5rem;
     display: flex;

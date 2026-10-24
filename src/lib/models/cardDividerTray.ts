@@ -1,3 +1,5 @@
+import type { CardSleeveSelection } from '$lib/types/project';
+import { effectiveCardSize } from '$lib/utils/projectCards';
 import { createOuterBody } from './outerCorners';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -19,7 +21,7 @@ import { vectorTextWithAccents } from './vectorTextWithAccents';
 export type CustomCardSize = CardSize;
 
 // A single stack within a card divider tray
-export interface CardDividerStack {
+export interface CardDividerStack extends CardSleeveSelection {
   cardSizeId: string; // Reference to a CardSize by ID
   count: number; // Number of cards in this stack
   label?: string; // Optional label for the stack
@@ -145,7 +147,7 @@ function getCardDividerSlotMetrics(
   const metrics: CardDividerSlotMetrics[] = [];
 
   for (const stack of params.stacks) {
-    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+    const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
     if (!cardSize) continue;
 
     metrics.push({
@@ -705,7 +707,7 @@ function buildCardDividerTray(
   // Horizontal: cards on side, cutout based on card length (longer side)
   let maxCutoutDimension = 0;
   for (const stack of stacks) {
-    const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+    const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
     if (!cardSize) continue;
     const cutoutDimension = orientation === 'vertical' ? cardSize.width : cardSize.length;
     maxCutoutDimension = Math.max(maxCutoutDimension, cutoutDimension);
@@ -732,7 +734,7 @@ function buildCardDividerTray(
     const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
 
     for (const stack of stacks) {
-      const cardSize = getCardSize(stack.cardSizeId, customCardSizes);
+      const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
       if (!cardSize) continue;
 
       const { width: cardWidth, length: cardLength } = cardSize;

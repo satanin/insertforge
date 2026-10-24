@@ -1,4 +1,6 @@
 <script lang="ts">
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import { FormControl, Input, InputCheckbox } from '@tableslayer/ui';
   import { IconChevronDown } from '@tabler/icons-svelte';
   import TextStyleControls from './TextStyleControls.svelte';
@@ -74,11 +76,15 @@
       {#if visible(field.mode) && !(field.key === 'spacingY' && layout.p.linkedSpacing) && !(field.key === 'requestedCount' && layout.p.quantityMode === 'fill')}
         <FormControl label={field.label} name={`socket-${field.key}`}>
           {#snippet input({ inputProps })}
+            {#if field.key === 'requestedCount' || field.key === 'rows' || field.key === 'columns'}
+              <QuantityInput id={inputProps.id} label={field.label} min={field.min} max={field.max} value={layout.p[field.key]} onChange={(value) => update({ [field.key]: value })} />
+            {:else}
             <Input {...inputProps} type="number" min={field.min} max={field.max} step={field.step}
               value={layout.p[field.key]} onchange={(e) => {
                 const value = Number.parseFloat(e.currentTarget.value);
                 if (Number.isFinite(value)) update({ [field.key]: value });
               }} />
+            {/if}
           {/snippet}
           {#snippet end()}{field.key === 'rows' || field.key === 'columns' || field.key === 'requestedCount' ? '' : field.key === 'tabOverlapPercent' ? '%' : 'mm'}{/snippet}
         </FormControl>
@@ -106,6 +112,7 @@
   {#if layout.error}<p role="alert" class="error">{layout.error} No printable rack is generated for this configuration.</p>{/if}
   {#each layout.warnings as warning}<p role="alert" class="warning">{warning}</p>{/each}
 
+  <EditorSection title="Dimensions">
   <section class="editorSection" aria-label="Rack dimensions">
     <h3>Rack dimensions</h3>
     <h4>Maximum dimensions</h4>
@@ -137,7 +144,9 @@
     </div>
     <p class="help">Leave fixed dimensions blank for automatic sizing. Fixed sizes must respect the maximum limits. Heights include pegs.</p>
   </section>
+  </EditorSection>
 
+  <EditorSection title="Structure and stacking">
   <section class="editorSection" aria-label="Rack structure and stacking">
     <h3>Structure &amp; stacking</h3>
     {@render numericFields(['floorThickness', 'wallThickness', 'outerCornerRadius', 'headroom', 'postWidth', 'stackingClearance'])}
@@ -146,7 +155,9 @@
       onchange={(e) => update({ perforated: e.currentTarget.checked })} />
     <p class="help">To stack racks, match width, depth, post width and stacking clearance. Each rack can have its own height.</p>
   </section>
+  </EditorSection>
 
+  <EditorSection title="Lid">
   <section class="editorSection" aria-label="Rack lid">
     <h3>Lid</h3>
     <InputCheckbox label="Add flat stacking lid" checked={layout.p.lid}
@@ -169,7 +180,9 @@
       <p class="help">Rests on the four posts and locates over the pegs. Height limits include the lid and any raised text. Exported separately; raised lettering faces up for printing. Check the underside pockets when slicing. Not a sealed or locking lid; load capacity needs print testing.</p>
     {/if}
   </section>
+  </EditorSection>
 
+  <EditorSection title="Labels">
   <section class="editorSection" aria-label="Socket labels">
     <h3>Socket labels · Experimental</h3>
     <InputCheckbox label="Add socket label plates" checked={layout.p.labelsEnabled}
@@ -189,7 +202,9 @@
       <p class="help">Plates stay behind the retaining tab and use the existing gap, extending up to 1 mm per side where spacing allows. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(4, layout.p.nozzleDiameter * 10).toFixed(1)} mm. These conservative limits still need a test print.</p>
     {/if}
   </section>
+  </EditorSection>
 
+  <EditorSection title="Content and distribution">
   <section class="editorSection" aria-label="Miniatures and layout">
     <h3>Miniatures &amp; layout</h3>
     <label class="modeLabel">Layout mode
@@ -267,12 +282,16 @@
               {#if !(field.key === 'count' && layout.p.quantityMode === 'fill' && layout.p.fillModelId === model.id)}
                 <FormControl label={field.label} name={`model-${model.id}-${field.key}`}>
                   {#snippet input({ inputProps })}
+                    {#if field.key === 'count'}
+                      <QuantityInput id={inputProps.id} label={`${model.name} count`} min={field.min} max={field.max} value={model.count} onChange={(count) => updateModel(index, { count })} />
+                    {:else}
                     <Input {...inputProps} type="number" min={field.min} max={field.max}
-                      step={field.key === 'count' ? 1 : 0.1} value={model[field.key]}
+                      step={0.1} value={model[field.key]}
                       onchange={(e) => {
                         const value = Number.parseFloat(e.currentTarget.value);
                         if (Number.isFinite(value)) updateModel(index, { [field.key]: value });
                       }} />
+                    {/if}
                   {/snippet}
                   {#snippet end()}{field.key === 'count' ? '' : 'mm'}{/snippet}
                 </FormControl>
@@ -285,7 +304,9 @@
       <button disabled={layout.p.models.length >= 10} onclick={addModel}>+ Add miniature model</button>
     {/if}
   </section>
+  </EditorSection>
 
+  <EditorSection title="Sockets and retention">
   <section class="editorSection" aria-label="Sockets and retention">
     <h3>Sockets &amp; retention</h3>
     <p class="help">In free/grid mode, spacing is the gap between socket walls. By miniature models, it is extra clearance beyond each model's full width/depth. For arms, wings or weapons, measure the whole miniature, not just its base. X/Y can be unlinked. Large spacing still has to fit within the rack limits.</p>
@@ -305,6 +326,7 @@
       <p class="help">Allow for off-centre arms and weapons. Preview miniatures shows approximate volumes, which are excluded from exports. Placement and filling may not find the densest layout.</p>
     </details>
   </section>
+  </EditorSection>
 </div>
 
 <style>

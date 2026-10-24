@@ -1,3 +1,5 @@
+import type { CardSleeveSelection } from '$lib/types/project';
+import { effectiveCardSize } from '$lib/utils/projectCards';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { createOuterBody } from './outerCorners';
@@ -19,7 +21,7 @@ import { vectorTextWithAccents } from './vectorTextWithAccents';
 // Re-export for backwards compatibility
 export type CustomCardSize = CardSize;
 
-export interface CardDrawTrayParams {
+export interface CardDrawTrayParams extends CardSleeveSelection {
   outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   cardSizeId: string; // Reference to a CardSize by ID
   cardCount: number;
@@ -101,7 +103,7 @@ export function getCardDrawTrayDimensions(
   const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
   // Look up card size from global card sizes
-  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const cardSize = effectiveCardSize(getCardSize(cardSizeId, customCardSizes), params)!;
   const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
   const interiorWidth = cardWidth + clearance * 2;
@@ -133,7 +135,7 @@ export function getCardDrawPositions(
   const { cardSizeId, cardCount, wallThickness, clearance, floorThickness } = params;
 
   // Look up card size from global card sizes
-  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const cardSize = effectiveCardSize(getCardSize(cardSizeId, customCardSizes), params)!;
   const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
   // Calculate tray depth and slope rise (same as in getCardTrayDimensions)
@@ -188,7 +190,7 @@ export function createCardDrawTray(
   const { cardSizeId, cardCount, wallThickness, floorThickness, clearance } = params;
 
   // Look up card size from global card sizes
-  const cardSize = getCardSize(cardSizeId, customCardSizes);
+  const cardSize = effectiveCardSize(getCardSize(cardSizeId, customCardSizes), params)!;
   const { width: cardWidth, length: cardLength, thickness: cardThickness } = cardSize;
 
   // Calculate interior dimensions (space for cards)

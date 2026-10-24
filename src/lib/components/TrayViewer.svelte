@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { interfaceUi } from '$lib/stores/interface.svelte';
   import { Canvas } from '@threlte/core';
   import TrayScene from './TrayScene.svelte';
   import ViewCube from './ViewCube.svelte';
@@ -349,6 +350,14 @@
   <!-- ViewCube for camera navigation (hidden in debug/capture mode) -->
   {#if !debugMode && !hideUI}
     <ViewCube {cameraQuaternion} onSelectAngle={handleSelectCameraAngle} />
+    {#if interfaceUi.mode === 'modern' && !isLayoutEditMode && !isLayerLayoutEditMode}
+      <div class="viewerCameraToolbar" aria-label="Camera views">
+        <button type="button" onclick={() => handleSelectCameraAngle('iso')}>Perspective</button>
+        <button type="button" onclick={() => handleSelectCameraAngle('top')}>Top</button>
+        <button type="button" onclick={() => handleSelectCameraAngle('front')}>Front</button>
+        <button type="button" onclick={() => handleSelectCameraAngle('right')}>Right</button>
+      </div>
+    {/if}
   {/if}
 
   <!-- Tray/Box info overlay when clicked (non-edit mode only) -->

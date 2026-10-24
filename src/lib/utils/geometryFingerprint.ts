@@ -57,6 +57,7 @@ function sharedProjectGeometryFingerprint(project: Project) {
   return {
     globalSettings: project.globalSettings ?? null,
     cardSizes: project.cardSizes ?? [],
+    cardSleeveThicknesses: project.cardSleeveThicknesses ?? null,
     counterShapes: project.counterShapes ?? []
   };
 }

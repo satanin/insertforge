@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getSceneAppearance } from '$lib/utils/sceneAppearance.svelte';
+  const appearance = $derived(getSceneAppearance());
   import { getLidExplodeOffset } from '$lib/utils/lidExplode';
   import DiceMesh from './three/DiceMesh.svelte';
   import { onDestroy, untrack } from 'svelte';
@@ -1333,8 +1335,8 @@
 {#if (showAllBoxes || showAllLayers) && !hidePrintBed}
   <Grid
     position.y={-0.51}
-    cellColor="#2a2a2a"
-    sectionColor="#5a3530"
+    cellColor={appearance.grid}
+    sectionColor={appearance.section}
     sectionThickness={1}
     cellSize={10}
     sectionSize={50}
@@ -1552,8 +1554,8 @@
   <!-- Grid background for layer view (large, subtle) -->
   <Grid
     position.y={-0.51}
-    cellColor="#2a2a2a"
-    sectionColor="#5a3530"
+    cellColor={appearance.grid}
+    sectionColor={appearance.section}
     sectionThickness={1}
     cellSize={10}
     sectionSize={50}
@@ -2160,8 +2162,8 @@
   {#if !visualEditMode}
     <Grid
       position.y={-0.51}
-      cellColor="#2a2a2a"
-      sectionColor="#5a3530"
+      cellColor={appearance.grid}
+      sectionColor={appearance.section}
       sectionThickness={1}
       cellSize={10}
       sectionSize={50}

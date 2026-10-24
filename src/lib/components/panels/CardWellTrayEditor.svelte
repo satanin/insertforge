@@ -1,4 +1,8 @@
 <script lang="ts">
+  import CardSleeveControl from '../CardSleeveControl.svelte';
+  import EditorSection from '../EditorSection.svelte';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select, IconButton, Icon } from '@tableslayer/ui';
   import { IconRotate2 } from '@tabler/icons-svelte';
   import type { CardWellTray } from '$lib/types/project';
@@ -62,7 +66,7 @@
     const newStacks = [...tray.params.stacks];
     const current = newStacks[index];
     if (field === 'cardSizeId') {
-      newStacks[index] = { ...current, cardSizeId: value as string };
+      newStacks[index] = { ...current, cardSizeId: value as string, cardThicknessOverride: undefined };
     } else if (field === 'count') {
       newStacks[index] = { ...current, count: value as number };
     } else if (field === 'rotation') {
@@ -91,7 +95,8 @@
   );
 </script>
 
-<div class="panelFormSection">
+{#snippet distributionSection()}
+  <EditorSection title="Distribution" summary={`${cellIds.length} wells`} open={false}>
   <section class="section">
     <h3 class="sectionTitle">Layout</h3>
     <CardWellLayoutEditor
@@ -107,9 +112,11 @@
       onUpdateLayout={handleLayoutUpdate}
     />
   </section>
+  </EditorSection>
+{/snippet}
 
-  <Spacer size="0.5rem" />
-
+{#snippet contentSection()}
+  <EditorSection title="Content" summary={`${tray.params.stacks.reduce((sum, s) => sum + s.count, 0)} cards in ${tray.params.stacks.length} stacks`}>
   <section class="section">
     <h3 class="sectionTitle">Card Stacks</h3>
     <Spacer size="0.5rem" />
@@ -130,12 +137,11 @@
                 onSelectedChange={(selected) => updateStack(stackIndex, 'cardSizeId', selected[0])}
               />
             </div>
-            <Input
-              type="number"
-              min="1"
+            <QuantityInput
+              legacyStyle="width: 3.5rem;"
+              label={`Cards in ${trayLetter}${getCellRefNumber(stack.cellId)}`}
               value={stack.count}
-              onchange={(e) => updateStack(stackIndex, 'count', parseInt(e.currentTarget.value))}
-              style="width: 3.5rem;"
+              onChange={(value) => updateStack(stackIndex, 'count', value)}
             />
             <IconButton
               variant="ghost"
@@ -146,6 +152,7 @@
               <Icon Icon={IconRotate2} color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'} />
             </IconButton>
           </div>
+          <CardSleeveControl selection={stack} label={`Sleeves ${trayLetter}${getCellRefNumber(stack.cellId)}`} onChange={(value) => onUpdateParams({ ...tray.params, stacks: tray.params.stacks.map(s => s.id === stack.id ? { ...s, ...value } : s) })} />
           <FormControl label="Stack name" name={`stackLabel-${stack.id}`}>
             {#snippet input({ inputProps })}
               <Input
@@ -171,9 +178,11 @@
       Names are engraved in each well floor, away from the finger hole. Long names are scaled to fit.
     </p>
   </section>
+  </EditorSection>
+{/snippet}
 
-  <Spacer size="0.5rem" />
-
+{#snippet manufacturingSection()}
+  <EditorSection title="Manufacturing" summary={`Wall ${tray.params.wallThickness} · floor ${tray.params.floorThickness} mm`}>
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
@@ -234,7 +243,13 @@
         {#snippet end()}mm{/snippet}
       </FormControl>
     </div>
-    <Spacer size="1rem" />
+  </section>
+  </EditorSection>
+{/snippet}
+
+{#snippet finishSection()}
+  <EditorSection title="Corner finish" summary={`Requested radius ${tray.params.outerCornerRadius ?? 0} mm`} open={false}>
+  <section class="section">
     <FormControl label="Outer corner radius" name="outerCornerRadius">
       {#snippet input({ inputProps })}
         <Input
@@ -255,7 +270,13 @@
       0 keeps square corners. Applied radius: {getCardWellCornerRadius(tray.params, getCardSizes()).toFixed(1)} mm, limited
       to protect the wells and extraction notches. Top and bottom stay flat for stacking.
     </p>
-    <Spacer size="1rem" />
+  </section>
+  </EditorSection>
+{/snippet}
+
+{#snippet dimensionsSection()}
+  <EditorSection title="Dimensions" summary={`${dimensions.width.toFixed(1)} × ${dimensions.depth.toFixed(1)} × ${dimensions.height.toFixed(1)} mm`} open={false}>
+  <section class="section">
     <h3 class="sectionTitle">Minimum exterior dimensions</h3>
     <div class="formGrid">
       {#each minimumFields as field (field.key)}
@@ -287,7 +308,21 @@
       Empty or 0 keeps automatic sizing. Smaller values never reduce card space. Extra width and length are shared
       between outer margins and internal dividers; extra height raises the well floors.
     </p>
-    <Spacer size="1rem" />
+    {#if onUpdateTray}
+      <Spacer size="1rem" />
+      <InputCheckbox
+        label="Auto-adjust height to layer"
+        checked={tray.autoHeight ?? true}
+        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+      />
+    {/if}
+  </section>
+  </EditorSection>
+{/snippet}
+
+{#snippet extractionSection()}
+  <EditorSection title="Extraction" summary={tray.params.extractionNotches ? 'Through notches enabled' : 'Notches disabled'} open={false}>
+  <section class="section">
     <InputCheckbox
       label="Extraction notches"
       checked={tray.params.extractionNotches ?? false}
@@ -318,15 +353,31 @@
         trays form a continuous finger channel when stacked.
       </p>
     {/if}
-    {#if onUpdateTray}
-      <Spacer size="1rem" />
-      <InputCheckbox
-        label="Auto-adjust height to layer"
-        checked={tray.autoHeight ?? true}
-        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
-      />
-    {/if}
   </section>
+  </EditorSection>
+{/snippet}
+<div class="panelFormSection">
+  {#if interfaceUi.mode === 'modern'}
+    {@render contentSection()}
+    {@render distributionSection()}
+    {@render dimensionsSection()}
+    {@render manufacturingSection()}
+    {@render extractionSection()}
+    {@render finishSection()}
+  {:else}
+    {@render distributionSection()}
+    <Spacer size="0.5rem" />
+    {@render contentSection()}
+    <Spacer size="0.5rem" />
+    {@render manufacturingSection()}
+    <Spacer size="0.5rem" />
+    {@render finishSection()}
+    <Spacer size="0.5rem" />
+    {@render dimensionsSection()}
+    <Spacer size="0.5rem" />
+    {@render extractionSection()}
+    <Spacer size="0.5rem" />
+  {/if}
 </div>
 
 <style>

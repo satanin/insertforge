@@ -1,3 +1,4 @@
+import { DEFAULT_CARD_SLEEVE_THICKNESSES, getProjectCardSizes, migrateProjectCards } from '$lib/utils/projectCards';
 import defaultProjectJson from '$lib/data/defaultProject.json';
 import { APP_VERSION } from '$lib/appInfo';
 import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
@@ -137,8 +138,8 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
     name: 'Square',
     category: 'counter',
     baseShape: 'square',
-    width: 15.9,
-    length: 15.9,
+    width: 16,
+    length: 16,
     thickness: DEFAULT_COUNTER_THICKNESS
   },
   {
@@ -146,8 +147,8 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
     name: 'Hex',
     category: 'counter',
     baseShape: 'hex',
-    width: 15.9,
-    length: 15.9,
+    width: 16,
+    length: 16,
     thickness: DEFAULT_COUNTER_THICKNESS,
     pointyTop: false
   },
@@ -156,8 +157,8 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
     name: 'Circle',
     category: 'counter',
     baseShape: 'circle',
-    width: 15.9,
-    length: 15.9,
+    width: 16,
+    length: 16,
     thickness: DEFAULT_COUNTER_THICKNESS
   },
   {
@@ -165,8 +166,8 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
     name: 'Triangle',
     category: 'counter',
     baseShape: 'triangle',
-    width: 15.9,
-    length: 15.9,
+    width: 16,
+    length: 16,
     thickness: DEFAULT_COUNTER_THICKNESS,
     cornerRadius: 1.5
   },
@@ -213,7 +214,6 @@ export const DEFAULT_COUNTER_SHAPES: CounterShape[] = [
 // Default card sizes (global)
 export const DEFAULT_CARD_SIZES: CardSize[] = [
   { id: DEFAULT_CARD_SIZE_IDS.standard, name: 'Standard', width: 66, length: 91, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.standardPremium, name: 'Standard Premium', width: 66, length: 91, thickness: 0.8 },
   {
     id: DEFAULT_CARD_SIZE_IDS.miniAmerican,
     name: 'Mini American',
@@ -222,34 +222,16 @@ export const DEFAULT_CARD_SIZES: CardSize[] = [
     thickness: 0.5
   },
   {
-    id: DEFAULT_CARD_SIZE_IDS.miniAmericanPremium,
-    name: 'Mini American Premium',
-    width: 44,
-    length: 66,
-    thickness: 0.8
-  },
-  {
     id: DEFAULT_CARD_SIZE_IDS.miniEuropean,
     name: 'Mini European',
     width: 47,
     length: 71,
     thickness: 0.5
   },
-  {
-    id: DEFAULT_CARD_SIZE_IDS.miniEuropeanPremium,
-    name: 'Mini European Premium',
-    width: 47,
-    length: 71,
-    thickness: 0.8
-  },
   { id: DEFAULT_CARD_SIZE_IDS.euro, name: 'Euro', width: 62, length: 95, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.euroPremium, name: 'Euro Premium', width: 62, length: 95, thickness: 0.8 },
   { id: DEFAULT_CARD_SIZE_IDS.japanese, name: 'Japanese', width: 62, length: 89, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.japanesePremium, name: 'Japanese Premium', width: 62, length: 89, thickness: 0.8 },
   { id: DEFAULT_CARD_SIZE_IDS.tarot, name: 'Tarot', width: 73, length: 123, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.tarotPremium, name: 'Tarot Premium', width: 73, length: 123, thickness: 0.8 },
   { id: DEFAULT_CARD_SIZE_IDS.square, name: 'Square', width: 73, length: 73, thickness: 0.5 },
-  { id: DEFAULT_CARD_SIZE_IDS.squarePremium, name: 'Square Premium', width: 73, length: 73, thickness: 0.8 }
 ];
 
 function generateId(): string {
@@ -672,7 +654,7 @@ function createFitAwareLayeredBoxSection(
     };
   }
 
-  const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+  const sectionDims = getLayeredBoxSectionDimensions(section, getProjectCardSizes(project), project.counterShapes);
   if (sectionDims.width > availableWidth + 0.01 || sectionDims.depth > availableDepth + 0.01) {
     return null;
   }
@@ -689,7 +671,7 @@ function getBestLayeredBoxLayerGapRect(layeredBox: LayeredBox, layeredBoxLayerId
     (layeredBox.customDepth ?? 0) - layeredBox.wallThickness * 2 - layeredBox.tolerance * 2,
     20
   );
-  const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+  const layout = getLayeredBoxRenderLayout(layeredBox, getProjectCardSizes(project), project.counterShapes);
   const obstacles = layout.sections
     .filter((placement) => placement.internalLayerId === layeredBoxLayerId)
     .map((placement) => ({
@@ -1064,7 +1046,7 @@ function getLayeredBoxInteriorLimits(layeredBox: LayeredBox): { width?: number; 
 
 function getLayeredBoxSectionContentOverflow(section: LayeredBoxSection): { fits: boolean; widthOverflow: number; depthOverflow: number } {
   if ((section.type === 'counter' || section.type === 'playerBoard') && section.counterParams) {
-    const actualDimensions = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+    const actualDimensions = getLayeredBoxSectionDimensions(section, getProjectCardSizes(project), project.counterShapes);
     const minDimensions = getLayeredBoxSectionDimensions(
       {
         ...section,
@@ -1073,7 +1055,7 @@ function getLayeredBoxSectionContentOverflow(section: LayeredBoxSection): { fits
           trayWidthOverride: 0
         }
       },
-      project.cardSizes,
+      getProjectCardSizes(project),
       project.counterShapes
     );
 
@@ -1101,7 +1083,7 @@ function getLayeredBoxLayoutOverflow(layeredBox: LayeredBox): {
   heightOverflow: number;
 } {
   const limits = getLayeredBoxInteriorLimits(layeredBox);
-  const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+  const layout = getLayeredBoxRenderLayout(layeredBox, getProjectCardSizes(project), project.counterShapes);
   const widthOverflow =
     limits.width !== undefined ? Math.max(layout.width - limits.width, 0) : 0;
   const depthOverflow =
@@ -1195,7 +1177,7 @@ function createDefaultProject(): Project {
       })) ?? [],
     boards: layer.boards ?? []
   }));
-  return project;
+  return migrateProjectCards(project);
 }
 
 function createBlankProject(): Project {
@@ -1209,6 +1191,7 @@ function createBlankProject(): Project {
     layers: [bottomLayer],
     counterShapes: DEFAULT_COUNTER_SHAPES.map((shape) => ({ ...shape })),
     cardSizes: DEFAULT_CARD_SIZES.map((size) => ({ ...size })),
+    cardSleeveThicknesses: { ...DEFAULT_CARD_SLEEVE_THICKNESSES },
     selectedLayerId: bottomLayer.id,
     selectedBoxId: null,
     selectedTrayId: null,
@@ -1876,7 +1859,7 @@ export function expandLayeredBoxToAvailableSpace(
     const arrangement = arrangeLayerContents(layer, {
       gameContainerWidth,
       gameContainerDepth,
-      cardSizes: project.cardSizes,
+      cardSizes: getProjectCardSizes(project),
       counterShapes: project.counterShapes
     });
     const proxyId = `layered-box-${layeredBoxId}`;
@@ -1919,7 +1902,7 @@ export function expandLayeredBoxToAvailableSpace(
           internalLayer.sections.every((section) => section.type === 'cup' && section.cupParams)
       );
     const canShrinkContent = isEmpty || isCupOnly;
-    const layout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+    const layout = getLayeredBoxRenderLayout(layeredBox, getProjectCardSizes(project), project.counterShapes);
     const minBodyWidth = layout.width + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
     const minBodyDepth = layout.depth + layeredBox.wallThickness * 2 + layeredBox.tolerance * 2;
     const cupOnlyMinimums = isCupOnly
@@ -2197,7 +2180,7 @@ export function addSectionToLayeredBoxLayer(
     boxLayer.sections.push(section);
     if (layeredBox.customWidth !== undefined && layeredBox.customDepth !== undefined && fittedSection) {
       if (gapRect) {
-        const currentLayout = getLayeredBoxRenderLayout(layeredBox, project.cardSizes, project.counterShapes);
+        const currentLayout = getLayeredBoxRenderLayout(layeredBox, getProjectCardSizes(project), project.counterShapes);
         const existingPlacements = currentLayout.sections
           .filter((placement) => placement.internalLayerId === boxLayer.id && placement.section.id !== section.id)
           .map((placement) => ({
@@ -2206,7 +2189,7 @@ export function addSectionToLayeredBoxLayer(
             y: placement.y,
             rotation: placement.rotation
           }));
-        const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes);
+        const sectionDims = getLayeredBoxSectionDimensions(section, getProjectCardSizes(project), project.counterShapes);
         boxLayer.manualLayout = [
           ...existingPlacements,
           {
@@ -2676,7 +2659,7 @@ export function expandBoxToAvailableSpace(
     const arrangement = arrangeLayerContents(layer, {
       gameContainerWidth,
       gameContainerDepth,
-      cardSizes: project.cardSizes,
+      cardSizes: getProjectCardSizes(project),
       counterShapes: project.counterShapes
     });
     const targetPlacement = arrangement.boxes.find((placement) => placement.box.id === boxId);
@@ -2720,7 +2703,7 @@ export function expandBoxToAvailableSpace(
             customBoxWidth: box.customWidth,
             wallThickness: box.wallThickness,
             tolerance: box.tolerance,
-            cardSizes: project.cardSizes,
+            cardSizes: getProjectCardSizes(project),
             counterShapes: project.counterShapes,
             manualLayout: box.manualLayout
           })
@@ -2742,7 +2725,7 @@ export function expandBoxToAvailableSpace(
         })()
       : null;
 
-    const minimums = calculateMinimumBoxDimensions(box, project.cardSizes, project.counterShapes);
+    const minimums = calculateMinimumBoxDimensions(box, getProjectCardSizes(project), project.counterShapes);
     const currentRotation = targetPlacement.rotation;
     const isCurrentlySwapped = currentRotation === 90 || currentRotation === 270;
     const matchingRotation = currentRotation;
@@ -3283,9 +3266,15 @@ export function deleteCounterShape(id: string): void {
   }
 }
 
+export function updateCardSleeveThickness(sleeve: import('$lib/types/project').ProjectCardSleeve, value: number): void {
+  if (!Number.isFinite(value) || value <= 0) return;
+  project.cardSleeveThicknesses = { ...DEFAULT_CARD_SLEEVE_THICKNESSES, ...project.cardSleeveThicknesses, [sleeve]: value };
+  autosave();
+}
+
 // Card size operations (global)
 export function getCardSizes(): CardSize[] {
-  return project.cardSizes;
+  return getProjectCardSizes(project);
 }
 
 export function getCardSize(id: string): CardSize | null {
@@ -3460,7 +3449,7 @@ export function updateCardStorageParams(trayId: string, params: CardStorageParam
 }
 
 export function updateCardDividerTrayParams(trayId: string, params: CardDividerTrayParams): void {
-  const sanitizedParams = sanitizeCardDividerTrayParams(params, project.cardSizes);
+  const sanitizedParams = sanitizeCardDividerTrayParams(params, getProjectCardSizes(project));
   for (const layer of project.layers) {
     for (const box of layer.boxes) {
       const tray = box.trays.find((t) => t.id === trayId);

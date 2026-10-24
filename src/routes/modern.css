@@ -1,0 +1,330 @@
+/* Optional skin. Pane sizes, canvas dimensions and camera controls stay owned by the existing layout. */
+.appContainer.ui-modern.dark {
+  --bg: #171d28;
+  --fg: #ecf1fa;
+  --fgMuted: #a9b6ca;
+  --fgPrimary: #a9c2ff;
+  --contrastEmpty: #202938;
+  --contrastLowest: #202938;
+  --contrastLow: #2b374a;
+  --contrastMedium: #3c4a60;
+  --contrastHigh: #b4c2d8;
+  --inputBg: #1a2230;
+  --inputFocusBg: #25334a;
+  --inputBorderColor: #465773;
+  --popoverBg: #202938;
+  --modernAccent: #a9c2ff;
+  --modernSelected: #324767;
+  --modernShadow: 0 8px 24px #080e1830;
+}
+.appContainer.ui-modern.light {
+  --bg: #eef2f8;
+  --fg: #23334d;
+  --fgMuted: #536781;
+  --fgPrimary: #315caa;
+  --contrastEmpty: #fff;
+  --contrastLowest: #fff;
+  --contrastLow: #e7edf7;
+  --contrastMedium: #cdd7e6;
+  --contrastHigh: #435b7e;
+  --inputBg: #f7f9fd;
+  --inputFocusBg: #fff;
+  --inputBorderColor: #bccbe0;
+  --popoverBg: #fff;
+  --modernAccent: #315caa;
+  --modernSelected: #e1ebfd;
+  --modernShadow: 0 8px 24px #20365714;
+}
+.ui-modern {
+  --modernControlHeight: 2.5rem;
+  --surfaceBg: var(--contrastLowest);
+  --borderThin: solid var(--borderWidthThin) var(--contrastMedium);
+  --radius-2: 0.45rem;
+}
+.ui-modern .appHeader {
+  background: var(--contrastLowest);
+}
+.ui-modern .editorPanelInner {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.appContainer.ui-modern .editorPanel .panelHeader {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  padding: 1rem;
+}
+.ui-modern .panelHeader h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.ui-modern .headerStats {
+  font-family: var(--font-sans);
+}
+.ui-modern .editorIdentity {
+  color: var(--fgMuted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ui-modern .editorExterior {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+.ui-modern .navMenu {
+  background: var(--contrastLowest);
+  border-radius: 0.6rem;
+  box-shadow: var(--modernShadow);
+}
+.ui-modern .navItem {
+  border-radius: 0.35rem;
+}
+.ui-modern .navItem--selected {
+  background: var(--modernSelected);
+  color: var(--modernAccent);
+  border-left-color: var(--modernAccent);
+}
+.ui-modern .projectNavigationToggle {
+  position: fixed;
+  top: 4rem;
+  left: 1.5rem;
+  z-index: 101;
+  border: var(--borderThin);
+  border-radius: var(--radius-2);
+  background: var(--contrastLowest);
+  color: var(--fg);
+  font: inherit;
+  padding: 0.4rem 0.7rem;
+  box-shadow: var(--modernShadow);
+}
+.ui-modern .navMenu--modern {
+  top: 7rem;
+  max-height: calc(100dvh - 11rem);
+}
+.ui-modern .trayViewer {
+  background: var(--bg);
+}
+.ui-modern .viewToolbar {
+  padding: 0.4rem;
+  background: var(--contrastLowest);
+  border: var(--borderThin);
+  border-radius: 0.6rem;
+  box-shadow: var(--modernShadow);
+}
+.ui-modern .bottomToolbar {
+  padding: 0.6rem;
+  background: var(--contrastLowest);
+  border: var(--borderThin);
+  border-radius: 0.6rem;
+  box-shadow: var(--modernShadow);
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.ui-modern .toolbarRight {
+  flex-wrap: wrap;
+}
+.ui-modern .btn {
+  --btn-border: 1px solid var(--inputBorderColor);
+  --btn-borderHover: 1px solid var(--modernAccent);
+  --btn-bgHover: var(--modernSelected);
+  --btn-bgSpecial: var(--modernSelected);
+  --btn-color: var(--fg);
+}
+.ui-modern .btn--special {
+  background: var(--modernSelected);
+  border-color: var(--modernAccent);
+}
+.ui-modern .regenerateButton--dirty button {
+  animation: none;
+  outline: 2px solid var(--modernAccent);
+  outline-offset: 2px;
+}
+.appContainer.ui-modern .traysPanel .trayIdentity > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  border-radius: 0;
+  list-style: none;
+  cursor: pointer;
+}
+.ui-modern .trayIdentity {
+  border-bottom: var(--borderThin);
+}
+.ui-modern .trayIdentity[open] > summary svg {
+  transform: rotate(180deg);
+}
+.ui-modern .traysPanel {
+  height: auto;
+  overflow: visible;
+}
+.ui-modern .traysPanel .panelForm {
+  overflow: visible;
+}
+.ui-modern .panelContent > .traysPanel > .panelForm {
+  padding-top: 0;
+}
+.ui-modern .trayDivider {
+  display: none;
+}
+.ui-modern .panelFormSection:has(> .editorSectionGroup) {
+  padding-inline: 0;
+}
+.ui-modern .editorSectionGroup .section {
+  padding-inline: 0.9rem;
+}
+.ui-modern .editorSectionGroup .editorSection {
+  padding-inline: 0.9rem;
+}
+.ui-modern .editorSectionGroup :is(.boxSection, .layeredBoxSection) {
+  padding-inline: 0.9rem;
+}
+.ui-modern .layeredBoxDivider {
+  display: none;
+}
+.ui-modern .editorSectionGroup + [class*='spacer'] {
+  display: none;
+}
+.ui-modern .inventoryContent {
+  border-radius: 0;
+  background: var(--contrastLowest);
+}
+.ui-modern .inventoryDialog {
+  background: var(--contrastLowest);
+  color: var(--fg);
+  border-color: var(--contrastMedium);
+  border-radius: 0.75rem;
+}
+.ui-modern :is(input:not([type='checkbox']):not([type='range']):not([type='color']), select, .select__button) {
+  background: var(--inputBg);
+  color: var(--fg);
+  border-color: var(--inputBorderColor);
+  border-radius: var(--radius-2);
+}
+.ui-modern
+  :is(.panelContent, .inventoryDialog)
+  :is(input:not([type='checkbox']):not([type='range']):not([type='color']), select, .select__button) {
+  height: var(--modernControlHeight);
+}
+.appContainer.ui-modern .quantityInput button,
+.appContainer.ui-modern .quantityControl button {
+  height: var(--modernControlHeight);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  text-align: center;
+  line-height: 1;
+}
+.appContainer.ui-modern .control__inputWrapper > :is(.control__start, .control__end) {
+  height: var(--modernControlHeight);
+  flex-shrink: 0;
+}
+.appContainer.ui-modern .control__inputWrapper--end > input.input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.appContainer.ui-modern .control__inputWrapper--start > input.input {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.ui-modern .quantityInput > input,
+.ui-modern .quantityControl > input {
+  border-radius: 0;
+}
+.appContainer.ui-modern .inventoryDialog .quantityControl {
+  display: grid;
+  grid-template-columns: 2rem minmax(2rem, 1fr) 2rem;
+}
+.ui-modern .quantityControl > input {
+  width: 100%;
+}
+.ui-modern .quantityControl > button {
+  width: auto;
+}
+.ui-modern .quantityInput {
+  flex: 0 0 7rem;
+}
+.ui-modern .stackRow {
+  flex-wrap: wrap;
+}
+.ui-modern .stackRow .stackSelect,
+.ui-modern .stackRow .stackCardSelect {
+  min-width: 7rem;
+}
+.ui-modern .interfacePicker select {
+  height: auto;
+}
+.ui-modern :is(input, select, button):focus-visible {
+  outline: 2px solid var(--modernAccent);
+  outline-offset: 2px;
+}
+.ui-modern input[type='checkbox'],
+.ui-modern input[type='range'] {
+  accent-color: var(--modernAccent);
+}
+.ui-modern .viewerCameraToolbar {
+  position: absolute;
+  top: 1rem;
+  right: 7.5rem;
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 30rem;
+}
+.ui-modern .viewerCameraToolbar button {
+  border: var(--borderThin);
+  border-radius: var(--radius-2);
+  background: var(--contrastLowest);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+.ui-modern .viewerCameraToolbar button:hover {
+  background: var(--modernSelected);
+}
+.ui-modern .viewerCameraToolbar button[aria-pressed='true'] {
+  border-color: var(--modernAccent);
+  color: var(--modernAccent);
+}
+.ui-modern .generationState {
+  font-size: 0.75rem;
+  color: var(--fgMuted);
+}
+@media (max-width: 1100px) {
+  .ui-modern .headerLinks {
+    display: none;
+  }
+  .ui-modern .headerMenu {
+    display: block;
+  }
+  .ui-modern .viewerCameraToolbar {
+    top: auto;
+    bottom: 7rem;
+    right: 1rem;
+    left: 1rem;
+    justify-content: center;
+  }
+}
+@media (max-width: 768px) {
+  .ui-modern .projectNavigationToggle {
+    display: none;
+  }
+  .ui-modern .navMenu--modern {
+    top: auto;
+    max-height: none;
+  }
+  .ui-modern .viewerCameraToolbar {
+    bottom: 8.5rem;
+  }
+  .ui-modern .bottomToolbar {
+    padding: 0.4rem;
+  }
+}

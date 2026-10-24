@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getProjectCardSizes } from '$lib/utils/projectCards';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
+  import EditorSection from './EditorSection.svelte';
   import { resolveCardStorage } from '$lib/models/cardStorageTray';
   import { Panel, Title, Input, FormControl, Spacer, Text, InputCheckbox, Select, Hr, addToast } from '@tableslayer/ui';
   import GlobalsPanel from './GlobalsPanel.svelte';
@@ -538,7 +541,7 @@
       isCups = true;
     } else if (tray.type === 'cardStorage') {
       stacks = tray.params.dividers.length;
-      counters = resolveCardStorage(tray.params, getProject().cardSizes).capacity;
+      counters = resolveCardStorage(tray.params, getProjectCardSizes(getProject())).capacity;
       isCards = true;
     } else if (isMiniatureRackTray(tray)) {
       stacks = getMiniatureRackSlotCount(tray.params);
@@ -599,9 +602,16 @@
   <Panel class="editorPanelInner">
     <!-- Header -->
     <div class="panelHeader">
+      {#if interfaceUi.mode === 'modern'}
+        <span class="editorIdentity">{selectionType === 'tray' ? selectedTray?.type ?? 'Piece' : selectionType}</span>
+      {/if}
       <Title as="h2" size="sm">
         {panelTitle}
       </Title>
+      {#if interfaceUi.mode === 'modern' && selectionType === 'tray' && selectedTray}
+        {@const exterior = getTrayDimensionsForTray(selectedTray, getProjectCardSizes(project), project.counterShapes)}
+        <span class="editorExterior">{exterior.width.toFixed(1)} × {exterior.depth.toFixed(1)} × {exterior.height.toFixed(1)} mm <small>natural exterior</small></span>
+      {/if}
       {#if selectionType === 'layer' && selectedLayer}
         {@const boxCount = selectedLayer.boxes.length + selectedLayer.layeredBoxes.length}
         {@const looseCount = selectedLayer.looseTrays.length + selectedLayer.boards.length}
@@ -638,11 +648,11 @@
     <!-- Content -->
     <div class="panelContent">
       {#if !isLayoutEditMode && selectionType === 'tray' && selectedTray}
-        {#key selectedTray.id}<InventoryContent targetId={selectedTray.id} />{/key}
+        {#key selectedTray.id}<EditorSection title="Inventory content" summary="Explicit assignments and applied measurements" open={false}><InventoryContent targetId={selectedTray.id} /></EditorSection>{/key}
       {:else if !isLayoutEditMode && selectionType === 'layeredBoxSection' && selectedLayeredBoxSection}
-        {#key selectedLayeredBoxSection.id}<InventoryContent targetId={selectedLayeredBoxSection.id} />{/key}
+        {#key selectedLayeredBoxSection.id}<EditorSection title="Inventory content" summary="Explicit assignments and applied measurements" open={false}><InventoryContent targetId={selectedLayeredBoxSection.id} /></EditorSection>{/key}
       {:else if !isLayoutEditMode && selectionType === 'board' && selectedBoard}
-        {#key selectedBoard.id}<InventoryContent targetId={selectedBoard.id} />{/key}
+        {#key selectedBoard.id}<EditorSection title="Inventory content" open={false}><InventoryContent targetId={selectedBoard.id} /></EditorSection>{/key}
       {/if}
       {#if isLayoutEditMode}
           <div class="layoutEditMessage">
@@ -675,7 +685,7 @@
         />
       {:else if selectionType === 'layer'}
         {#if selectedLayer}
-          {@const cardSizes = project.cardSizes ?? []}
+          {@const cardSizes = getProjectCardSizes(project) ?? []}
           {@const counterShapes = project.counterShapes ?? []}
           {@const layerHeight = calculateLayerHeight(selectedLayer, { cardSizes, counterShapes })}
           {@const layerArrangement = arrangeLayerContents(selectedLayer, {
@@ -830,8 +840,8 @@
         {/if}
       {:else if selectionType === 'layeredBox'}
         {#if selectedLayeredBox}
-          {@const layeredBoxLayout = getLayeredBoxRenderLayout(selectedLayeredBox, project.cardSizes, project.counterShapes)}
-          {@const layeredBoxExterior = getLayeredBoxExteriorDimensions(selectedLayeredBox, project.cardSizes, project.counterShapes)}
+          {@const layeredBoxLayout = getLayeredBoxRenderLayout(selectedLayeredBox, getProjectCardSizes(project), project.counterShapes)}
+          {@const layeredBoxExterior = getLayeredBoxExteriorDimensions(selectedLayeredBox, getProjectCardSizes(project), project.counterShapes)}
           {@const layeredBoxLidHeight = getLidHeight({
             id: selectedLayeredBox.id,
             name: selectedLayeredBox.name,
@@ -866,6 +876,7 @@
               ? selectedLayeredBox.customBoxHeight + layeredBoxLidHeight
               : undefined}
           <div class="panelFormSection layeredBoxForm">
+            <EditorSection title="Identity">
             <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Details</h4>
@@ -897,9 +908,11 @@
                 {/snippet}
               </FormControl>
             </section>
+            </EditorSection>
 
             <Hr class="layeredBoxDivider" />
 
+            <EditorSection title="Dimensions and lid">
             <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Options</h4>
@@ -1031,9 +1044,11 @@
                 </span>
               </div>
             </section>
+            </EditorSection>
 
             <Hr class="layeredBoxDivider" />
 
+            <EditorSection title="Manufacturing">
             <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Print Options</h4>
@@ -1093,9 +1108,11 @@
                 </Text>
               {/if}
             </section>
+            </EditorSection>
 
             <Hr class="layeredBoxDivider" />
 
+            <EditorSection title="Internal layers">
             <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Internal Layers</h4>
@@ -1128,7 +1145,7 @@
                     </div>
                   {:else}
                     {#each boxLayer.sections as section (section.id)}
-                      {@const sectionDims = getLayeredBoxSectionDimensions(section, project.cardSizes, project.counterShapes)}
+                      {@const sectionDims = getLayeredBoxSectionDimensions(section, getProjectCardSizes(project), project.counterShapes)}
                       <div class="treeItem treeItem--tray treeItem--nested">
                         <span class="treeItemName">{section.name}</span>
                         <span class="treeItemDims">
@@ -1142,9 +1159,11 @@
                 {/each}
               </div>
             </section>
+            </EditorSection>
 
             <Hr class="layeredBoxDivider" />
 
+            <EditorSection title="Actions">
             <section class="layeredBoxSection">
               <div class="buttonRow">
                 <button
@@ -1155,6 +1174,7 @@
                 </button>
               </div>
             </section>
+            </EditorSection>
           </div>
         {:else}
           <div class="emptyState">

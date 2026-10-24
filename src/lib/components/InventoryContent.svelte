@@ -1,4 +1,5 @@
 <script lang="ts">
+  import QuantityInput from './QuantityInput.svelte';
   import { getProject, setInventoryContent } from '$lib/stores/project.svelte';
   import type { InventoryAssignment } from '$lib/types/project';
   import {
@@ -88,15 +89,12 @@
           </label>
           {#if selected}<label class="count">
               In this piece
-              <input
-                type="number"
-                min="1"
+              <QuantityInput
                 max={available}
-                step="1"
-                aria-label={`Quantity of ${group.name}`}
+                label={`Quantity of ${group.name}`}
                 value={selected.quantity}
-                onchange={(e) => {
-                  selected.quantity = e.currentTarget.valueAsNumber;
+                onChange={(value) => {
+                  selected.quantity = value;
                 }}
               />
             </label>
@@ -238,7 +236,7 @@
     font-size: 0.75rem;
     margin-top: 0.5rem;
   }
-  .count input {
+  .count :global(input) {
     width: 5rem;
     padding: 0.35rem;
     border: var(--borderThin);

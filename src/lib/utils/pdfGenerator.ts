@@ -1,3 +1,4 @@
+import { getProjectCardSizes } from '$lib/utils/projectCards';
 import { arrangeTrays } from '$lib/models/box';
 import { getCardDividerPositions } from '$lib/models/cardDividerTray';
 import { getCardDrawPositions } from '$lib/models/cardTray';
@@ -179,7 +180,7 @@ export function extractPdfData(project: Project): PdfData {
   const boxes: PdfBoxData[] = [];
 
   // Get project-level card sizes and counter shapes
-  const cardSizes = project.cardSizes ?? [];
+  const cardSizes = getProjectCardSizes(project) ?? [];
   const counterShapes = project.counterShapes ?? [];
 
   // Get all boxes from all layers

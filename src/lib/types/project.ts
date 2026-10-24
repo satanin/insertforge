@@ -31,6 +31,14 @@ export interface CardSize {
   width: number; // Sleeved width in mm
   length: number; // Sleeved length in mm
   thickness: number; // Sleeved thickness in mm
+  sleeveThicknesses?: CardSleeveThicknesses; // Runtime projection; not stored in the catalogue
+}
+
+export type ProjectCardSleeve = 'none' | 'normal' | 'premium';
+export type CardSleeveThicknesses = Record<ProjectCardSleeve, number>;
+export interface CardSleeveSelection {
+  sleeve?: ProjectCardSleeve;
+  cardThicknessOverride?: number; // Preserves historical measured thicknesses
 }
 
 // Base tray interface shared by all tray types
@@ -297,6 +305,7 @@ export interface GlobalSettings {
 }
 
 export interface Project {
+  cardSleeveThicknesses?: CardSleeveThicknesses;
   diceSizes?: DiceSize[];
   inventory?: InventoryGroup[];
   inventoryCardDefaults?: { cardSizeId: string; sleeve: CardSleeve; thickness?: number };

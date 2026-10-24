@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('token inventory content offers top and edge loading per group', async ({ page }) => {
   await page.addInitScript(() => {
+    localStorage.setItem('insertforge-interface', 'classic');
     localStorage.setItem(
       'counter-tray-project',
       JSON.stringify({

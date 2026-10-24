@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { effectiveCardSize } from '$lib/utils/projectCards';
+  import CardSleeveControl from '../CardSleeveControl.svelte';
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select } from '@tableslayer/ui';
   import type { CardDrawTray } from '$lib/types/project';
@@ -16,7 +20,7 @@
   let { tray, onUpdateParams, onUpdateTray, actualHeight, displayDimensions }: Props = $props();
 
   let cardSizes = $derived(getCardSizes());
-  let selectedCardSize = $derived(cardSizes.find((s) => s.id === tray.params.cardSizeId));
+  let selectedCardSize = $derived(effectiveCardSize(cardSizes.find((s) => s.id === tray.params.cardSizeId), tray.params));
 
   // Compute dimensions, using actualHeight if provided (when tray expands to match box height)
   // If displayDimensions is provided (with rotation applied), use those for display
@@ -32,11 +36,12 @@
   });
 
   function updateParam<K extends keyof CardDrawTrayParams>(key: K, value: CardDrawTrayParams[K]) {
-    onUpdateParams({ ...tray.params, [key]: value });
+    onUpdateParams({ ...tray.params, [key]: value, ...(key === 'cardSizeId' ? { cardThicknessOverride: undefined } : {}) });
   }
 </script>
 
 <div class="panelFormSection">
+  <EditorSection title="Content · card format">
   <section class="section">
     <h3 class="sectionTitle">Card Size</h3>
     <Spacer size="0.5rem" />
@@ -57,35 +62,38 @@
         />
       {/snippet}
     </FormControl>
+    <CardSleeveControl selection={tray.params} onChange={(value) => onUpdateParams({ ...tray.params, ...value })} />
     {#if selectedCardSize}
       <Spacer size="0.25rem" />
       <p class="cardSizeInfo">
-        {selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm thick (sleeved)
+        {selectedCardSize.width}mm × {selectedCardSize.length}mm, {selectedCardSize.thickness}mm per card
       </p>
     {/if}
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
+  <EditorSection title="Content · card stack">
   <section class="section">
     <h3 class="sectionTitle">Card Stack</h3>
     <Spacer size="0.5rem" />
     <FormControl label="Card count" name="cardCount">
       {#snippet input({ inputProps })}
-        <Input
-          {...inputProps}
-          type="number"
-          step="1"
-          min="1"
+        <QuantityInput
+          id={inputProps.id}
+          label="Card count"
           value={tray.params.cardCount}
-          onchange={(e) => updateParam('cardCount', parseInt(e.currentTarget.value))}
+          onChange={(value) => updateParam('cardCount', value)}
         />
       {/snippet}
     </FormControl>
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
+  <EditorSection title="Manufacturing">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
@@ -159,9 +167,11 @@
       />
     {/if}
   </section>
+  </EditorSection>
 
   <Spacer size="0.5rem" />
 
+  <EditorSection title="Magnet holes">
   <section class="section">
     <h3 class="sectionTitle">Magnet Holes</h3>
     <Spacer size="0.5rem" />
@@ -192,6 +202,7 @@
       </FormControl>
     </div>
   </section>
+  </EditorSection>
 </div>
 
 <style>

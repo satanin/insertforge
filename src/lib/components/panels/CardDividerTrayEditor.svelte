@@ -1,4 +1,7 @@
 <script lang="ts">
+  import CardSleeveControl from '../CardSleeveControl.svelte';
+  import EditorSection from '../EditorSection.svelte';
+  import QuantityInput from '../QuantityInput.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
@@ -97,7 +100,7 @@
     const newStacks = [...tray.params.stacks];
     const current = newStacks[index];
     if (field === 'cardSizeId') {
-      newStacks[index] = { ...current, cardSizeId: value as string };
+      newStacks[index] = { ...current, cardSizeId: value as string, cardThicknessOverride: undefined };
     } else if (field === 'count') {
       newStacks[index] = { ...current, count: value as number };
     } else {
@@ -110,7 +113,7 @@
     const cardSizeId = getProjectDefaultCardSizeId();
     onUpdateParams({
       ...tray.params,
-      stacks: [...tray.params.stacks, { cardSizeId, count: 30, label: undefined }]
+      stacks: [...tray.params.stacks, { cardSizeId, sleeve: 'normal', count: 30, label: undefined }]
     });
   }
 
@@ -150,6 +153,7 @@
 
 {#if renderMode === 'all' || renderMode === 'settings'}
   <div class="panelFormSection">
+  <EditorSection title="Distribution">
   <section class="section">
     <h3 class="sectionTitle">Layout</h3>
     <Spacer size="0.5rem" />
@@ -189,6 +193,7 @@
       {/snippet}
     </FormControl>
   </section>
+  </EditorSection>
 </div>
 {/if}
 
@@ -196,6 +201,7 @@
   <div class="panelFormSection">
   <Spacer size="0.5rem" />
 
+  <EditorSection title="Content · card stacks">
   <section class="section">
     <h3 class="sectionTitle">Card Stacks</h3>
     <Spacer size="0.5rem" />
@@ -240,22 +246,18 @@
               onSelectedChange={(selected) => updateStack(index, 'cardSizeId', selected[0])}
             />
           </div>
-          <Input
-            type="number"
-            min="1"
-            value={stack.count}
-            onchange={(e) => updateStack(index, 'count', parseInt(e.currentTarget.value))}
-            style="width: 3.5rem;"
-          />
+          <QuantityInput label={`Cards in stack ${index + 1}`} legacyStyle="width: 3.5rem;" value={stack.count} onChange={(value) => updateStack(index, 'count', value)} />
           <IconButton variant="ghost" onclick={() => removeStack(index)} title="Remove stack" color="var(--fgMuted)">
             <Icon Icon={IconX} color="var(--fgMuted)" />
           </IconButton>
         </div>
+        <CardSleeveControl selection={stack} label={`Sleeves stack ${index + 1}`} onChange={(value) => onUpdateParams({ ...tray.params, stacks: tray.params.stacks.map((s, i) => i === index ? { ...s, ...value } : s) })} />
       {/each}
       <Spacer size="0.5rem" />
       <Link as="button" onclick={addStack}>Add card stack</Link>
     </div>
   </section>
+  </EditorSection>
 </div>
 {/if}
 
@@ -263,6 +265,7 @@
   <div class="panelFormSection">
   <Spacer size="0.5rem" />
 
+  <EditorSection title="Manufacturing">
   <section class="section">
     <div class="sectionHeader">
       <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
@@ -367,6 +370,7 @@
       </p>
     {/if}
   </section>
+  </EditorSection>
 </div>
 {/if}
 

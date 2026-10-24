@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.32`
+- Version visible actual: `1.2.33`
 
 ## Desarrollo local
 
@@ -36,6 +36,15 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.33 (2026-10-25): usuario autoriza commit del bloque de interfaz Beta, cartas/fundas y counters de 16 mm. Check/build y pruebas de geometría, migración, inventario e interfaz verificados; validación manual/impresa pendiente. Push no solicitado. [Cartas y compatibilidad](docs/plans/project-card-sleeves.md), [interfaz](docs/plans/interface-beta.md).
+
+- Counters predeterminados Square/Hex/Circle/Triangle de 16 mm reales en proyecto vacío y de ejemplo. Se conservan medidas guardadas/importadas.
+
+- 2026-10-24: usuario decide continuar con New · Beta como principal; Skeleton no aporta mejora suficiente. Retirados piloto/dependencias; Classic disponible y preferencia explícita respetada. Prioridad desktop; móvil solo usable. [Evaluación histórica](docs/plans/ui-library-evaluation.md).
+
+
+- New · Beta conserva el mismo visor, cámara y reparto 75/25, con tema azul grisáceo, secciones plegables y cantidades compartidas.
 
 - v1.2.32: usuario acepta y autoriza commit del bloque de inventario. Mejora de legibilidad y alineación, ayudas adaptativas, controles superiores fijos y cabecera sticky. Dados con selector único y tamaño snapshot editable; cartas con medidas custom visibles y resúmenes de formato/fundas; cantidades con −/+; Tokens y Tiles separados sin reclasificar grupos antiguos. Tests de inventario, medidas custom, ayudas y scroll verificados durante la iteración. Push no solicitado.
 

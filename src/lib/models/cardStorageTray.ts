@@ -1,3 +1,5 @@
+import type { CardSleeveSelection } from '$lib/types/project';
+import { effectiveCardSize } from '$lib/utils/projectCards';
 import type { Box, CardSize } from '$lib/types/project';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
@@ -62,7 +64,7 @@ export interface StorageDivider {
   tab: 'left' | 'center' | 'right' | 'full';
   color?: string;
 }
-export interface CardStorageParams {
+export interface CardStorageParams extends CardSleeveSelection {
   outerCornerRadius?: number;
   cardSizeId: string;
   orientation: 'vertical' | 'horizontal';
@@ -103,7 +105,7 @@ export const defaultCardStorageParams: CardStorageParams = {
 };
 
 export function resolveCardStorage(p: CardStorageParams, cards: CardSize[]) {
-  const card = cards.find((c) => c.id === p.cardSizeId);
+  const card = effectiveCardSize(cards.find((c) => c.id === p.cardSizeId), p);
   const errors: string[] = [];
   if (!card) errors.push('Choose an available card size.');
   const w = p.orientation === 'vertical' ? (card?.width ?? 63) : (card?.length ?? 88);
