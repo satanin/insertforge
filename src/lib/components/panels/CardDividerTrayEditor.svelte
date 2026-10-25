@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import CardSleeveControl from '../CardSleeveControl.svelte';
   import EditorSection from '../EditorSection.svelte';
   import QuantityInput from '../QuantityInput.svelte';
@@ -25,8 +27,15 @@
     renderMode?: 'all' | 'settings' | 'stacks';
   }
 
-  let { tray, trayLetter, onUpdateParams, onUpdateTray, actualHeight, displayDimensions, renderMode = 'all' }: Props =
-    $props();
+  let {
+    tray,
+    trayLetter,
+    onUpdateParams,
+    onUpdateTray,
+    actualHeight,
+    displayDimensions,
+    renderMode = 'all'
+  }: Props = $props();
 
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
@@ -153,225 +162,258 @@
 
 {#if renderMode === 'all' || renderMode === 'settings'}
   <div class="panelFormSection">
-  <EditorSection title="Distribution">
-  <section class="section">
-    <h3 class="sectionTitle">Layout</h3>
-    <Spacer size="0.5rem" />
-    <FormControl label="Card orientation" name="cardOrientation">
-      {#snippet input({ inputProps })}
-        <Select
-          {...inputProps}
-          selected={[tray.params.orientation]}
-          options={[
-            { value: 'vertical', label: 'Vertical (tall cards)' },
-            { value: 'horizontal', label: 'Horizontal (wide cards)' }
-          ]}
-          onSelectedChange={(selected) => {
-            if (selected[0]) {
-              updateParam('orientation', selected[0] as 'vertical' | 'horizontal');
-            }
-          }}
-        />
-      {/snippet}
-    </FormControl>
-    <Spacer size="1rem" />
-    <FormControl label="Stack arrangement" name="stackDirection">
-      {#snippet input({ inputProps })}
-        <Select
-          {...inputProps}
-          selected={[tray.params.stackDirection]}
-          options={[
-            { value: 'sideBySide', label: 'Side by side' },
-            { value: 'frontToBack', label: 'Front to back' }
-          ]}
-          onSelectedChange={(selected) => {
-            if (selected[0]) {
-              updateParam('stackDirection', selected[0] as 'sideBySide' | 'frontToBack');
-            }
-          }}
-        />
-      {/snippet}
-    </FormControl>
-  </section>
-  </EditorSection>
-</div>
+    <EditorSection title="Distribution">
+      <section class="section">
+        <h3 class="sectionTitle">Layout</h3>
+        <Spacer size="0.5rem" />
+        <FormControl label="Card orientation" name="cardOrientation">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={[tray.params.orientation]}
+              options={[
+                { value: 'vertical', label: 'Vertical (tall cards)' },
+                { value: 'horizontal', label: 'Horizontal (wide cards)' }
+              ]}
+              onSelectedChange={(selected) => {
+                if (selected[0]) {
+                  updateParam('orientation', selected[0] as 'vertical' | 'horizontal');
+                }
+              }}
+            />
+          {/snippet}
+        </FormControl>
+        <Spacer size="1rem" />
+        <FormControl label="Stack arrangement" name="stackDirection">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={[tray.params.stackDirection]}
+              options={[
+                { value: 'sideBySide', label: 'Side by side' },
+                { value: 'frontToBack', label: 'Front to back' }
+              ]}
+              onSelectedChange={(selected) => {
+                if (selected[0]) {
+                  updateParam('stackDirection', selected[0] as 'sideBySide' | 'frontToBack');
+                }
+              }}
+            />
+          {/snippet}
+        </FormControl>
+      </section>
+    </EditorSection>
+  </div>
 {/if}
 
 {#if renderMode === 'all' || renderMode === 'stacks'}
   <div class="panelFormSection">
-  <Spacer size="0.5rem" />
-
-  <EditorSection title="Content · card stacks">
-  <section class="section">
-    <h3 class="sectionTitle">Card Stacks</h3>
     <Spacer size="0.5rem" />
-    <div class="stackList">
-      {#each tray.params.stacks as stack, index (index)}
-        <div
-          class="stackRow {draggedIndex === index ? 'stackRow--dragging' : ''} {dragOverIndex === index &&
-          draggedIndex !== index
-            ? 'stackRow--dragover'
-            : ''}"
-          role="listitem"
-          ondragover={(e) => handleDragOver(e, index)}
-          ondrop={(e) => handleDrop(e, index)}
-        >
-          <span
-            class="dragHandle"
-            title="Drag to reorder"
-            draggable="true"
-            ondragstart={(e) => handleDragStart(e, index)}
-            ondragend={handleDragEnd}
-            role="button"
-            tabindex="0"
-          >
-            <Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
-          </span>
-          <div class="stackLabelInput">
-            <span class="stackRef">{trayLetter}{index + 1}</span>
-            <Input
-              type="text"
-              placeholder="Label"
-              value={stack.label ?? ''}
-              onchange={(e) => updateStack(index, 'label', e.currentTarget.value)}
+
+    <EditorSection title="Content · card stacks">
+      <section class="section">
+        <h3 class="sectionTitle">Card Stacks</h3>
+        <Spacer size="0.5rem" />
+        <div class="stackList">
+          {#each tray.params.stacks as stack, index (index)}
+            <div
+              class="stackRow {draggedIndex === index ? 'stackRow--dragging' : ''} {dragOverIndex === index &&
+              draggedIndex !== index
+                ? 'stackRow--dragover'
+                : ''}"
+              role="listitem"
+              ondragover={(e) => handleDragOver(e, index)}
+              ondrop={(e) => handleDrop(e, index)}
+            >
+              <span
+                class="dragHandle"
+                title="Drag to reorder"
+                draggable="true"
+                ondragstart={(e) => handleDragStart(e, index)}
+                ondragend={handleDragEnd}
+                role="button"
+                tabindex="0"
+              >
+                <Icon Icon={IconMenu} size="1rem" color="var(--fgMuted)" />
+              </span>
+              <div class="stackLabelInput">
+                <span class="stackRef">{trayLetter}{index + 1}</span>
+                <Input
+                  type="text"
+                  placeholder="Label"
+                  value={stack.label ?? ''}
+                  onchange={(e) => updateStack(index, 'label', e.currentTarget.value)}
+                />
+              </div>
+              <div class="stackSelect">
+                <Select
+                  selected={[stack.cardSizeId]}
+                  options={getCardSizes().map((s) => ({
+                    value: s.id,
+                    label: s.name
+                  }))}
+                  onSelectedChange={(selected) => updateStack(index, 'cardSizeId', selected[0])}
+                />
+              </div>
+              <QuantityInput
+                label={`Cards in stack ${index + 1}`}
+                legacyStyle="width: 3.5rem;"
+                value={stack.count}
+                onChange={(value) => updateStack(index, 'count', value)}
+              />
+              <IconButton
+                variant="ghost"
+                onclick={() => removeStack(index)}
+                title="Remove stack"
+                color="var(--fgMuted)"
+              >
+                <Icon Icon={IconX} color="var(--fgMuted)" />
+              </IconButton>
+            </div>
+            <CardSleeveControl
+              selection={stack}
+              label={`Sleeves stack ${index + 1}`}
+              onChange={(value) =>
+                onUpdateParams({
+                  ...tray.params,
+                  stacks: tray.params.stacks.map((s, i) => (i === index ? { ...s, ...value } : s))
+                })}
             />
-          </div>
-          <div class="stackSelect">
-            <Select
-              selected={[stack.cardSizeId]}
-              options={getCardSizes().map((s) => ({
-                value: s.id,
-                label: s.name
-              }))}
-              onSelectedChange={(selected) => updateStack(index, 'cardSizeId', selected[0])}
-            />
-          </div>
-          <QuantityInput label={`Cards in stack ${index + 1}`} legacyStyle="width: 3.5rem;" value={stack.count} onChange={(value) => updateStack(index, 'count', value)} />
-          <IconButton variant="ghost" onclick={() => removeStack(index)} title="Remove stack" color="var(--fgMuted)">
-            <Icon Icon={IconX} color="var(--fgMuted)" />
-          </IconButton>
+          {/each}
+          <Spacer size="0.5rem" />
+          <Link as="button" onclick={addStack}>Add card stack</Link>
         </div>
-        <CardSleeveControl selection={stack} label={`Sleeves stack ${index + 1}`} onChange={(value) => onUpdateParams({ ...tray.params, stacks: tray.params.stacks.map((s, i) => i === index ? { ...s, ...value } : s) })} />
-      {/each}
-      <Spacer size="0.5rem" />
-      <Link as="button" onclick={addStack}>Add card stack</Link>
-    </div>
-  </section>
-  </EditorSection>
-</div>
+      </section>
+    </EditorSection>
+  </div>
 {/if}
 
 {#if renderMode === 'all' || renderMode === 'settings'}
   <div class="panelFormSection">
-  <Spacer size="0.5rem" />
-
-  <EditorSection title="Manufacturing">
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
-      {#if dimensions}
-        <span class="dimensionsInfo">
-          {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
-        </span>
-      {/if}
-    </div>
     <Spacer size="0.5rem" />
-    <div class="formGrid">
-      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
-        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
-      <FormControl label="Wall" name="wallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.wallThickness}
-            onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+
+    <EditorSection title="Dimensions">
+      <section class="section">
+        <div class="formGrid">
+          <HelpRow>
+            <FormControl label="Max height" name="maxHeight">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.1"
+                  placeholder="Auto"
+                  value={tray.params.maxHeight ?? ''}
+                  onchange={handleMaxHeightChange}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <HelpTip label="Help: Maximum card height">
+              When Max height is set, card stacks taller than that value tilt back automatically to fit.
+            </HelpTip>
+          </HelpRow>
+        </div>
+        <InputCheckbox
+          label="Auto-adjust height to layer"
+          checked={tray.autoHeight ?? true}
+          onchange={(e) => onUpdateTray?.({ autoHeight: e.currentTarget.checked })}
+        />{#if maxHeightWarning}
+          <p class="warningText">{maxHeightWarning}</p>
+        {:else if tray.params.maxHeight !== null && heightValidation.usesAngledCards}
+          <p class="warningText">
+            Minimum viable height with the current cards is {heightValidation.minimumHeight.toFixed(1)} mm at a fixed
+            {MIN_CARD_DIVIDER_ANGLE_DEGREES}° support angle.
+          </p>
+        {/if}
+      </section>
+    </EditorSection>
+    <EditorSection title="Manufacturing">
+      <section class="section">
+        <div class="sectionHeader">
+          <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
+          {#if dimensions}
+            <span class="dimensionsInfo">
+              {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
+            </span>
+          {/if}
+        </div>
+        <Spacer size="0.5rem" />
+        <div class="formGrid">
+          <OuterCornerControls
+            value={tray.params.outerCornerRadius}
+            width={dimensions.width}
+            depth={dimensions.depth}
+            margin={tray.params.wallThickness}
+            onchange={(value) => updateParam('outerCornerRadius', value)}
           />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Floor" name="floorThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.floorThickness}
-            onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+          <FormControl label="Wall" name="wallThickness">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                step="0.1"
+                value={tray.params.wallThickness}
+                onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+          <FormControl label="Floor" name="floorThickness">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                step="0.1"
+                value={tray.params.floorThickness}
+                onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+          <FormControl label="Clearance" name="clearance">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                step="0.1"
+                value={tray.params.clearance}
+                onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+          <FormControl label="Rim" name="rimHeight">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                step="0.1"
+                value={tray.params.rimHeight}
+                onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+        </div>
+
+        <Spacer size="1rem" />
+        <HelpRow>
+          <InputCheckbox
+            label="Emboss stack labels on tray"
+            checked={tray.showStackLabels ?? true}
+            onchange={(e) => onUpdateTray?.({ showStackLabels: e.currentTarget.checked })}
           />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Clearance" name="clearance">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.clearance}
-            onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Rim" name="rimHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.rimHeight}
-            onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Max height" name="maxHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            placeholder="Auto"
-            value={tray.params.maxHeight ?? ''}
-            onchange={handleMaxHeightChange}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-    <p class="settingHint">
-      When Max height is set, card stacks taller than that value tilt back automatically to fit.
-    </p>
-    <Spacer size="1rem" />
-    <InputCheckbox
-      label="Emboss stack labels on tray"
-      checked={tray.showStackLabels ?? true}
-      onchange={(e) => onUpdateTray?.({ showStackLabels: e.currentTarget.checked })}
-    />
-    <Spacer size="0.75rem" />
-    <InputCheckbox
-      label="Auto-adjust height to layer"
-      checked={tray.autoHeight ?? true}
-      onchange={(e) => onUpdateTray?.({ autoHeight: e.currentTarget.checked })}
-    />
-    {#if maxHeightWarning}
-      <p class="warningText">{maxHeightWarning}</p>
-    {:else if tray.params.maxHeight !== null && heightValidation.usesAngledCards}
-      <p class="warningText">
-        Minimum viable height with the current cards is {heightValidation.minimumHeight.toFixed(1)} mm at a fixed
-        {MIN_CARD_DIVIDER_ANGLE_DEGREES}° support angle.
-      </p>
-    {/if}
-    {#if (tray.showStackLabels ?? true) && tray.params.wallThickness < 2}
-      <p class="settingHint">
-        Thin walls reduce stack label emboss depth automatically to avoid cutting through the wall.
-      </p>
-    {/if}
-  </section>
-  </EditorSection>
-</div>
+          {#if (tray.showStackLabels ?? true) && tray.params.wallThickness < 2}<HelpTip
+              label="Help: Thin walls and labels"
+            >
+              Thin walls reduce stack label emboss depth automatically to avoid cutting through the wall.
+            </HelpTip>{/if}
+        </HelpRow>
+        <Spacer size="0.75rem" />
+      </section>
+    </EditorSection>
+  </div>
 {/if}
 
 <style>
@@ -407,13 +449,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-  }
-
-  .settingHint {
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--fgMuted);
-    line-height: 1.4;
   }
 
   .warningText {

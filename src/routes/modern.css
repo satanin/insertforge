@@ -159,12 +159,90 @@
 .ui-modern .trayIdentity[open] > summary svg {
   transform: rotate(180deg);
 }
-.ui-modern .traysPanel {
+.appContainer.ui-modern .traysPanel {
   height: auto;
+  min-height: 0;
+  overflow: visible;
+  display: block;
+}
+.appContainer.ui-modern .traysPanel .panelForm {
+  flex: none;
   overflow: visible;
 }
-.ui-modern .traysPanel .panelForm {
-  overflow: visible;
+.appContainer.ui-modern .traysPanel .panelForm > * {
+  flex-shrink: 0;
+}
+
+/* One scroll owner above the export footer, including long expanded editors. */
+.appContainer.ui-modern .editorPanelInner {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+}
+.appContainer.ui-modern .panelContent {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.appContainer.ui-modern .globalsPanel .tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+.appContainer.ui-modern .globalsPanel .tabs :is(.tabLabel, .tabCount) {
+  line-height: 1.2;
+}
+
+/* Keep labels readable while limiting the width of short measurement values. */
+.appContainer.ui-modern .panelContent :is(.formGrid, .socketFields) {
+  grid-template-columns: repeat(2, minmax(0, 11.5rem));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+.appContainer.ui-modern .panelContent .control__inputWrapper:has(> input[type='number']) {
+  width: 100%;
+  max-width: 11.5rem;
+  min-width: 0;
+}
+.appContainer.ui-modern .panelContent .control__inputWrapper > input[type='number'] {
+  min-width: 0;
+}
+.appContainer.ui-modern .slotCountControl {
+  grid-template-columns: minmax(0, auto) 7rem;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.appContainer.ui-modern .slotCountLabel {
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.appContainer.ui-modern .socketEditor :is(.contentCard, .modelCard) {
+  border: var(--borderThin);
+  border-radius: var(--radius-2);
+  padding: 0.75rem;
+  background: var(--contrastLow);
+}
+.appContainer.ui-modern .socketEditor legend {
+  padding: 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+.appContainer.ui-modern .socketEditor :is(label, .control__label) {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fg);
+}
+.appContainer.ui-modern .socketEditor :is(input, select) {
+  font-size: 1rem;
+  font-weight: 400;
+}
+.appContainer.ui-modern .socketEditor :is(.help, .modelCounts, .editorSection p) {
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 .ui-modern .panelContent > .traysPanel > .panelForm {
   padding-top: 0;
@@ -185,6 +263,9 @@
   padding-inline: 0.9rem;
 }
 .ui-modern .layeredBoxDivider {
+  display: none;
+}
+.appContainer.ui-modern :is(.boxDivider, .layeredBoxDivider) {
   display: none;
 }
 .ui-modern .editorSectionGroup + [class*='spacer'] {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import EditorSection from '../EditorSection.svelte';
   import QuantityInput from '../QuantityInput.svelte';
   import { interfaceUi } from '$lib/stores/interface.svelte';
@@ -108,357 +110,379 @@
 {#if tray.params.variant === 'sockets'}
   {#if renderMode === 'all' || renderMode === 'settings'}
     <div class="panelFormSection">
-      <MiniatureSocketRackEditor params={tray.params.sockets} trayName={tray.name} onUpdate={(sockets) => updateParams({ sockets })} />
+      <MiniatureSocketRackEditor
+        params={tray.params.sockets}
+        trayName={tray.name}
+        onUpdate={(sockets) => updateParams({ sockets })}
+      />
     </div>
   {:else}
     <Text size="0.875rem" color="fgMuted">Configure individual bases in Rack Settings.</Text>
   {/if}
 {:else}
-{#if renderMode === 'all' || renderMode === 'settings'}
-<div class="panelFormSection">
-  <EditorSection title="Structure and dimensions">
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle sectionTitle--featured">Rack Settings</h3>
-      <span class="dimensionsInfo">
-        {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
-      </span>
-    </div>
-    <Spacer size="0.5rem" />
-    <div class="formGrid">
-      <FormControl label="Height" name="rackHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.5"
-            placeholder="Auto"
-            value={tray.params.rackHeight ?? ''}
-            onchange={(e) => updateParams({ rackHeight: parseOptionalNumber(e.currentTarget.value) })}
-          />
-        {/snippet}
-        {#snippet end()}{tray.params.rackHeight === null ? 'Auto' : 'mm'}{/snippet}
-      </FormControl>
-      <FormControl label="Top Margin" name="rackRimHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="0"
-            step="0.5"
-            value={tray.params.rimHeight ?? DEFAULT_MINIATURE_RACK_RIM_HEIGHT}
-            onchange={(e) => updateParams({ rimHeight: parseFloat(e.currentTarget.value) || 0 })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Rack Base Depth" name="rackBaseDepth">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min={minimumBaseDepth}
-            step="0.5"
-            value={tray.params.rackBaseDepth}
-            onchange={(e) => updateParams({ rackBaseDepth: parseFloat(e.currentTarget.value) || minimumBaseDepth })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Wall Thickness" name="wallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="1"
-            step="0.5"
-            value={tray.params.wallThickness}
-            onchange={(e) => updateParams({ wallThickness: parseFloat(e.currentTarget.value) || 1 })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Side Wall Thickness" name="sideWallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="1"
-            step="0.5"
-            value={tray.params.sideWallThickness}
-            onchange={(e) => updateParams({ sideWallThickness: parseFloat(e.currentTarget.value) || 1 })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Rail Wall Thickness" name="railWallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="1"
-            step="0.5"
-            value={tray.params.railWallThickness ?? DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS}
-            onchange={(e) =>
-              updateParams({
-                railWallThickness:
-                  parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS
-              })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Rail Lip Inset" name="railLipInset">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="0.5"
-            step="0.5"
-            value={tray.params.railLipInset ?? DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET}
-            onchange={(e) =>
-              updateParams({
-                railLipInset:
-                  parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET
-              })}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Base Width Tolerance" name="baseWidthTolerance">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="0"
-            step="0.1"
-            value={tray.params.baseWidthTolerance ?? DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE}
-            onchange={(e) =>
-              updateParams((() => {
-                const value = parseFloat(e.currentTarget.value);
-                return {
-                  baseWidthTolerance: Number.isFinite(value)
-                    ? value
-                    : DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE
-                };
-              })())}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Base Height Tolerance" name="baseHeightTolerance">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            min="0"
-            step="0.1"
-            value={tray.params.baseHeightTolerance ?? DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE}
-            onchange={(e) =>
-              updateParams((() => {
-                const value = parseFloat(e.currentTarget.value);
-                return {
-                  baseHeightTolerance: Number.isFinite(value)
-                    ? value
-                    : DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE
-                };
-              })())}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-    <Spacer size="0.5rem" />
-    {#if onUpdateTray}
-      <InputCheckbox
-        label="Auto-adjust height to layer"
-        checked={tray.autoHeight ?? true}
-        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
-      />
-      <Spacer size="0.5rem" />
-    {/if}
-    <Text size="0.875rem" color="fgMuted">
-      Rack Base Depth controls how far the lower shelf extends forward. Its minimum follows the tallest mini height so the rack keeps enough support.
-    </Text>
-  </section>
-  </EditorSection>
-</div>
-{/if}
-
-{#if renderMode === 'all' || renderMode === 'slots'}
-<div class="panelFormSection">
-  {#if renderMode === 'all'}
-  <Spacer size="0.5rem" />
-  {/if}
-
-  <EditorSection title="Content · slots">
-  <section class="section">
-    <h3 class="sectionTitle">Slots</h3>
-    <Spacer size="0.5rem" />
-    <div class="slotList">
-      {#each tray.params.slots as slot, index (slot.id)}
-        <div class="slotCard">
-          <div class="slotHeader">
-            <div class="slotHeaderMain">
-              <span class="slotTitle">Slot {index + 1}</span>
-              <div class="slotCountControl">
-                <span class="slotCountLabel">Miniatures</span>
-                {#if interfaceUi.mode === 'modern'}
-                  <QuantityInput label={`Miniatures in slot ${index + 1}`} max={MAX_MINIATURES_IN_SLOT} value={slot.miniatureCount ?? 1} onChange={(value) => updateSlot(slot.id, { miniatureCount: value })} />
-                {:else}
-                <Select
-                  selected={[String(slot.miniatureCount ?? 1)]}
-                  options={Array.from({ length: MAX_MINIATURES_IN_SLOT }, (_, optionIndex) => {
-                    const count = optionIndex + 1;
-                    return { value: String(count), label: String(count) };
-                  })}
-                  onSelectedChange={(selected) => {
-                    const count = parseInt(selected[0] ?? '1');
-                    updateSlot(slot.id, { miniatureCount: Number.isFinite(count) ? count : 1 });
-                  }}
-                />
-                {/if}
-              </div>
-            </div>
-            <IconButton
-              variant="ghost"
-              title="Remove slot"
-              disabled={tray.params.slots.length <= 1}
-              onclick={() => removeSlot(slot.id)}
-            >
-              <Icon Icon={IconX} color="var(--fgMuted)" />
-            </IconButton>
-          </div>
+  {#if renderMode === 'all' || renderMode === 'settings'}
+    <div class="panelFormSection">
+      <EditorSection title="Dimensions">
+        <section class="section">
           <div class="formGrid">
-            <FormControl label="Label" name={`slotLabel-${slot.id}`}>
+            <FormControl label="Height" name="rackHeight">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
-                  value={slot.label ?? ''}
-                  onchange={(e) => updateSlot(slot.id, { label: e.currentTarget.value })}
+                  type="number"
+                  step="0.5"
+                  placeholder="Auto"
+                  value={tray.params.rackHeight ?? ''}
+                  onchange={(e) => updateParams({ rackHeight: parseOptionalNumber(e.currentTarget.value) })}
                 />
               {/snippet}
-            </FormControl>
-            <FormControl label="Lip Angle" name={`slotLipAngle-${slot.id}`}>
+              {#snippet end()}{tray.params.rackHeight === null ? 'Auto' : 'mm'}{/snippet}
+            </FormControl><HelpRow>
+              <FormControl label="Rack Base Depth" name="rackBaseDepth">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    min={minimumBaseDepth}
+                    step="0.5"
+                    value={tray.params.rackBaseDepth}
+                    onchange={(e) =>
+                      updateParams({ rackBaseDepth: parseFloat(e.currentTarget.value) || minimumBaseDepth })}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              <HelpTip label="Help: Rack base depth">
+                Rack Base Depth controls how far the lower shelf extends forward. Its minimum follows the tallest mini
+                height so the rack keeps enough support.
+              </HelpTip>
+            </HelpRow>
+          </div>
+          {#if onUpdateTray}
+            <InputCheckbox
+              label="Auto-adjust height to layer"
+              checked={tray.autoHeight ?? true}
+              onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+            />
+            <Spacer size="0.5rem" />
+          {/if}
+        </section>
+      </EditorSection>
+      <EditorSection title="Manufacturing" summary="Structure and tolerances">
+        <section class="section">
+          <div class="sectionHeader">
+            <h3 class="sectionTitle sectionTitle--featured">Rack Settings</h3>
+            <span class="dimensionsInfo">
+              {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
+            </span>
+          </div>
+          <Spacer size="0.5rem" />
+          <div class="formGrid">
+            <FormControl label="Top Margin" name="rackRimHeight">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
                   type="number"
                   min="0"
-                  max="80"
-                  step="1"
-                  value={slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE}
-                  onchange={(e) =>
-                    updateSlot(
-                      slot.id,
-                      (() => {
-                        const value = parseFloat(e.currentTarget.value);
-                        return {
-                          lipAngle: Number.isFinite(value) ? value : DEFAULT_MINIATURE_RACK_LIP_ANGLE
-                        };
-                      })()
-                    )}
-                />
-              {/snippet}
-              {#snippet end()}deg{/snippet}
-            </FormControl>
-          </div>
-          <Spacer size="0.5rem" />
-          <div class="formGrid">
-            <FormControl label="Base Width" name={`slotBaseWidth-${slot.id}`}>
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  min="10"
                   step="0.5"
-                  value={slot.baseWidth}
-                  onchange={(e) => updateSlot(slot.id, { baseWidth: parseFloat(e.currentTarget.value) || 10 })}
+                  value={tray.params.rimHeight ?? DEFAULT_MINIATURE_RACK_RIM_HEIGHT}
+                  onchange={(e) => updateParams({ rimHeight: parseFloat(e.currentTarget.value) || 0 })}
                 />
               {/snippet}
               {#snippet end()}mm{/snippet}
             </FormControl>
-            <FormControl label="Base Thickness" name={`slotBaseHeight-${slot.id}`}>
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  min="1"
-                  step="0.1"
-                  value={slot.baseHeight}
-                  onchange={(e) => updateSlot(slot.id, { baseHeight: parseFloat(e.currentTarget.value) || 1 })}
-                />
-              {/snippet}
-              {#snippet end()}mm{/snippet}
-            </FormControl>
-            <FormControl label="Mini Height" name={`slotMiniatureHeight-${slot.id}`}>
+
+            <FormControl label="Wall Thickness" name="wallThickness">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
                   type="number"
                   min="1"
                   step="0.5"
-                  value={slot.miniatureHeight ?? DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT}
+                  value={tray.params.wallThickness}
+                  onchange={(e) => updateParams({ wallThickness: parseFloat(e.currentTarget.value) || 1 })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Side Wall Thickness" name="sideWallThickness">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={tray.params.sideWallThickness}
+                  onchange={(e) => updateParams({ sideWallThickness: parseFloat(e.currentTarget.value) || 1 })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Rail Wall Thickness" name="railWallThickness">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={tray.params.railWallThickness ?? DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS}
                   onchange={(e) =>
-                    updateSlot(slot.id, {
-                      miniatureHeight: parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT
+                    updateParams({
+                      railWallThickness: parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_RAIL_WALL_THICKNESS
                     })}
                 />
               {/snippet}
               {#snippet end()}mm{/snippet}
             </FormControl>
-            <FormControl label="Base Vertical Size" name={`slotBaseVerticalSize-${slot.id}`}>
+            <FormControl label="Rail Lip Inset" name="railLipInset">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
                   type="number"
+                  min="0.5"
                   step="0.5"
-                  placeholder="Same as width"
-                  value={slot.baseVerticalSize ?? ''}
-                  onchange={(e) => updateSlot(slot.id, { baseVerticalSize: parseOptionalNumber(e.currentTarget.value) })}
-                />
-              {/snippet}
-              {#snippet end()}{slot.baseVerticalSize == null ? 'Auto' : 'mm'}{/snippet}
-            </FormControl>
-            <FormControl label="Slot Spacing Left" name={`slotSpacingLeft-${slot.id}`}>
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={slot.slotSpacingLeft}
+                  value={tray.params.railLipInset ?? DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET}
                   onchange={(e) =>
-                    updateSlot(slot.id, { slotSpacingLeft: parseFloat(e.currentTarget.value) || 0 })}
+                    updateParams({
+                      railLipInset: parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_RAIL_LIP_INSET
+                    })}
                 />
               {/snippet}
               {#snippet end()}mm{/snippet}
             </FormControl>
-            <FormControl label="Slot Spacing Right" name={`slotSpacingRight-${slot.id}`}>
+            <FormControl label="Base Width Tolerance" name="baseWidthTolerance">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
                   type="number"
                   min="0"
-                  step="0.5"
-                  value={slot.slotSpacingRight}
+                  step="0.1"
+                  value={tray.params.baseWidthTolerance ?? DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE}
                   onchange={(e) =>
-                    updateSlot(slot.id, { slotSpacingRight: parseFloat(e.currentTarget.value) || 0 })}
+                    updateParams(
+                      (() => {
+                        const value = parseFloat(e.currentTarget.value);
+                        return {
+                          baseWidthTolerance: Number.isFinite(value)
+                            ? value
+                            : DEFAULT_MINIATURE_RACK_BASE_WIDTH_TOLERANCE
+                        };
+                      })()
+                    )}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+            <FormControl label="Base Height Tolerance" name="baseHeightTolerance">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={tray.params.baseHeightTolerance ?? DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE}
+                  onchange={(e) =>
+                    updateParams(
+                      (() => {
+                        const value = parseFloat(e.currentTarget.value);
+                        return {
+                          baseHeightTolerance: Number.isFinite(value)
+                            ? value
+                            : DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE
+                        };
+                      })()
+                    )}
                 />
               {/snippet}
               {#snippet end()}mm{/snippet}
             </FormControl>
           </div>
-        </div>
-      {/each}
-      <Spacer size="0.5rem" />
-      <Link as="button" onclick={addSlot}>Add slot</Link>
+          <Spacer size="0.5rem" />
+        </section>
+      </EditorSection>
     </div>
-  </section>
-  </EditorSection>
-</div>
-{/if}
+  {/if}
 
+  {#if renderMode === 'all' || renderMode === 'slots'}
+    <div class="panelFormSection">
+      {#if renderMode === 'all'}
+        <Spacer size="0.5rem" />
+      {/if}
+
+      <EditorSection title="Content · slots">
+        <section class="section">
+          <h3 class="sectionTitle">Slots</h3>
+          <Spacer size="0.5rem" />
+          <div class="slotList">
+            {#each tray.params.slots as slot, index (slot.id)}
+              <div class="slotCard">
+                <div class="slotHeader">
+                  <div class="slotHeaderMain">
+                    <span class="slotTitle">Slot {index + 1}</span>
+                    <div class="slotCountControl">
+                      <span class="slotCountLabel">Miniatures</span>
+                      {#if interfaceUi.mode === 'modern'}
+                        <QuantityInput
+                          label={`Miniatures in slot ${index + 1}`}
+                          max={MAX_MINIATURES_IN_SLOT}
+                          value={slot.miniatureCount ?? 1}
+                          onChange={(value) => updateSlot(slot.id, { miniatureCount: value })}
+                        />
+                      {:else}
+                        <Select
+                          selected={[String(slot.miniatureCount ?? 1)]}
+                          options={Array.from({ length: MAX_MINIATURES_IN_SLOT }, (_, optionIndex) => {
+                            const count = optionIndex + 1;
+                            return { value: String(count), label: String(count) };
+                          })}
+                          onSelectedChange={(selected) => {
+                            const count = parseInt(selected[0] ?? '1');
+                            updateSlot(slot.id, { miniatureCount: Number.isFinite(count) ? count : 1 });
+                          }}
+                        />
+                      {/if}
+                    </div>
+                  </div>
+                  <IconButton
+                    variant="ghost"
+                    title="Remove slot"
+                    disabled={tray.params.slots.length <= 1}
+                    onclick={() => removeSlot(slot.id)}
+                  >
+                    <Icon Icon={IconX} color="var(--fgMuted)" />
+                  </IconButton>
+                </div>
+                <div class="formGrid">
+                  <FormControl label="Label" name={`slotLabel-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        value={slot.label ?? ''}
+                        onchange={(e) => updateSlot(slot.id, { label: e.currentTarget.value })}
+                      />
+                    {/snippet}
+                  </FormControl>
+                  <FormControl label="Lip Angle" name={`slotLipAngle-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="0"
+                        max="80"
+                        step="1"
+                        value={slot.lipAngle ?? DEFAULT_MINIATURE_RACK_LIP_ANGLE}
+                        onchange={(e) =>
+                          updateSlot(
+                            slot.id,
+                            (() => {
+                              const value = parseFloat(e.currentTarget.value);
+                              return {
+                                lipAngle: Number.isFinite(value) ? value : DEFAULT_MINIATURE_RACK_LIP_ANGLE
+                              };
+                            })()
+                          )}
+                      />
+                    {/snippet}
+                    {#snippet end()}deg{/snippet}
+                  </FormControl>
+                </div>
+                <Spacer size="0.5rem" />
+                <div class="formGrid">
+                  <FormControl label="Base Width" name={`slotBaseWidth-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="10"
+                        step="0.5"
+                        value={slot.baseWidth}
+                        onchange={(e) => updateSlot(slot.id, { baseWidth: parseFloat(e.currentTarget.value) || 10 })}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Base Thickness" name={`slotBaseHeight-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="1"
+                        step="0.1"
+                        value={slot.baseHeight}
+                        onchange={(e) => updateSlot(slot.id, { baseHeight: parseFloat(e.currentTarget.value) || 1 })}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Mini Height" name={`slotMiniatureHeight-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={slot.miniatureHeight ?? DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT}
+                        onchange={(e) =>
+                          updateSlot(slot.id, {
+                            miniatureHeight:
+                              parseFloat(e.currentTarget.value) || DEFAULT_MINIATURE_RACK_MINIATURE_HEIGHT
+                          })}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Base Vertical Size" name={`slotBaseVerticalSize-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        step="0.5"
+                        placeholder="Same as width"
+                        value={slot.baseVerticalSize ?? ''}
+                        onchange={(e) =>
+                          updateSlot(slot.id, { baseVerticalSize: parseOptionalNumber(e.currentTarget.value) })}
+                      />
+                    {/snippet}
+                    {#snippet end()}{slot.baseVerticalSize == null ? 'Auto' : 'mm'}{/snippet}
+                  </FormControl>
+                  <FormControl label="Slot Spacing Left" name={`slotSpacingLeft-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={slot.slotSpacingLeft}
+                        onchange={(e) =>
+                          updateSlot(slot.id, { slotSpacingLeft: parseFloat(e.currentTarget.value) || 0 })}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                  <FormControl label="Slot Spacing Right" name={`slotSpacingRight-${slot.id}`}>
+                    {#snippet input({ inputProps })}
+                      <Input
+                        {...inputProps}
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={slot.slotSpacingRight}
+                        onchange={(e) =>
+                          updateSlot(slot.id, { slotSpacingRight: parseFloat(e.currentTarget.value) || 0 })}
+                      />
+                    {/snippet}
+                    {#snippet end()}mm{/snippet}
+                  </FormControl>
+                </div>
+              </div>
+            {/each}
+            <Spacer size="0.5rem" />
+            <Link as="button" onclick={addSlot}>Add slot</Link>
+          </div>
+        </section>
+      </EditorSection>
+    </div>
+  {/if}
 {/if}
 
 <style>

@@ -79,143 +79,142 @@
 
 <div class="panelFormSection">
   <!-- Tray Dimensions (Primary Controls) -->
-  <EditorSection title="Dimensions">
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle sectionTitle--featured">Tray Dimensions</h3>
-      <span class="dimensionsInfo">
-        {dimensions.width.toFixed(1)} &times; {dimensions.depth.toFixed(1)} &times; {dimensions.height.toFixed(1)} mm
-      </span>
-    </div>
-    <Spacer size="0.5rem" />
-    <div class="formGrid">
-      <FormControl label="Width" name="trayWidth">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="20"
-            value={tray.params.trayWidth}
-            onchange={(e) => updateParam('trayWidth', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Depth" name="trayDepth">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="20"
-            value={tray.params.trayDepth}
-            onchange={(e) => updateParam('trayDepth', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-  </section>
-  </EditorSection>
-
-  <Spacer size="0.5rem" />
-
-  <!-- Cup Layout -->
   <EditorSection title="Distribution">
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle">Cup Layout</h3>
-      <span class="calculatedInfo">
-        {cupCount} cup{cupCount !== 1 ? 's' : ''}
-      </span>
-    </div>
-    <Spacer size="0.5rem" />
-    <CupLayoutEditor
-      layout={tray.params.layout}
-      trayWidth={tray.params.trayWidth}
-      trayDepth={tray.params.trayDepth}
-      onUpdateLayout={handleLayoutUpdate}
-    />
-    {#if warnings.length > 0}
+    <section class="section">
+      <div class="sectionHeader">
+        <h3 class="sectionTitle">Cup Layout</h3>
+        <span class="calculatedInfo">
+          {cupCount} cup{cupCount !== 1 ? 's' : ''}
+        </span>
+      </div>
       <Spacer size="0.5rem" />
-      {#each warnings as warning, i (i)}
-        <p class="warningText">{warning}</p>
-      {/each}
-    {/if}
-  </section>
+      <CupLayoutEditor
+        layout={tray.params.layout}
+        trayWidth={tray.params.trayWidth}
+        trayDepth={tray.params.trayDepth}
+        onUpdateLayout={handleLayoutUpdate}
+      />
+      {#if warnings.length > 0}
+        <Spacer size="0.5rem" />
+        {#each warnings as warning, i (i)}
+          <p class="warningText">{warning}</p>
+        {/each}
+      {/if}
+    </section>
   </EditorSection>
 
-  <Spacer size="0.5rem" />
+  <EditorSection title="Dimensions">
+    <section class="section">
+      <div class="sectionHeader">
+        <h3 class="sectionTitle sectionTitle--featured">Tray Dimensions</h3>
+        <span class="dimensionsInfo">
+          {dimensions.width.toFixed(1)} &times; {dimensions.depth.toFixed(1)} &times; {dimensions.height.toFixed(1)} mm
+        </span>
+      </div>
+      <Spacer size="0.5rem" />
+      <div class="formGrid">
+        <FormControl label="Width" name="trayWidth">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="20"
+              value={tray.params.trayWidth}
+              onchange={(e) => updateParam('trayWidth', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Depth" name="trayDepth">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="20"
+              value={tray.params.trayDepth}
+              onchange={(e) => updateParam('trayDepth', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Cavity height" name="cupCavityHeight">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="10"
+              placeholder="Auto"
+              value={tray.params.cupCavityHeight ?? ''}
+              onchange={handleCupCavityHeightChange}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+      </div>
+      {#if onUpdateTray}
+        <Spacer size="1rem" />
+        <InputCheckbox
+          label="Auto-adjust height to layer"
+          checked={tray.autoHeight ?? true}
+          onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+        />
+      {/if}
+    </section>
+  </EditorSection>
 
-  <!-- Cup Cavity and Wall Settings -->
   <EditorSection title="Manufacturing">
-  <section class="section">
-    <div class="formGrid">
-      <FormControl label="Cavity height" name="cupCavityHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="10"
-            placeholder="Auto"
-            value={tray.params.cupCavityHeight ?? ''}
-            onchange={handleCupCavityHeightChange}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Corner radius" name="cornerRadius">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="1"
-            min="0"
-            max="20"
-            value={tray.params.cornerRadius}
-            onchange={(e) => updateParam('cornerRadius', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
-        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
-      <FormControl label="Wall" name="wallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.wallThickness}
-            onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Floor" name="floorThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.floorThickness}
-            onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-    {#if onUpdateTray}
-      <Spacer size="1rem" />
-      <InputCheckbox
-        label="Auto-adjust height to layer"
-        checked={tray.autoHeight ?? true}
-        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
-      />
-    {/if}
-  </section>
+    <section class="section">
+      <div class="formGrid">
+        <FormControl label="Corner radius" name="cornerRadius">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="1"
+              min="0"
+              max="20"
+              value={tray.params.cornerRadius}
+              onchange={(e) => updateParam('cornerRadius', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <OuterCornerControls
+          value={tray.params.outerCornerRadius}
+          width={dimensions.width}
+          depth={dimensions.depth}
+          margin={tray.params.wallThickness}
+          onchange={(value) => updateParam('outerCornerRadius', value)}
+        />
+        <FormControl label="Wall" name="wallThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.wallThickness}
+              onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Floor" name="floorThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.floorThickness}
+              onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+      </div>
+    </section>
   </EditorSection>
 </div>
 

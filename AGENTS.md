@@ -43,6 +43,8 @@
 
 ## Current product constraints
 
+- Las explicaciones y tips se muestran bajo demanda mediante `HelpTip` (hover, foco, clic/táctil); evitar párrafos permanentes de ayuda. Colocar el botón junto al texto o título relacionado mediante `HelpRow`, aprovechando el ancho sin crear una fila exclusiva. En campos, situarlo junto a la etiqueta y conservar el ancho completo del input. Mantener visibles datos actuales, errores y advertencias de la configuración.
+
 - `New · Beta` es la opción predeterminada; Classic sigue disponible y se respeta su preferencia guardada. Ambas comparten estado de proyecto, geometría y visor. El modo es una preferencia del navegador, fuera del JSON del proyecto. Cambiar el aspecto no debe remontar el canvas, cambiar cámara ni reducir su tamaño/reparto inicial (75/25 en desktop). La adopción de otra librería UI queda aplazada por decisión del usuario.
 
 - `Card Well`: los mínimos exteriores nunca reducen huecos/holguras de cartas. Hendiduras de extracción pasantes y redondeo deben respetar esos huecos; mantener caras de apilado planas. El giro del layout es de presentación y no cambia los ejes de parámetros/export.
@@ -54,6 +56,8 @@
 - `Miniature Rack` sigue siendo `loose tray` por ahora.
 - `Card Storage` es `loose tray` con piezas dependientes (separadores/tapa); su altura maxima incluye todo el conjunto y no debe crecer por `autoHeight`.
 - `Layered Box` debe seguir alineandose funcional y visualmente con `Box`.
+- En Box y Layered Box: Dimensions agrupa envolvente y ajuste al espacio; Manufacturing agrupa tolerancia, espesores y opciones estructurales; Lid agrupa texto/opciones propias de la tapa. Los campos numéricos usan celdas de igual ancho; no expandir un campo a dos columnas sin necesidad funcional.
+- El mismo criterio se aplica a todos los editores imprimibles: Dimensions contiene medidas/límites de la pieza y autoHeight; Manufacturing contiene espesores, holguras, redondeos, extracción y retención. Medidas del contenido en Content; colocación/espaciado en Distribution; parámetros específicos de tapa en Lid. La revisión global sustituye la ubicación anterior de autoHeight de Card Well en Manufacturing. No añadir controles de tamaño que el modelo no soporte ni autoHeight a Card Storage.
 - Los nuevos objetos externos no deben forzarse dentro de `Layer` si no encajan semanticamente.
 - `HANDOFF.md` debe actuar como lista de trabajo, no como documento largo de diseno.
 - Los exports 3MF de JSCAD deben pasar por `group3mf`, incluso sin grupos: comparte vertices exactamente coincidentes por malla para evitar trazos perdidos en Bambu Studio. Mantener un cuerpo de texto por pieza; no sustituir la prueba real de laminado por un chequeo manifold.

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import { Input, FormControl } from '@tableslayer/ui';
   import { getOuterCornerRadius } from '$lib/models/outerCorners';
   let {
@@ -17,7 +19,8 @@
 </script>
 
 <div class="corners">
-  <FormControl label="Outer corner radius" name="outerCornerRadius">
+  <HelpRow>
+<FormControl label="Outer corner radius" name="outerCornerRadius">
     {#snippet input({ inputProps })}
       <Input
         {...inputProps}
@@ -33,19 +36,16 @@
     {/snippet}
     {#snippet end()}mm{/snippet}
   </FormControl>
-  <p class="hint">
+<HelpTip label="Help: Outer corner radius">
     0 keeps square corners. Applied radius: {getOuterCornerRadius(value, width, depth, margin).toFixed(1)} mm, limited to
     protect cavities and fittings. Top and bottom stay flat.
-  </p>
+  </HelpTip>
+</HelpRow>
+
 </div>
 
 <style>
   .corners {
-    grid-column: 1 / -1;
-  }
-  .hint {
-    font-size: 0.8125rem;
-    opacity: 0.75;
-    line-height: 1.5;
+    min-width: 0;
   }
 </style>

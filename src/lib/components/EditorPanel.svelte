@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import { getProjectCardSizes } from '$lib/utils/projectCards';
   import { interfaceUi } from '$lib/stores/interface.svelte';
   import EditorSection from './EditorSection.svelte';
@@ -696,7 +698,8 @@
           })}
           <div class="layerSettings">
             <div class="panelFormSection">
-              <FormControl label="Layer name" name="layerName">
+              <HelpRow>
+<FormControl label="Layer name" name="layerName">
                 {#snippet input({ inputProps })}
                   <Input
                     {...inputProps}
@@ -706,17 +709,18 @@
                   />
                 {/snippet}
               </FormControl>
-              <Spacer size="1rem" />
-              <Text size="0.875rem" color="fgMuted">
-                A <Text as="span" size="0.875rem" weight={600}>layer</Text>
+<HelpTip label="Help: Layers">A layer
                 represents a horizontal slice of your game container. When editing in the layout editor, you can drag and
                 drop boxes and trays to visualize them within a layer, but this has no impact on the print.
-              </Text>
-              <Spacer size="1rem" />
-              <Text size="0.875rem" color="fgMuted">
-                Boxes and loose trays can auto-adjust to the tallest item in a layer. Disable auto height on an item to
+              </HelpTip>
+<HelpTip label="Help: Automatic layer height">Boxes and loose trays can auto-adjust to the tallest item in a layer. Disable auto height on an item to
                 keep its natural or custom height while the layer still reports the tallest overall item.
-              </Text>
+              </HelpTip>
+</HelpRow>
+              <Spacer size="1rem" />
+
+              <Spacer size="1rem" />
+
               <Spacer size="1rem" />
               <div class="layerContents">
                 <span class="contentsLabel">Layer content dimensions</span>
@@ -912,61 +916,16 @@
 
             <Hr class="layeredBoxDivider" />
 
-            <EditorSection title="Dimensions and lid">
+            <EditorSection title="Dimensions">
             <section class="layeredBoxSection">
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Options</h4>
               </div>
               <Spacer size="0.5rem" />
               <div class="formGrid">
-                <FormControl label="Tolerance" name="layeredBoxTolerance">
-                  {#snippet input({ inputProps })}
-                    <Input
-                      {...inputProps}
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={selectedLayeredBox.tolerance}
-                      onchange={(e) =>
-                        handleLayeredBoxUpdate({
-                          tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
-                        })}
-                    />
-                  {/snippet}
-                  {#snippet end()}mm{/snippet}
-                </FormControl>
-                <FormControl label="Wall" name="layeredBoxWallThickness">
-                  {#snippet input({ inputProps })}
-                    <Input
-                      {...inputProps}
-                      type="number"
-                      step="0.5"
-                      min="1"
-                      value={selectedLayeredBox.wallThickness}
-                      onchange={(e) =>
-                        handleLayeredBoxUpdate({
-                          wallThickness: parseFloat((e.target as HTMLInputElement).value) || 3
-                        })}
-                    />
-                  {/snippet}
-                  {#snippet end()}mm{/snippet}
-                </FormControl>
-                <FormControl label="Floor" name="layeredBoxFloorThickness" class="formGrid__spanTwo">
-                  {#snippet input({ inputProps })}
-                    <Input
-                      {...inputProps}
-                      type="number"
-                      step="0.5"
-                      min="1"
-                      value={selectedLayeredBox.floorThickness}
-                      onchange={(e) =>
-                        handleLayeredBoxUpdate({
-                          floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2
-                        })}
-                    />
-                  {/snippet}
-                  {#snippet end()}mm{/snippet}
-                </FormControl>
+
+
+
                 <FormControl label="Width (min: {minBodyWidth.toFixed(1)})" name="layeredBoxCustomWidth">
                   {#snippet input({ inputProps })}
                     <Input
@@ -1004,7 +963,6 @@
                 <FormControl
                   label="Total Height (min: {(minBodyHeight + layeredBoxLidHeight).toFixed(1)})"
                   name="layeredBoxCustomHeight"
-                  class="formGrid__spanTwo"
                 >
                   {#snippet input({ inputProps })}
                     <Input
@@ -1026,16 +984,18 @@
               </div>
               <Spacer size="1rem" />
               <div class="buttonRow">
-                <button
+                <HelpRow>
+<button
                   class="secondaryButton layeredBoxActionButton layeredBoxActionButton--danger"
                   onclick={handleExpandLayeredBoxToAvailableSpace}
                 >
                   Adapt to gap
                 </button>
+<HelpTip label="Help: Adapt layered box to gap">{layeredBoxAdaptToGapHelpText}
+              </HelpTip>
+</HelpRow>
               </div>
-              <Text color="var(--fgMuted)" size="0.875rem">
-                {layeredBoxAdaptToGapHelpText}
-              </Text>
+
               <Spacer size="1rem" />
               <div class="sectionHeader">
                 <h4 class="sectionTitle sectionTitle--featured">Box Size</h4>
@@ -1053,7 +1013,57 @@
               <div class="sectionHeader">
                 <h4 class="sectionTitle">Print Options</h4>
               </div>
-              <Spacer size="0.5rem" />
+              <div class="formGrid">
+<FormControl label="Tolerance" name="layeredBoxTolerance">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={selectedLayeredBox.tolerance}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+<FormControl label="Wall" name="layeredBoxWallThickness">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={selectedLayeredBox.wallThickness}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          wallThickness: parseFloat((e.target as HTMLInputElement).value) || 3
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+<FormControl label="Floor" name="layeredBoxFloorThickness">
+                  {#snippet input({ inputProps })}
+                    <Input
+                      {...inputProps}
+                      type="number"
+                      step="0.5"
+                      min="1"
+                      value={selectedLayeredBox.floorThickness}
+                      onchange={(e) =>
+                        handleLayeredBoxUpdate({
+                          floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2
+                        })}
+                    />
+                  {/snippet}
+                  {#snippet end()}mm{/snippet}
+                </FormControl>
+</div>
+<Spacer size="0.75rem" />
               <InputCheckbox
                 checked={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
                 onchange={(e) =>
@@ -1069,7 +1079,11 @@
                 label="Honeycomb for lid and box bottom"
               />
               <Spacer size="0.5rem" />
-              <span class={selectedLayeredBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+              </section>
+            </EditorSection>
+<EditorSection title="Lid">
+<section class="layeredBoxSection">
+<span class={selectedLayeredBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
                 <InputCheckbox
                   checked={!selectedLayeredBox.lidParams?.honeycombEnabled && (selectedLayeredBox.lidParams?.showName ?? true)}
                   disabled={selectedLayeredBox.lidParams?.honeycombEnabled ?? false}
@@ -1107,8 +1121,9 @@
                   Lid text is disabled when honeycomb pattern is enabled
                 </Text>
               {/if}
-            </section>
-            </EditorSection>
+
+</section>
+</EditorSection>
 
             <Hr class="layeredBoxDivider" />
 
@@ -1262,7 +1277,8 @@
       {:else if selectionType === 'layeredBoxSection'}
         {#if selectedLayeredBox && selectedLayeredBoxLayer && selectedLayeredBoxSection}
           <div class="panelFormSection">
-            <FormControl label="Section name" name="layeredBoxSectionName">
+            <HelpRow>
+<FormControl label="Section name" name="layeredBoxSectionName">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
@@ -1272,6 +1288,9 @@
                 />
               {/snippet}
             </FormControl>
+{#if selectedLayeredBoxSection.type === 'playerBoard'}<HelpTip label="Help: Player board sections">Player board sections reuse the counter tray generator with a single oversized board slot by default.
+                </HelpTip>{/if}
+</HelpRow>
             <Spacer size="1rem" />
             <FormControl label="Box Layer" name="layeredBoxSectionLayer">
               {#snippet input({ inputProps })}
@@ -1311,9 +1330,7 @@
                 params: selectedLayeredBoxSection.counterParams
               } satisfies CounterTray}
               {#if selectedLayeredBoxSection.type === 'playerBoard'}
-                <Text size="0.875rem" color="fgMuted">
-                  Player board sections reuse the counter tray generator with a single oversized board slot by default.
-                </Text>
+
                 <Spacer size="1rem" />
               {/if}
               <CounterTrayEditor
@@ -1419,7 +1436,8 @@
       {:else if selectionType === 'board'}
         {#if selectedBoard}
           <div class="panelFormSection">
-            <FormControl label="Board name" name="boardName">
+            <HelpRow>
+<FormControl label="Board name" name="boardName">
               {#snippet input({ inputProps })}
                 <Input
                   {...inputProps}
@@ -1429,6 +1447,9 @@
                 />
               {/snippet}
             </FormControl>
+<HelpTip label="Help: Board planning blocks">Boards are visual-only planning blocks for checking whether the full game contents fit within a layer.
+            </HelpTip>
+</HelpRow>
             <Spacer size="1rem" />
             <FormControl label="Layer" name="moveBoardToLayer">
               {#snippet input({ inputProps })}
@@ -1449,7 +1470,7 @@
               <button class="secondaryButton" onclick={handleDuplicateSelectedBoard}>Duplicate board</button>
             </div>
             <Spacer size="1rem" />
-            <div class="formGrid">
+            <EditorSection title="Dimensions"><div class="formGrid">
               <FormControl label="Width" name="boardWidth">
                 {#snippet input({ inputProps })}
                   <Input
@@ -1489,7 +1510,9 @@
                 {/snippet}
                 {#snippet end()}mm{/snippet}
               </FormControl>
-              <FormControl label="Color" name="boardColor">
+
+            </div></EditorSection>
+<FormControl label="Color" name="boardColor">
                 {#snippet input({ inputProps })}
                   <Input
                     {...inputProps}
@@ -1499,11 +1522,8 @@
                   />
                 {/snippet}
               </FormControl>
-            </div>
             <Spacer size="1rem" />
-            <Text size="0.875rem" color="fgMuted">
-              Boards are visual-only planning blocks for checking whether the full game contents fit within a layer.
-            </Text>
+
           </div>
         {:else}
           <div class="emptyState">

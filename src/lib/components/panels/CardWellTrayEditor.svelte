@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import CardSleeveControl from '../CardSleeveControl.svelte';
   import EditorSection from '../EditorSection.svelte';
   import { interfaceUi } from '$lib/stores/interface.svelte';
@@ -97,159 +99,191 @@
 
 {#snippet distributionSection()}
   <EditorSection title="Distribution" summary={`${cellIds.length} wells`} open={false}>
-  <section class="section">
-    <h3 class="sectionTitle">Layout</h3>
-    <CardWellLayoutEditor
-      layout={tray.params.layout}
-      stacks={tray.params.stacks}
-      cardSizes={getCardSizes()}
-      {trayLetter}
-      trayWidth={dimensions.width}
-      trayDepth={dimensions.depth}
-      clearance={tray.params.clearance}
-      wallThickness={tray.params.wallThickness}
-      gripInset={getCardWellGripRadius(tray.params)}
-      onUpdateLayout={handleLayoutUpdate}
-    />
-  </section>
+    <section class="section">
+      <h3 class="sectionTitle">Layout</h3>
+      <CardWellLayoutEditor
+        layout={tray.params.layout}
+        stacks={tray.params.stacks}
+        cardSizes={getCardSizes()}
+        {trayLetter}
+        trayWidth={dimensions.width}
+        trayDepth={dimensions.depth}
+        clearance={tray.params.clearance}
+        wallThickness={tray.params.wallThickness}
+        gripInset={getCardWellGripRadius(tray.params)}
+        onUpdateLayout={handleLayoutUpdate}
+      />
+    </section>
   </EditorSection>
 {/snippet}
 
 {#snippet contentSection()}
-  <EditorSection title="Content" summary={`${tray.params.stacks.reduce((sum, s) => sum + s.count, 0)} cards in ${tray.params.stacks.length} stacks`}>
-  <section class="section">
-    <h3 class="sectionTitle">Card Stacks</h3>
-    <Spacer size="0.5rem" />
-    <div class="stackList">
-      {#each sortedStacks as stack (stack.id)}
-        {@const stackIndex = tray.params.stacks.findIndex((s) => s.id === stack.id)}
-        {@const rotation = stack.rotation ?? 0}
-        <div class="stackItem">
-          <div class="stackRow">
-            <span class="cellRef">{trayLetter}{getCellRefNumber(stack.cellId)}</span>
-            <div class="stackCardSelect">
-              <Select
-                selected={[stack.cardSizeId]}
-                options={getCardSizes().map((s) => ({
-                  value: s.id,
-                  label: s.name
-                }))}
-                onSelectedChange={(selected) => updateStack(stackIndex, 'cardSizeId', selected[0])}
+  <EditorSection
+    title="Content"
+    summary={`${tray.params.stacks.reduce((sum, s) => sum + s.count, 0)} cards in ${tray.params.stacks.length} stacks`}
+  >
+    <section class="section">
+      <h3 class="sectionTitle">Card Stacks</h3>
+      <Spacer size="0.5rem" />
+      <div class="stackList">
+        {#each sortedStacks as stack (stack.id)}
+          {@const stackIndex = tray.params.stacks.findIndex((s) => s.id === stack.id)}
+          {@const rotation = stack.rotation ?? 0}
+          <div class="stackItem">
+            <div class="stackRow">
+              <span class="cellRef">{trayLetter}{getCellRefNumber(stack.cellId)}</span>
+              <div class="stackCardSelect">
+                <Select
+                  selected={[stack.cardSizeId]}
+                  options={getCardSizes().map((s) => ({
+                    value: s.id,
+                    label: s.name
+                  }))}
+                  onSelectedChange={(selected) => updateStack(stackIndex, 'cardSizeId', selected[0])}
+                />
+              </div>
+              <QuantityInput
+                legacyStyle="width: 3.5rem;"
+                label={`Cards in ${trayLetter}${getCellRefNumber(stack.cellId)}`}
+                value={stack.count}
+                onChange={(value) => updateStack(stackIndex, 'count', value)}
               />
+              <IconButton
+                variant="ghost"
+                onclick={() => toggleRotation(stackIndex)}
+                title={rotation === 0 ? 'Rotate 90°' : 'Rotate 0°'}
+                color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'}
+              >
+                <Icon Icon={IconRotate2} color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'} />
+              </IconButton>
             </div>
-            <QuantityInput
-              legacyStyle="width: 3.5rem;"
-              label={`Cards in ${trayLetter}${getCellRefNumber(stack.cellId)}`}
-              value={stack.count}
-              onChange={(value) => updateStack(stackIndex, 'count', value)}
+            <CardSleeveControl
+              selection={stack}
+              label={`Sleeves ${trayLetter}${getCellRefNumber(stack.cellId)}`}
+              onChange={(value) =>
+                onUpdateParams({
+                  ...tray.params,
+                  stacks: tray.params.stacks.map((s) => (s.id === stack.id ? { ...s, ...value } : s))
+                })}
             />
-            <IconButton
-              variant="ghost"
-              onclick={() => toggleRotation(stackIndex)}
-              title={rotation === 0 ? 'Rotate 90°' : 'Rotate 0°'}
-              color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'}
-            >
-              <Icon Icon={IconRotate2} color={rotation === 90 ? 'var(--fg)' : 'var(--fgMuted)'} />
-            </IconButton>
+            <FormControl label="Stack name" name={`stackLabel-${stack.id}`}>
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="text"
+                  aria-label={`Stack name ${trayLetter}${getCellRefNumber(stack.cellId)}`}
+                  placeholder="Optional name"
+                  value={stack.label ?? ''}
+                  onchange={(e) => updateStack(stackIndex, 'label', e.currentTarget.value)}
+                />
+              {/snippet}
+            </FormControl>
           </div>
-          <CardSleeveControl selection={stack} label={`Sleeves ${trayLetter}${getCellRefNumber(stack.cellId)}`} onChange={(value) => onUpdateParams({ ...tray.params, stacks: tray.params.stacks.map(s => s.id === stack.id ? { ...s, ...value } : s) })} />
-          <FormControl label="Stack name" name={`stackLabel-${stack.id}`}>
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="text"
-                aria-label={`Stack name ${trayLetter}${getCellRefNumber(stack.cellId)}`}
-                placeholder="Optional name"
-                value={stack.label ?? ''}
-                onchange={(e) => updateStack(stackIndex, 'label', e.currentTarget.value)}
-              />
-            {/snippet}
-          </FormControl>
-        </div>
-      {/each}
-    </div>
-    <Spacer size="0.5rem" />
-    <InputCheckbox
-      label="Engrave stack labels"
-      checked={tray.params.engraveStackLabels ?? true}
-      onchange={(e) => updateParam('engraveStackLabels', e.currentTarget.checked)}
-    />
-    <p class="minimumHint">
-      Names are engraved in each well floor, away from the finger hole. Long names are scaled to fit.
-    </p>
-  </section>
+        {/each}
+      </div>
+      <Spacer size="0.5rem" />
+      <HelpRow>
+        <InputCheckbox
+          label="Engrave stack labels"
+          checked={tray.params.engraveStackLabels ?? true}
+          onchange={(e) => updateParam('engraveStackLabels', e.currentTarget.checked)}
+        />
+        <HelpTip label="Help: Engraved stack labels">
+          Names are engraved in each well floor, away from the finger hole. Long names are scaled to fit.
+        </HelpTip>
+      </HelpRow>
+    </section>
   </EditorSection>
+{/snippet}
+
+{#snippet autoHeightControl()}
+  {#if onUpdateTray}
+    <Spacer size="1rem" />
+    <InputCheckbox
+      label="Auto-adjust height to layer"
+      checked={tray.autoHeight ?? true}
+      onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+    />
+  {/if}
 {/snippet}
 
 {#snippet manufacturingSection()}
-  <EditorSection title="Manufacturing" summary={`Wall ${tray.params.wallThickness} · floor ${tray.params.floorThickness} mm`}>
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
-      {#if dimensions}
-        <span class="dimensionsInfo">
-          {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
-        </span>
+  <EditorSection
+    title="Manufacturing"
+    summary={`Wall ${tray.params.wallThickness} · floor ${tray.params.floorThickness} mm`}
+  >
+    <section class="section">
+      <div class="sectionHeader">
+        <h3 class="sectionTitle sectionTitle--featured">Tray Settings</h3>
+        {#if dimensions}
+          <span class="dimensionsInfo">
+            {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
+          </span>
+        {/if}
+      </div>
+      <Spacer size="0.5rem" />
+      <div class="formGrid">
+        <FormControl label="Wall" name="wallThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.wallThickness}
+              onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Floor" name="floorThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.floorThickness}
+              onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Clearance" name="clearance">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.clearance}
+              onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Rim" name="rimHeight">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              value={tray.params.rimHeight}
+              onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        {#if interfaceUi.mode === 'modern'}{@render cornerControl()}{/if}
+      </div>
+
+      {#if interfaceUi.mode === 'modern'}
+        <Spacer size="0.5rem" />
+        {@render extractionControls()}
       {/if}
-    </div>
-    <Spacer size="0.5rem" />
-    <div class="formGrid">
-      <FormControl label="Wall" name="wallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.wallThickness}
-            onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Floor" name="floorThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.floorThickness}
-            onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Clearance" name="clearance">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.clearance}
-            onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-      <FormControl label="Rim" name="rimHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            value={tray.params.rimHeight}
-            onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-  </section>
+    </section>
   </EditorSection>
 {/snippet}
 
-{#snippet finishSection()}
-  <EditorSection title="Corner finish" summary={`Requested radius ${tray.params.outerCornerRadius ?? 0} mm`} open={false}>
-  <section class="section">
+{#snippet cornerControl()}
+  <HelpRow>
     <FormControl label="Outer corner radius" name="outerCornerRadius">
       {#snippet input({ inputProps })}
         <Input
@@ -266,70 +300,80 @@
       {/snippet}
       {#snippet end()}mm{/snippet}
     </FormControl>
-    <p class="minimumHint">
+    <HelpTip label="Help: Card Well corner radius">
       0 keeps square corners. Applied radius: {getCardWellCornerRadius(tray.params, getCardSizes()).toFixed(1)} mm, limited
       to protect the wells and extraction notches. Top and bottom stay flat for stacking.
-    </p>
-  </section>
+    </HelpTip>
+  </HelpRow>
+{/snippet}
+
+{#snippet finishSection()}
+  <EditorSection
+    title="Corner finish"
+    summary={`Requested radius ${tray.params.outerCornerRadius ?? 0} mm`}
+    open={false}
+  >
+    <section class="section">
+      {@render cornerControl()}
+    </section>
   </EditorSection>
 {/snippet}
 
 {#snippet dimensionsSection()}
-  <EditorSection title="Dimensions" summary={`${dimensions.width.toFixed(1)} × ${dimensions.depth.toFixed(1)} × ${dimensions.height.toFixed(1)} mm`} open={false}>
-  <section class="section">
-    <h3 class="sectionTitle">Minimum exterior dimensions</h3>
-    <div class="formGrid">
-      {#each minimumFields as field (field.key)}
-        <div class="minimumField">
-          <FormControl label={field.label} name={field.key}>
-            {#snippet input({ inputProps })}
-              <Input
-                {...inputProps}
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder="Auto"
-                value={tray.params[field.key] ?? ''}
-                onchange={(e) => {
-                  const value = Number(e.currentTarget.value);
-                  updateParam(field.key, Number.isFinite(value) && value > 0 ? value : null);
-                }}
-              />
-            {/snippet}
-            {#snippet end()}mm{/snippet}
-          </FormControl>
-          <small class="currentDimension">
-            Current {field.label.replace('Minimum ', '')} ({field.axis}): {dimensions[field.dimension].toFixed(1)} mm
-          </small>
-        </div>
-      {/each}
-    </div>
-    <p class="minimumHint">
-      Empty or 0 keeps automatic sizing. Smaller values never reduce card space. Extra width and length are shared
-      between outer margins and internal dividers; extra height raises the well floors.
-    </p>
-    {#if onUpdateTray}
-      <Spacer size="1rem" />
-      <InputCheckbox
-        label="Auto-adjust height to layer"
-        checked={tray.autoHeight ?? true}
-        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
-      />
-    {/if}
-  </section>
+  <EditorSection
+    title="Dimensions"
+    summary={`${dimensions.width.toFixed(1)} × ${dimensions.depth.toFixed(1)} × ${dimensions.height.toFixed(1)} mm`}
+    open={false}
+  >
+    <section class="section">
+      <h3 class="sectionTitle">Minimum exterior dimensions</h3>
+      <div class="formGrid">
+        {#each minimumFields as field (field.key)}
+          <div class="minimumField">
+            <HelpRow>
+              <FormControl label={field.label} name={field.key}>
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="Auto"
+                    value={tray.params[field.key] ?? ''}
+                    onchange={(e) => {
+                      const value = Number(e.currentTarget.value);
+                      updateParam(field.key, Number.isFinite(value) && value > 0 ? value : null);
+                    }}
+                  />
+                {/snippet}
+                {#snippet end()}mm{/snippet}
+              </FormControl>
+              {#if field.key === 'trayWidthOverride'}<HelpTip label="Help: Minimum exterior dimensions">
+                  Empty or 0 keeps automatic sizing. Smaller values never reduce card space. Extra width and length are
+                  shared between outer margins and internal dividers; extra height raises the well floors.
+                </HelpTip>{/if}
+            </HelpRow>
+            <small class="currentDimension">
+              Current {field.label.replace('Minimum ', '')} ({field.axis}): {dimensions[field.dimension].toFixed(1)} mm
+            </small>
+          </div>
+        {/each}
+      </div>
+
+      {@render autoHeightControl()}
+    </section>
   </EditorSection>
 {/snippet}
 
-{#snippet extractionSection()}
-  <EditorSection title="Extraction" summary={tray.params.extractionNotches ? 'Through notches enabled' : 'Notches disabled'} open={false}>
-  <section class="section">
-    <InputCheckbox
-      label="Extraction notches"
-      checked={tray.params.extractionNotches ?? false}
-      onchange={(e) => updateParam('extractionNotches', e.currentTarget.checked)}
-    />
-    {#if tray.params.extractionNotches}
-      <Spacer size="0.5rem" />
+{#snippet extractionControls()}
+  <InputCheckbox
+    label="Extraction notches"
+    checked={tray.params.extractionNotches ?? false}
+    onchange={(e) => updateParam('extractionNotches', e.currentTarget.checked)}
+  />
+  {#if tray.params.extractionNotches}
+    <Spacer size="0.5rem" />
+    <HelpRow>
       <FormControl label="Notch diameter" name="extractionNotchDiameter">
         {#snippet input({ inputProps })}
           <Input
@@ -347,13 +391,24 @@
         {/snippet}
         {#snippet end()}mm{/snippet}
       </FormControl>
-      <p class="minimumHint">
+      <HelpTip label="Help: Extraction notches">
         Two centered recesses on the left and right sides (X). The central divider gets priority when both outer columns
         have several wells; otherwise side margins protect the cards. The recesses pass through the floor so aligned
         trays form a continuous finger channel when stacked.
-      </p>
-    {/if}
-  </section>
+      </HelpTip>
+    </HelpRow>
+  {/if}
+{/snippet}
+
+{#snippet extractionSection()}
+  <EditorSection
+    title="Extraction"
+    summary={tray.params.extractionNotches ? 'Through notches enabled' : 'Notches disabled'}
+    open={false}
+  >
+    <section class="section">
+      {@render extractionControls()}
+    </section>
   </EditorSection>
 {/snippet}
 <div class="panelFormSection">
@@ -362,8 +417,6 @@
     {@render distributionSection()}
     {@render dimensionsSection()}
     {@render manufacturingSection()}
-    {@render extractionSection()}
-    {@render finishSection()}
   {:else}
     {@render distributionSection()}
     <Spacer size="0.5rem" />
@@ -395,11 +448,6 @@
     margin-top: 0.25rem;
     font-size: 0.75rem;
     color: var(--fgMuted);
-  }
-  .minimumHint {
-    font-size: 0.75rem;
-    color: var(--fgMuted);
-    margin-top: 0.5rem;
   }
   .panelFormSection {
     padding: 0 0.75rem;

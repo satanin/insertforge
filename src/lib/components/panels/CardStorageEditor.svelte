@@ -1,8 +1,9 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import CardSleeveControl from '../CardSleeveControl.svelte';
   import EditorSection from '../EditorSection.svelte';
   import QuantityInput from '../QuantityInput.svelte';
-  import { interfaceUi } from '$lib/stores/interface.svelte';
   import type { CardStorageTray } from '$lib/types/project';
   import { getCardSizes, updateCardStorageParams } from '$lib/stores/project.svelte';
   import {
@@ -28,7 +29,11 @@
     if (!exists) selectedPart = 'all';
   });
   function update<K extends keyof CardStorageParams>(key: K, value: CardStorageParams[K]) {
-    updateCardStorageParams(tray.id, { ...tray.params, [key]: value, ...(key === 'cardSizeId' ? { cardThicknessOverride: undefined } : {}) });
+    updateCardStorageParams(tray.id, {
+      ...tray.params,
+      [key]: value,
+      ...(key === 'cardSizeId' ? { cardThicknessOverride: undefined } : {})
+    });
   }
   function setClosure(lid: boolean) {
     updateCardStorageParams(tray.id, {
@@ -71,250 +76,301 @@
 </script>
 
 <section class="storageEditor">
-  <EditorSection title="Content, dimensions and lid">
-  <h3>Card Storage</h3>
-  <label>
-    Card size
-    <select value={tray.params.cardSizeId} onchange={(e) => update('cardSizeId', e.currentTarget.value)}>
-      {#each getCardSizes() as card}<option value={card.id}>{card.name}</option>{/each}
-    </select>
-  </label>
-  <CardSleeveControl selection={tray.params} onChange={(value) => updateCardStorageParams(tray.id, { ...tray.params, ...value })} />
-  <label>
-    Orientation
-    <select
-      value={tray.params.orientation}
-      onchange={(e) => update('orientation', e.currentTarget.value as 'vertical' | 'horizontal')}
-    >
-      <option value="horizontal">Landscape</option>
-      <option value="vertical">Portrait</option>
-    </select>
-  </label>
-  <label>
-    Size by
-    <select value={tray.params.sizing} onchange={(e) => update('sizing', e.currentTarget.value as 'count' | 'length')}>
-      <option value="count">Total card count</option>
-      <option value="length">Exterior length</option>
-    </select>
-  </label>
-  {#if tray.params.sizing === 'count'}
+  <EditorSection title="Content">
+    <h3>Card Storage</h3>
     <label>
-      Number of cards <QuantityInput
-        label="Number of cards"
-        value={tray.params.count}
-        onChange={(value) => update('count', value)}
-      />
-    </label>
-  {:else}
-    <label>
-      Exterior length (mm) <input
-        type="number"
-        min="1"
-        step="1"
-        value={tray.params.exteriorLength}
-        onchange={(e) => update('exteriorLength', e.currentTarget.valueAsNumber)}
-      />
-    </label>
-  {/if}
-  <label>
-    Maximum total height (mm)
-    <input
-      type="number"
-      min="1"
-      step="1"
-      placeholder="Auto"
-      value={tray.params.maxHeight ?? ''}
-      onchange={(e) => update('maxHeight', e.currentTarget.value === '' ? null : e.currentTarget.valueAsNumber)}
-    />
-  </label>
-  <label>
-    Closure
-    <select
-      value={tray.params.lid ? 'sliding' : 'none'}
-      onchange={(e) => setClosure(e.currentTarget.value === 'sliding')}
-    >
-      <option value="none">No lid</option>
-      <option value="sliding">Sliding lid (Box lock)</option>
-    </select>
-  </label>
-  {#if tray.params.lid}
-    <label>
-      Lid text
-      <input
-        value={tray.params.lidText ?? 'Card Storage'}
-        maxlength="100"
-        placeholder="No text"
-        onchange={(e) => update('lidText', e.currentTarget.value)}
-      />
-    </label>
-    <label>
-      Lid text mode
-      <select
-        value={tray.params.lidTextMode ?? 'emboss'}
-        onchange={(e) => update('lidTextMode', e.currentTarget.value as 'emboss' | 'inlay')}
-      >
-        <option value="emboss">Engraved</option>
-        <option value="inlay">Inlay (multicolour)</option>
+      Card size
+      <select value={tray.params.cardSizeId} onchange={(e) => update('cardSizeId', e.currentTarget.value)}>
+        {#each getCardSizes() as card}<option value={card.id}>{card.name}</option>{/each}
       </select>
     </label>
-    <p class="hint">Uses the Box sliding lock. The lid opens along the card-storage direction.</p>
-  {/if}
-  <p class="summary">
-    {result.width.toFixed(1)} × {result.depth.toFixed(1)} × {result.height.toFixed(1)} mm
-    <br />
-    Capacity: {result.capacity} cards · Tilt: {((result.angle * 180) / Math.PI).toFixed(1)}° from upright
-  </p>
-  {#each result.errors as error}<p class="error" role="alert">{error}</p>{/each}
-  </EditorSection>
-  <EditorSection title="Removable dividers" summary={`${tray.params.dividers.length} dividers`}>
-  <h3>Removable dividers</h3>
-  <FormControl label="Default divider colour" name="defaultDividerColor">
-    {#snippet start()}
-      <Popover>
-        {#snippet trigger()}<ColorPickerSwatch color={dividerColor()} />{/snippet}
-        {#snippet content()}
-          <ColorPicker
-            showOpacity={false}
-            hex={dividerColor()}
-            onUpdate={(colorData) => update('dividerColor', colorData.hex)}
-          />
-        {/snippet}
-      </Popover>
-    {/snippet}
-    {#snippet input({ inputProps })}
-      <Input {...inputProps} value={dividerColor()} oninput={(e) => update('dividerColor', e.currentTarget.value)} />
-    {/snippet}
-  </FormControl>
-  <p class="hint">Positions are illustrative. Move the printed dividers freely between cards.</p>
-  {#each tray.params.dividers as divider, index (divider.id)}
-    <fieldset>
-      <legend>Divider {index + 1}</legend>
+    <CardSleeveControl
+      selection={tray.params}
+      onChange={(value) => updateCardStorageParams(tray.id, { ...tray.params, ...value })}
+    />
+    <label>
+      Orientation
+      <select
+        value={tray.params.orientation}
+        onchange={(e) => update('orientation', e.currentTarget.value as 'vertical' | 'horizontal')}
+      >
+        <option value="horizontal">Landscape</option>
+        <option value="vertical">Portrait</option>
+      </select>
+    </label>
+
+    {#if tray.params.sizing === 'count'}
       <label>
-        Label <input
-          value={divider.label}
-          placeholder="Blank divider"
-          maxlength="100"
-          onchange={(e) => editDivider(divider.id, { label: e.currentTarget.value })}
+        Number of cards <QuantityInput
+          label="Number of cards"
+          value={tray.params.count}
+          onChange={(value) => update('count', value)}
         />
       </label>
+    {/if}
+  </EditorSection>
+
+  <EditorSection title="Dimensions">
+    <section class="section">
       <label>
-        Tab
+        Size by
         <select
-          value={divider.tab}
-          onchange={(e) => editDivider(divider.id, { tab: e.currentTarget.value as StorageDivider['tab'] })}
+          value={tray.params.sizing}
+          onchange={(e) => update('sizing', e.currentTarget.value as 'count' | 'length')}
         >
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-          <option value="full">Full width</option>
+          <option value="count">Total card count</option>
+          <option value="length">Exterior length</option>
         </select>
       </label>
-      <FormControl label="Colour" name={`dividerColor-${divider.id}`}>
-        {#snippet start()}
-          <Popover>
-            {#snippet trigger()}<ColorPickerSwatch color={dividerColor(divider)} />{/snippet}
-            {#snippet content()}
-              <ColorPicker
-                showOpacity={false}
-                hex={dividerColor(divider)}
-                onUpdate={(colorData) => editDivider(divider.id, { color: colorData.hex })}
-              />
-            {/snippet}
-          </Popover>
-        {/snippet}
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            value={dividerColor(divider)}
-            oninput={(e) => editDivider(divider.id, { color: e.currentTarget.value })}
+      {#if tray.params.sizing === 'length'}
+        <label>
+          Exterior length (mm) <input
+            type="number"
+            min="1"
+            step="1"
+            value={tray.params.exteriorLength}
+            onchange={(e) => update('exteriorLength', e.currentTarget.valueAsNumber)}
           />
-        {/snippet}
-      </FormControl>
-      {#if divider.label.length > (divider.tab === 'full' ? 35 : 12)}<p class="hint">
-          Long labels are scaled down. Check readability before printing.
-        </p>{/if}
-      <div class="actions">
-        <button disabled={index === 0} onclick={() => move(divider.id, -1)} aria-label="Move divider up">↑</button>
-        <button
-          disabled={index === tray.params.dividers.length - 1}
-          onclick={() => move(divider.id, 1)}
-          aria-label="Move divider down"
-        >
-          ↓
-        </button>
-        <button onclick={() => update('dividers', [...tray.params.dividers, { ...divider, id: crypto.randomUUID() }])}>
-          Duplicate
-        </button>
-        <button
-          onclick={() => {
-            update(
-              'dividers',
-              tray.params.dividers.filter((d) => d.id !== divider.id)
-            );
-            if (selectedPart === divider.id) selectedPart = 'all';
-          }}
-        >
-          Remove
-        </button>
-      </div>
-    </fieldset>
-  {/each}
-  <button
-    onclick={() =>
-      update('dividers', [
-        ...tray.params.dividers,
-        { id: crypto.randomUUID(), label: '', tab: 'left', color: dividerColor() }
-      ])}
-  >
-    Add divider
-  </button>
-  </EditorSection>
-  <EditorSection title="Manufacturing" open={false}>
-  <details open={interfaceUi.mode === 'modern'}>
-    <summary>Print settings</summary>
-    <OuterCornerControls
-      value={tray.params.outerCornerRadius}
-      width={result.width}
-      depth={result.depth}
-      margin={getCardStorageCornerMargin(tray.params)}
-      onchange={(value) => update('outerCornerRadius', value)}
-    />
-    {#each [['wallThickness', 'Wall'], ['floorThickness', 'Floor'], ['clearance', 'Card clearance'], ['dividerThickness', 'Divider thickness'], ['tabHeight', 'Tab height'], ...(tray.params.lid ? [['lidThickness', 'Lid thickness'], ['lidClearance', 'Lid clearance']] : [])] as [key, label]}
+        </label>
+      {/if}
       <label>
-        {label} (mm)
+        Maximum total height (mm)
         <input
           type="number"
-          min={key === 'wallThickness' && tray.params.lid
-            ? minimumCardStorageLidWallThickness(tray.params.lidClearance)
-            : 0.1}
-          step="0.1"
-          value={tray.params[key as keyof CardStorageParams] as number}
-          onchange={(e) => update(key as keyof CardStorageParams, e.currentTarget.valueAsNumber)}
+          min="1"
+          step="1"
+          placeholder="Auto"
+          value={tray.params.maxHeight ?? ''}
+          onchange={(e) => update('maxHeight', e.currentTarget.value === '' ? null : e.currentTarget.valueAsNumber)}
         />
       </label>
-    {/each}
-  </details>
+      <p class="summary">
+        {result.width.toFixed(1)} × {result.depth.toFixed(1)} × {result.height.toFixed(1)} mm
+        <br />
+        Capacity: {result.capacity} cards · Tilt: {((result.angle * 180) / Math.PI).toFixed(1)}° from upright
+      </p>
+      {#each result.errors as error}<p class="error" role="alert">{error}</p>{/each}
+    </section>
   </EditorSection>
+
+  <EditorSection title="Manufacturing" open={false}>
+    <div class="formGrid">
+      <OuterCornerControls
+        value={tray.params.outerCornerRadius}
+        width={result.width}
+        depth={result.depth}
+        margin={getCardStorageCornerMargin(tray.params)}
+        onchange={(value) => update('outerCornerRadius', value)}
+      />
+      {#each [['wallThickness', 'Wall'], ['floorThickness', 'Floor'], ['clearance', 'Card clearance'], ['dividerThickness', 'Divider thickness'], ['tabHeight', 'Tab height']] as [key, label]}
+        <label>
+          {label} (mm)
+          <input
+            type="number"
+            min={key === 'wallThickness' && tray.params.lid
+              ? minimumCardStorageLidWallThickness(tray.params.lidClearance)
+              : 0.1}
+            step="0.1"
+            value={tray.params[key as keyof CardStorageParams] as number}
+            onchange={(e) => update(key as keyof CardStorageParams, e.currentTarget.valueAsNumber)}
+          />
+        </label>
+      {/each}
+    </div>
+  </EditorSection>
+
+  <EditorSection title="Lid">
+    <section class="section">
+      <label>
+        Closure
+        <select
+          value={tray.params.lid ? 'sliding' : 'none'}
+          onchange={(e) => setClosure(e.currentTarget.value === 'sliding')}
+        >
+          <option value="none">No lid</option>
+          <option value="sliding">Sliding lid (Box lock)</option>
+        </select>
+      </label>
+      {#if tray.params.lid}
+        <label>
+          Lid text
+          <input
+            value={tray.params.lidText ?? 'Card Storage'}
+            maxlength="100"
+            placeholder="No text"
+            onchange={(e) => update('lidText', e.currentTarget.value)}
+          />
+        </label>
+        <HelpRow>
+          <label>
+            Lid text mode
+            <select
+              value={tray.params.lidTextMode ?? 'emboss'}
+              onchange={(e) => update('lidTextMode', e.currentTarget.value as 'emboss' | 'inlay')}
+            >
+              <option value="emboss">Engraved</option>
+              <option value="inlay">Inlay (multicolour)</option>
+            </select>
+          </label>
+          <HelpTip label="Help: Sliding lid">
+            Uses the Box sliding lock. The lid opens along the card-storage direction.
+          </HelpTip>
+        </HelpRow>
+      {/if}{#if tray.params.lid}<div class="formGrid">
+          {#each [['lidThickness', 'Lid thickness'], ['lidClearance', 'Lid clearance']] as [key, label]}
+            <label>
+              {label} (mm)
+              <input
+                type="number"
+                min={key === 'wallThickness' && tray.params.lid
+                  ? minimumCardStorageLidWallThickness(tray.params.lidClearance)
+                  : 0.1}
+                step="0.1"
+                value={tray.params[key as keyof CardStorageParams] as number}
+                onchange={(e) => update(key as keyof CardStorageParams, e.currentTarget.valueAsNumber)}
+              />
+            </label>
+          {/each}
+        </div>{/if}
+    </section>
+  </EditorSection>
+
+  <EditorSection title="Removable dividers" summary={`${tray.params.dividers.length} dividers`}>
+    <HelpRow>
+      <h3>Removable dividers</h3>
+      <HelpTip label="Help: Divider positions">
+        Positions are illustrative. Move the printed dividers freely between cards.
+      </HelpTip>
+    </HelpRow>
+    <FormControl label="Default divider colour" name="defaultDividerColor">
+      {#snippet start()}
+        <Popover>
+          {#snippet trigger()}<ColorPickerSwatch color={dividerColor()} />{/snippet}
+          {#snippet content()}
+            <ColorPicker
+              showOpacity={false}
+              hex={dividerColor()}
+              onUpdate={(colorData) => update('dividerColor', colorData.hex)}
+            />
+          {/snippet}
+        </Popover>
+      {/snippet}
+      {#snippet input({ inputProps })}
+        <Input {...inputProps} value={dividerColor()} oninput={(e) => update('dividerColor', e.currentTarget.value)} />
+      {/snippet}
+    </FormControl>
+
+    {#each tray.params.dividers as divider, index (divider.id)}
+      <fieldset>
+        <legend>Divider {index + 1}</legend>
+        <label>
+          Label <input
+            value={divider.label}
+            placeholder="Blank divider"
+            maxlength="100"
+            onchange={(e) => editDivider(divider.id, { label: e.currentTarget.value })}
+          />
+        </label>
+        <label>
+          Tab
+          <select
+            value={divider.tab}
+            onchange={(e) => editDivider(divider.id, { tab: e.currentTarget.value as StorageDivider['tab'] })}
+          >
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+            <option value="full">Full width</option>
+          </select>
+        </label>
+        <FormControl label="Colour" name={`dividerColor-${divider.id}`}>
+          {#snippet start()}
+            <Popover>
+              {#snippet trigger()}<ColorPickerSwatch color={dividerColor(divider)} />{/snippet}
+              {#snippet content()}
+                <ColorPicker
+                  showOpacity={false}
+                  hex={dividerColor(divider)}
+                  onUpdate={(colorData) => editDivider(divider.id, { color: colorData.hex })}
+                />
+              {/snippet}
+            </Popover>
+          {/snippet}
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              value={dividerColor(divider)}
+              oninput={(e) => editDivider(divider.id, { color: e.currentTarget.value })}
+            />
+          {/snippet}
+        </FormControl>
+        {#if divider.label.length > (divider.tab === 'full' ? 35 : 12)}<p class="hint">
+            Long labels are scaled down. Check readability before printing.
+          </p>{/if}
+        <div class="actions">
+          <button disabled={index === 0} onclick={() => move(divider.id, -1)} aria-label="Move divider up">↑</button>
+          <button
+            disabled={index === tray.params.dividers.length - 1}
+            onclick={() => move(divider.id, 1)}
+            aria-label="Move divider down"
+          >
+            ↓
+          </button>
+          <button
+            onclick={() => update('dividers', [...tray.params.dividers, { ...divider, id: crypto.randomUUID() }])}
+          >
+            Duplicate
+          </button>
+          <button
+            onclick={() => {
+              update(
+                'dividers',
+                tray.params.dividers.filter((d) => d.id !== divider.id)
+              );
+              if (selectedPart === divider.id) selectedPart = 'all';
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      </fieldset>
+    {/each}
+    <button
+      onclick={() =>
+        update('dividers', [
+          ...tray.params.dividers,
+          { id: crypto.randomUUID(), label: '', tab: 'left', color: dividerColor() }
+        ])}
+    >
+      Add divider
+    </button>
+  </EditorSection>
+
   <EditorSection title="Export parts">
-  <h3>Export parts</h3>
-  <label>
-    Parts
-    <select bind:value={selectedPart}>
-      <option value="all">All parts</option>
-      <option value="body">Tray only</option>
-      {#if tray.params.lid}<option value="lid">Lid only</option>{/if}
-      <option value="dividers">All dividers</option>
-      {#each tray.params.dividers as divider, index}<option value={divider.id}>
-          Divider {index + 1}: {divider.label || 'Blank'}
-        </option>{/each}
-    </select>
-  </label>
-  <div class="actions">
-    <button disabled={!result.valid || busy} onclick={() => download('stl')}>Export STL</button>
-    <button disabled={!result.valid || busy} onclick={() => download('3mf')}>Export 3MF</button>
-  </div>
-  <p class="hint">Use 3MF to assign a separate colour to the text. Dividers export flat for printing.</p>
-  {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
+    <HelpRow>
+      <h3>Export parts</h3>
+      <HelpTip label="Help: Divider export">
+        Use 3MF to assign a separate colour to the text. Dividers export flat for printing.
+      </HelpTip>
+    </HelpRow>
+    <label>
+      Parts
+      <select bind:value={selectedPart}>
+        <option value="all">All parts</option>
+        <option value="body">Tray only</option>
+        {#if tray.params.lid}<option value="lid">Lid only</option>{/if}
+        <option value="dividers">All dividers</option>
+        {#each tray.params.dividers as divider, index}<option value={divider.id}>
+            Divider {index + 1}: {divider.label || 'Blank'}
+          </option>{/each}
+      </select>
+    </label>
+    <div class="actions">
+      <button disabled={!result.valid || busy} onclick={() => download('stl')}>Export STL</button>
+      <button disabled={!result.valid || busy} onclick={() => download('3mf')}>Export 3MF</button>
+    </div>
+
+    {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
   </EditorSection>
 </section>
 
@@ -371,8 +427,5 @@
   .error {
     color: #e87878;
     font-size: 0.85rem;
-  }
-  details label {
-    margin-top: 0.65rem;
   }
 </style>

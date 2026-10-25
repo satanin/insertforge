@@ -2541,6 +2541,7 @@ export function addBox(layerId?: string, trayType: TrayType = 'counter'): Box {
 
   const boxNumber = getAllBoxes().length + 1;
   const box = createDefaultBox(`Box ${boxNumber}`);
+  if (trayType === 'empty') box.fillSolidEmpty = false;
 
   if (trayType !== 'empty' && trayType !== 'miniatureRack' && trayType !== 'miniatureTray' && trayType !== 'cardStorage') {
     const color = getNextTrayColor(project.layers);

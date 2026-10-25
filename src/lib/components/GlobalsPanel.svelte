@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import { getCardSleeveThicknesses, projectSleeveOptions } from '$lib/utils/projectCards';
   import { updateCardSleeveThickness } from '$lib/stores/project.svelte';
   import DiceIcon from './DiceIcon.svelte';
@@ -361,7 +363,8 @@
     <section class="section">
       <h3 class="sectionTitle">Project</h3>
       <Spacer size="0.5rem" />
-      <FormControl label="Name" name="projectName">
+      <HelpRow>
+<FormControl label="Name" name="projectName">
         {#snippet input({ inputProps })}
           <Input
             {...inputProps}
@@ -372,14 +375,19 @@
           />
         {/snippet}
       </FormControl>
-      <Spacer size="0.5rem" />
-      <Text size="0.875rem" color="var(--fgMuted)">Used as the default filename for project exports.</Text>
-    </section>
+<HelpTip label="Help: Project filename">Used as the default filename for project exports.</HelpTip>
+</HelpRow></section>
 
     <Hr />
 
     <section class="section">
-      <h3 class="sectionTitle">Game Container</h3>
+      <HelpRow>
+<h3 class="sectionTitle">Game Container</h3>
+<HelpTip label="Help: Game container dimensions">
+        Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
+        calculations. Leave height empty to use the current stacked layer height automatically.
+      </HelpTip>
+</HelpRow>
       <div class="gameContainerInputs">
         <FormControl label="Width" name="gameContainerWidth">
           {#snippet input({ inputProps })}
@@ -426,10 +434,7 @@
         </FormControl>
       </div>
       <Spacer size="0.5rem" />
-      <Text size="0.875rem" color="var(--fgMuted)">
-        Set to the inner dimensions of the actual cardboard box your game uses. It provides the bounding area for layout
-        calculations. Leave height empty to use the current stacked layer height automatically.
-      </Text>
+
     </section>
 
     {#if onResetProject}
@@ -448,9 +453,12 @@
     {/if}
   {:else if activeTab === 'dice'}
     <section class="section">
-      <h3 class="sectionTitle">Dice</h3>
+      <HelpRow>
+<h3 class="sectionTitle">Dice</h3>
+<HelpTip label="Help: Dice measurements">Default measurements are starting values: measure your dice before use. For d6 measure one side, face to face; for other dice measure the greatest distance between tips.</HelpTip>
+</HelpRow>
       <Spacer size="0.5rem" />
-      <Text size="0.875rem" color="var(--fgMuted)">Default measurements are starting values: measure your dice before use. For d6 measure one side, face to face; for other dice measure the greatest distance between tips.</Text>
+
       <Spacer size="0.5rem" />
       <div class="customShapesList">
         {#each diceSizes as die (die.id)}
@@ -458,11 +466,14 @@
           <Panel class="shapePanel">
             <div class="shapePanelContent">
               <div class="shapeFormGrid diceFormGrid">
-                <FormControl label="Name" name="die-name-{die.id}">
+                <HelpRow>
+<FormControl label="Name" name="die-name-{die.id}">
                   {#snippet input({ inputProps })}
                     <Input {...inputProps} value={die.name} onchange={(e) => updateDiceSize(die.id, { name: e.currentTarget.value })} />
                   {/snippet}
                 </FormControl>
+
+</HelpRow>
                 <FormControl label="Die type" name="die-kind-{die.id}">
                   {#snippet input({ inputProps })}
                     <Select {...inputProps} selected={[die.kind]} options={['d4', 'd6', 'd8', 'd10', 'd12', 'd20'].map(value => ({ value, label: value.toUpperCase() }))} onSelectedChange={(values) => updateDiceSize(die.id, { kind: values[0] as import('$lib/types/project').DiceKind })} />
@@ -1096,8 +1107,11 @@
   </section>
   {:else if activeTab === 'cards'}
     <section class="section">
-    <h3 class="sectionTitle">Card thickness</h3>
-    <p class="sectionHint">Total thickness per card. Changes update pieces using these sleeves; inventory measurements stay unchanged.</p>
+    <HelpRow>
+<h3 class="sectionTitle">Card thickness</h3>
+<HelpTip label="Help: Card sleeve thickness">Total thickness per card. Changes update pieces using these sleeves; inventory measurements stay unchanged.</HelpTip>
+</HelpRow>
+
     <div class="shapeFormGrid">
       {#each projectSleeveOptions as option}
         <FormControl label={option.label} name={`cardSleeve-${option.value}`}>
@@ -1311,12 +1325,6 @@
     color: var(--fgMuted);
   }
 
-  .sectionHint {
-    margin: 0 0 0.5rem;
-    font-size: 0.75rem;
-    line-height: 1.4;
-    color: var(--fgMuted);
-  }
 
   .dangerSection {
     padding-bottom: 0.25rem;

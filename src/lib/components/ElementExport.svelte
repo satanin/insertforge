@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import { getProject } from '$lib/stores/project.svelte';
   import { sanitizeExportName } from '$lib/utils/exportNames';
   let { elementId, name, hasLid = false, referenceVolume = false }: { elementId: string; name: string; hasLid?: boolean; referenceVolume?: boolean } = $props();
@@ -52,7 +54,10 @@
 </script>
 
 <section aria-label="Export selected element" class="elementExport">
-  <h3>Export {name}</h3>
+  <HelpRow>
+<h3>Export {name}</h3>
+<HelpTip label="Help: Export selected element">{referenceVolume ? 'Exports the solid reference volume of this board.' : 'Only this element and its printable parts. Multiple STLs download as a ZIP.'}</HelpTip>
+</HelpRow>
   {#if hasLid}
     <label>Parts
       <select bind:value={part} disabled={busy}>
@@ -66,7 +71,7 @@
     <button disabled={busy} onclick={() => download('stl')}>{busy ? 'Exporting…' : 'Export STL'}</button>
     <button disabled={busy} onclick={() => download('3mf')}>Export 3MF</button>
   </div>
-  <p>{referenceVolume ? 'Exports the solid reference volume of this board.' : 'Only this element and its printable parts. Multiple STLs download as a ZIP.'}</p>
+
   {#if error}<p role="alert">{error}</p>{/if}
 </section>
 

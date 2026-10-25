@@ -1,18 +1,52 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import EditorSection from '../EditorSection.svelte';
   import QuantityInput from '../QuantityInput.svelte';
   import { FormControl, Input, InputCheckbox } from '@tableslayer/ui';
   import { IconChevronDown } from '@tabler/icons-svelte';
   import TextStyleControls from './TextStyleControls.svelte';
-  import { getMiniatureSocketRackLayout, getMiniatureSocketRackCornerRadius, normalizeMiniatureSocketRackParams, type MiniatureSocketRackParams, type MiniatureRackModel } from '$lib/models/miniatureSocketRack';
+  import {
+    getMiniatureSocketRackLayout,
+    getMiniatureSocketRackCornerRadius,
+    normalizeMiniatureSocketRackParams,
+    type MiniatureSocketRackParams,
+    type MiniatureRackModel
+  } from '$lib/models/miniatureSocketRack';
 
-  let { params, onUpdate, trayName = '' }: {
+  let {
+    params,
+    onUpdate,
+    trayName = ''
+  }: {
     trayName?: string;
     params?: MiniatureSocketRackParams;
     onUpdate: (params: MiniatureSocketRackParams) => void;
   } = $props();
   let layout = $derived(getMiniatureSocketRackLayout(params));
-  type NumberKey = Exclude<keyof MiniatureSocketRackParams, 'lidTextMode' | 'lidTextColor' | 'labelTextMode' | 'labelTextColor' | 'labelsEnabled' | 'labelText' | 'lidText' | 'lidTextEnabled' | 'lid' | 'perforated' | 'tabOverlap' | 'sizingMode' | 'linkedSpacing' | 'models' | 'maxHeight' | 'quantityMode' | 'fillModelId' | 'fixedWidth' | 'fixedDepth' | 'fixedHeight'>;
+  type NumberKey = Exclude<
+    keyof MiniatureSocketRackParams,
+    | 'lidTextMode'
+    | 'lidTextColor'
+    | 'labelTextMode'
+    | 'labelTextColor'
+    | 'labelsEnabled'
+    | 'labelText'
+    | 'lidText'
+    | 'lidTextEnabled'
+    | 'lid'
+    | 'perforated'
+    | 'tabOverlap'
+    | 'sizingMode'
+    | 'linkedSpacing'
+    | 'models'
+    | 'maxHeight'
+    | 'quantityMode'
+    | 'fillModelId'
+    | 'fixedWidth'
+    | 'fixedDepth'
+    | 'fixedHeight'
+  >;
   const fields: { key: NumberKey; label: string; min: number; max: number; step: number; mode?: string }[] = [
     { key: 'outerCornerRadius', label: 'Outer corner radius', min: 0, max: 100, step: 0.5 },
     { key: 'labelHeight', label: 'Letter height (minimum 4 mm)', min: 4, max: 12, step: 0.5 },
@@ -38,7 +72,12 @@
     { key: 'postWidth', label: 'Stacking post width', min: 8, max: 20, step: 0.5 },
     { key: 'stackingClearance', label: 'Stacking clearance per side', min: 0.1, max: 0.8, step: 0.1 }
   ];
-  const modelFields: { key: Exclude<keyof MiniatureRackModel, 'id' | 'name' | 'label'>; label: string; min: number; max: number }[] = [
+  const modelFields: {
+    key: Exclude<keyof MiniatureRackModel, 'id' | 'name' | 'label'>;
+    label: string;
+    min: number;
+    max: number;
+  }[] = [
     { key: 'count', label: 'Quantity', min: 1, max: 100 },
     { key: 'baseDiameter', label: 'Base diameter', min: 10, max: 100 },
     { key: 'baseThickness', label: 'Base thickness', min: 1, max: 15 },
@@ -55,39 +94,77 @@
     onUpdate(normalizeMiniatureSocketRackParams({ ...layout.p, ...updates }));
   }
   function addModel() {
-    update({ models: [...layout.p.models, {
-      id: crypto.randomUUID(), name: `Model ${layout.p.models.length + 1}`, count: 1,
-      baseDiameter: layout.p.baseDiameter, baseThickness: layout.p.baseThickness,
-      width: layout.p.baseDiameter, depth: layout.p.baseDiameter, height: layout.p.miniatureHeight
-    }] });
+    update({
+      models: [
+        ...layout.p.models,
+        {
+          id: crypto.randomUUID(),
+          name: `Model ${layout.p.models.length + 1}`,
+          count: 1,
+          baseDiameter: layout.p.baseDiameter,
+          baseThickness: layout.p.baseThickness,
+          width: layout.p.baseDiameter,
+          depth: layout.p.baseDiameter,
+          height: layout.p.miniatureHeight
+        }
+      ]
+    });
   }
   function updateModel(index: number, values: Partial<MiniatureRackModel>) {
-    update({ models: layout.p.models.map((model, i) => i === index ? { ...model, ...values } : model) });
+    update({ models: layout.p.models.map((model, i) => (i === index ? { ...model, ...values } : model)) });
   }
   function visible(mode?: string) {
-    return !mode || mode === layout.p.sizingMode || mode === 'limits' && layout.p.sizingMode !== 'grid'
-      || mode === 'base' && layout.p.sizingMode !== 'models';
+    return (
+      !mode ||
+      mode === layout.p.sizingMode ||
+      (mode === 'limits' && layout.p.sizingMode !== 'grid') ||
+      (mode === 'base' && layout.p.sizingMode !== 'models')
+    );
   }
 </script>
 
 {#snippet numericFields(keys: NumberKey[])}
   <div class="socketFields">
-    {#each fields.filter(field => keys.includes(field.key)) as field (field.key)}
+    {#each fields.filter((field) => keys.includes(field.key)) as field (field.key)}
       {#if visible(field.mode) && !(field.key === 'spacingY' && layout.p.linkedSpacing) && !(field.key === 'requestedCount' && layout.p.quantityMode === 'fill')}
-        <FormControl label={field.label} name={`socket-${field.key}`}>
-          {#snippet input({ inputProps })}
-            {#if field.key === 'requestedCount' || field.key === 'rows' || field.key === 'columns'}
-              <QuantityInput id={inputProps.id} label={field.label} min={field.min} max={field.max} value={layout.p[field.key]} onChange={(value) => update({ [field.key]: value })} />
-            {:else}
-            <Input {...inputProps} type="number" min={field.min} max={field.max} step={field.step}
-              value={layout.p[field.key]} onchange={(e) => {
-                const value = Number.parseFloat(e.currentTarget.value);
-                if (Number.isFinite(value)) update({ [field.key]: value });
-              }} />
-            {/if}
-          {/snippet}
-          {#snippet end()}{field.key === 'rows' || field.key === 'columns' || field.key === 'requestedCount' ? '' : field.key === 'tabOverlapPercent' ? '%' : 'mm'}{/snippet}
-        </FormControl>
+        {#snippet unit()}{field.key === 'tabOverlapPercent' ? '%' : 'mm'}{/snippet}
+        <HelpRow>
+          <FormControl
+            label={field.label}
+            name={`socket-${field.key}`}
+            end={field.key === 'rows' || field.key === 'columns' || field.key === 'requestedCount' ? undefined : unit}
+          >
+            {#snippet input({ inputProps })}
+              {#if field.key === 'requestedCount' || field.key === 'rows' || field.key === 'columns'}
+                <QuantityInput
+                  id={inputProps.id}
+                  label={field.label}
+                  min={field.min}
+                  max={field.max}
+                  value={layout.p[field.key]}
+                  onChange={(value) => update({ [field.key]: value })}
+                />
+              {:else}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  min={field.min}
+                  max={field.max}
+                  step={field.step}
+                  value={layout.p[field.key]}
+                  onchange={(e) => {
+                    const value = Number.parseFloat(e.currentTarget.value);
+                    if (Number.isFinite(value)) update({ [field.key]: value });
+                  }}
+                />
+              {/if}
+            {/snippet}
+          </FormControl>
+          {#if field.key === 'outerCornerRadius'}<HelpTip label="Help: Corner radius">
+              Effective outer radius: {getMiniatureSocketRackCornerRadius(layout.p).toFixed(1)} mm. Applies to the base, outer
+              post corners and lid; limited to preserve stacking pockets. Set 0 for square corners.
+            </HelpTip>{/if}
+        </HelpRow>
       {/if}
     {/each}
   </div>
@@ -95,8 +172,13 @@
 
 <div class="socketEditor">
   <aside class="experimentalNotice" role="note" aria-label="Experimental feature">
-    <strong>Experimental · further print validation pending</strong>
-    <p>Initial rack print tests passed. New options, including the lid, still need physical validation. Test fit and strength with a small sample first.</p>
+    <HelpRow>
+      <strong>Experimental · further print validation pending</strong>
+      <HelpTip label="Help: Experimental print validation">
+        Initial rack print tests passed. New options, including the lid, still need physical validation. Test fit and
+        strength with a small sample first.
+      </HelpTip>
+    </HelpRow>
   </aside>
   <div class="rackSummary" aria-label="Rack summary">
     <strong>{layout.width.toFixed(1)} × {layout.depth.toFixed(1)} × {layout.height.toFixed(1)} mm</strong>
@@ -109,251 +191,556 @@
       · stacking pitch {layout.stackPitch.toFixed(1)} mm
     </span>
   </div>
-  {#if layout.error}<p role="alert" class="error">{layout.error} No printable rack is generated for this configuration.</p>{/if}
+  {#if layout.error}<p role="alert" class="error">
+      {layout.error} No printable rack is generated for this configuration.
+    </p>{/if}
   {#each layout.warnings as warning}<p role="alert" class="warning">{warning}</p>{/each}
 
   <EditorSection title="Dimensions">
-  <section class="editorSection" aria-label="Rack dimensions">
-    <h3>Rack dimensions</h3>
-    <h4>Maximum dimensions</h4>
-    {@render numericFields(['maxWidth', 'maxDepth'])}
-    <FormControl label="Maximum rack height (includes pegs)" name="socket-maxHeight">
-      {#snippet input({ inputProps })}
-        <Input {...inputProps} type="number" min="5" max="400" step="0.5" placeholder="No limit"
-          value={layout.p.maxHeight ?? ''} onchange={(e) => {
-            const value = Number.parseFloat(e.currentTarget.value);
-            update({ maxHeight: Number.isFinite(value) ? value : null });
-          }} />
-      {/snippet}
-      {#snippet end()}mm{/snippet}
-    </FormControl>
-    <h4>Fixed dimensions · optional</h4>
-    <div class="socketFields">
-      {#each fixedFields as field}
-        <FormControl label={field.label} name={`socket-${field.key}`}>
-          {#snippet input({ inputProps })}
-            <Input {...inputProps} type="number" min={field.min} max={field.max} step="0.5" placeholder="Auto"
-              value={layout.p[field.key] ?? ''} onchange={(e) => {
-                const value = Number.parseFloat(e.currentTarget.value);
-                update({ [field.key]: Number.isFinite(value) ? value : null });
-              }} />
-          {/snippet}
-          {#snippet end()}mm{/snippet}
-        </FormControl>
-      {/each}
-    </div>
-    <p class="help">Leave fixed dimensions blank for automatic sizing. Fixed sizes must respect the maximum limits. Heights include pegs.</p>
-  </section>
+    <section class="editorSection" aria-label="Rack dimensions">
+      <h3>Rack dimensions</h3>
+      <h4>Maximum dimensions</h4>
+      {@render numericFields(['maxWidth', 'maxDepth'])}
+      <FormControl label="Maximum rack height (includes pegs)" name="socket-maxHeight">
+        {#snippet input({ inputProps })}
+          <Input
+            {...inputProps}
+            type="number"
+            min="5"
+            max="400"
+            step="0.5"
+            placeholder="No limit"
+            value={layout.p.maxHeight ?? ''}
+            onchange={(e) => {
+              const value = Number.parseFloat(e.currentTarget.value);
+              update({ maxHeight: Number.isFinite(value) ? value : null });
+            }}
+          />
+        {/snippet}
+        {#snippet end()}mm{/snippet}
+      </FormControl>
+      <HelpRow>
+        <h4>Fixed dimensions · optional</h4>
+        <HelpTip label="Help: Fixed dimensions">
+          Leave fixed dimensions blank for automatic sizing. Fixed sizes must respect the maximum limits. Heights
+          include pegs.
+        </HelpTip>
+      </HelpRow>
+      <div class="socketFields">
+        {#each fixedFields as field}
+          <FormControl label={field.label} name={`socket-${field.key}`}>
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                type="number"
+                min={field.min}
+                max={field.max}
+                step="0.5"
+                placeholder="Auto"
+                value={layout.p[field.key] ?? ''}
+                onchange={(e) => {
+                  const value = Number.parseFloat(e.currentTarget.value);
+                  update({ [field.key]: Number.isFinite(value) ? value : null });
+                }}
+              />
+            {/snippet}
+            {#snippet end()}mm{/snippet}
+          </FormControl>
+        {/each}
+      </div>
+    </section>
   </EditorSection>
 
-  <EditorSection title="Structure and stacking">
-  <section class="editorSection" aria-label="Rack structure and stacking">
-    <h3>Structure &amp; stacking</h3>
-    {@render numericFields(['floorThickness', 'wallThickness', 'outerCornerRadius', 'headroom', 'postWidth', 'stackingClearance'])}
-    <p class="help">Effective outer radius: {getMiniatureSocketRackCornerRadius(layout.p).toFixed(1)} mm. Applies to the base, outer post corners and lid; limited to preserve stacking pockets. Set 0 for square corners.</p>
-    <InputCheckbox label="Lighten floor below each base" checked={layout.p.perforated}
-      onchange={(e) => update({ perforated: e.currentTarget.checked })} />
-    <p class="help">To stack racks, match width, depth, post width and stacking clearance. Each rack can have its own height.</p>
-  </section>
+  <EditorSection title="Manufacturing" summary="Structure and stacking">
+    <section class="editorSection" aria-label="Rack structure and stacking">
+      <h3>Structure &amp; stacking</h3>
+      {@render numericFields([
+        'floorThickness',
+        'wallThickness',
+        'outerCornerRadius',
+        'headroom',
+        'postWidth',
+        'stackingClearance'
+      ])}
+
+      <HelpRow>
+        <InputCheckbox
+          label="Lighten floor below each base"
+          checked={layout.p.perforated}
+          onchange={(e) => update({ perforated: e.currentTarget.checked })}
+        />
+        <HelpTip label="Help: Stacking racks">
+          To stack racks, match width, depth, post width and stacking clearance. Each rack can have its own height.
+        </HelpTip>
+      </HelpRow>
+
+      <h4>Base clearance &amp; retaining tab</h4>
+      {@render numericFields(['diameterClearance', 'verticalClearance', 'tabOverlapPercent', 'tabThickness'])}
+      <HelpRow>
+        <p class="help">
+          Overlap: {layout.p.tabOverlapPercent.toFixed(1)}% of each base diameter.
+          {#if layout.p.sizingMode !== 'models'}For this base: {(
+              (layout.p.baseDiameter * layout.p.tabOverlapPercent) /
+              100
+            ).toFixed(2)} mm.{/if}
+        </p>
+        <HelpTip label="Help: Fit, handling and preview">
+          Tilt the base under the tab, then lower it into the socket without pressing. Print a two-base sample first.
+          Retention is not a transport lock.
+          <br />
+          <br />
+          Allow for off-centre arms and weapons. Preview miniatures shows approximate volumes, which are excluded from
+          exports. Placement and filling may not find the densest layout.
+        </HelpTip>
+      </HelpRow>
+    </section>
   </EditorSection>
 
   <EditorSection title="Lid">
-  <section class="editorSection" aria-label="Rack lid">
-    <h3>Lid</h3>
-    <InputCheckbox label="Add flat stacking lid" checked={layout.p.lid}
-      onchange={(e) => update({ lid: e.currentTarget.checked })} />
-    {#if layout.p.lid}
-      {@render numericFields(['lidThickness'])}
-      <InputCheckbox label="Add lid text" checked={layout.p.lidTextEnabled}
-        onchange={(e) => update({ lidTextEnabled: e.currentTarget.checked })} />
-      {#if layout.p.lidTextEnabled}
-        <FormControl label="Lid text" name="socket-lidText">
-          {#snippet input({ inputProps })}
-            <Input {...inputProps} value={layout.p.lidText ?? ''} placeholder={trayName} maxlength={100}
-              onchange={(e) => update({ lidText: e.currentTarget.value })} />
-          {/snippet}
-        </FormControl>
-        <TextStyleControls label="Lid" mode={layout.p.lidTextMode} color={layout.p.lidTextColor}
-          onMode={(lidTextMode) => update({ lidTextMode })} onColor={(lidTextColor) => update({ lidTextColor })} />
-        <p class="help">Leave blank to follow the tray name. Engraved and inlay text keep the top flat. Raised text affects flat stacking and is included in the total height.</p>
+    <section class="editorSection" aria-label="Rack lid">
+      <h3>Lid</h3>
+      <fieldset class="contentCard" aria-label="Lid settings">
+        <legend>Lid</legend>
+        <HelpRow>
+          <InputCheckbox
+            label="Add flat stacking lid"
+            checked={layout.p.lid}
+            onchange={(e) => update({ lid: e.currentTarget.checked })}
+          />
+          {#if layout.p.lid}<HelpTip label="Help: Stacking lid">
+              Rests on the four posts and locates over the pegs. Height limits include the lid and any raised text.
+              Exported separately; raised lettering faces up for printing. Check the underside pockets when slicing. Not
+              a sealed or locking lid; load capacity needs print testing.
+            </HelpTip>{/if}
+        </HelpRow>
+        {#if layout.p.lid}
+          {@render numericFields(['lidThickness'])}
+        {/if}
+      </fieldset>
+      {#if layout.p.lid}
+        <fieldset class="contentCard" aria-label="Lid text settings">
+          <legend>Text</legend>
+          <InputCheckbox
+            label="Add lid text"
+            checked={layout.p.lidTextEnabled}
+            onchange={(e) => update({ lidTextEnabled: e.currentTarget.checked })}
+          />
+          {#if layout.p.lidTextEnabled}
+            <HelpRow>
+              <FormControl label="Lid text" name="socket-lidText">
+                {#snippet input({ inputProps })}
+                  <Input
+                    {...inputProps}
+                    value={layout.p.lidText ?? ''}
+                    placeholder={trayName}
+                    maxlength={100}
+                    onchange={(e) => update({ lidText: e.currentTarget.value })}
+                  />
+                {/snippet}
+              </FormControl>
+              <HelpTip label="Help: Lid text">
+                Leave blank to follow the tray name. Engraved and inlay text keep the top flat. Raised text affects flat
+                stacking and is included in the total height.
+              </HelpTip>
+            </HelpRow>
+            <TextStyleControls
+              label="Lid"
+              mode={layout.p.lidTextMode}
+              color={layout.p.lidTextColor}
+              onMode={(lidTextMode) => update({ lidTextMode })}
+              onColor={(lidTextColor) => update({ lidTextColor })}
+            />
+          {/if}
+        </fieldset>
       {/if}
-      <p class="help">Rests on the four posts and locates over the pegs. Height limits include the lid and any raised text. Exported separately; raised lettering faces up for printing. Check the underside pockets when slicing. Not a sealed or locking lid; load capacity needs print testing.</p>
-    {/if}
-  </section>
+    </section>
   </EditorSection>
 
   <EditorSection title="Labels">
-  <section class="editorSection" aria-label="Socket labels">
-    <h3>Socket labels · Experimental</h3>
-    <InputCheckbox label="Add socket label plates" checked={layout.p.labelsEnabled}
-      onchange={(e) => update({ labelsEnabled: e.currentTarget.checked })} />
-    {#if layout.p.labelsEnabled}
-      {@render numericFields(['nozzleDiameter', 'labelHeight'])}
-      <TextStyleControls label="Label" mode={layout.p.labelTextMode} color={layout.p.labelTextColor}
-        onMode={(labelTextMode) => update({ labelTextMode })} onColor={(labelTextColor) => update({ labelTextColor })} />
-      {#if layout.p.sizingMode !== 'models'}
-        <FormControl label="Socket label" name="socket-labelText">
-          {#snippet input({ inputProps })}
-            <Input {...inputProps} value={layout.p.labelText} maxlength={100}
-              onchange={(e) => update({ labelText: e.currentTarget.value })} />
-          {/snippet}
-        </FormControl>
-      {/if}
-      <p class="help">Plates stay behind the retaining tab and use the existing gap, extending up to 1 mm per side where spacing allows. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(4, layout.p.nozzleDiameter * 10).toFixed(1)} mm. These conservative limits still need a test print.</p>
-    {/if}
-  </section>
-  </EditorSection>
-
-  <EditorSection title="Content and distribution">
-  <section class="editorSection" aria-label="Miniatures and layout">
-    <h3>Miniatures &amp; layout</h3>
-    <label class="modeLabel">Layout mode
-      <span class="selectControl">
-        <select value={layout.p.sizingMode} onchange={(e) => {
-          const sizingMode = e.currentTarget.value as MiniatureSocketRackParams['sizingMode'];
-          update({ sizingMode, requestedCount: layout.p.sizingMode === 'grid' ? layout.seats.length : layout.p.requestedCount,
-            models: sizingMode === 'models' && layout.p.models.length === 0 ? [{
-              id: crypto.randomUUID(), name: 'Model 1', count: 1,
-              baseDiameter: layout.p.baseDiameter, baseThickness: layout.p.baseThickness,
-              width: layout.p.baseDiameter, depth: layout.p.baseDiameter, height: layout.p.miniatureHeight
-            }] : layout.p.models });
-        }}>
-          <option value="free">Free rack</option>
-          <option value="models">By miniature models</option>
-          <option value="grid">Manual grid</option>
-        </select>
-        <IconChevronDown size={16} aria-hidden="true" />
-      </span>
-    </label>
-    {#if layout.p.sizingMode !== 'grid'}
-      <label class="modeLabel">Quantity mode
-        <span class="selectControl">
-          <select value={layout.p.quantityMode} onchange={(e) => update({ quantityMode: e.currentTarget.value as MiniatureSocketRackParams['quantityMode'] })}>
-            <option value="all">Fit all miniatures</option>
-            <option value="partial">Place what fits</option>
-            <option value="fill">Fill available space</option>
-          </select>
-          <IconChevronDown size={16} aria-hidden="true" />
-        </span>
-      </label>
-      <p class="help">
-        {#if layout.p.quantityMode === 'all'}All requested miniatures must fit.
-        {:else if layout.p.quantityMode === 'partial'}Create a rack with what fits and report the remaining quantities.
-        {:else}Calculate the quantity from the available space.{/if}
-      </p>
-      {#if layout.p.quantityMode === 'fill' && layout.p.sizingMode === 'models'}
-        <label class="modeLabel">Model to fill remaining space
-          <span class="selectControl">
-            <select value={layout.p.fillModelId ?? ''} onchange={(e) => update({ fillModelId: e.currentTarget.value })}>
-              {#each layout.p.models as model}<option value={model.id}>{model.name}</option>{/each}
-            </select>
-            <IconChevronDown size={16} aria-hidden="true" />
-          </span>
-        </label>
-        <p class="help">Place the quantities of the other models first, then fill the remaining space with this model.</p>
-      {/if}
-    {/if}
-    {@render numericFields(['requestedCount', 'rows', 'columns', 'baseDiameter', 'baseThickness', 'miniatureHeight'])}
-    {#if layout.p.sizingMode === 'free'}
-      <p class="help">Capacity at these limits: {layout.capacity}. Rows and columns are calculated from the quantity.</p>
-    {/if}
-    {#if layout.p.sizingMode === 'models'}
-      <p class="help">Measure the whole miniature including its base, arms and weapons. Volumes are centred on the base. Automatic sizing compares individual 90° rotations to reduce the footprint; tabs and labels turn with each socket.</p>
-      {#each layout.p.models as model, index (model.id)}
-        {@const counts = layout.modelCounts.find(c => c.id === model.id)}
-        <fieldset class="modelCard">
-          <legend>{model.name || `Model ${index + 1}`}</legend>
-          {#if counts}
-            <p class="modelCounts">Placed: {counts.placed}{counts.requested === null ? ' · calculated fill quantity' : ` / ${counts.requested} · Remaining: ${counts.remaining}`}</p>
-          {/if}
-          <FormControl label="Model name" name={`model-name-${model.id}`}>
-            {#snippet input({ inputProps })}<Input {...inputProps} value={model.name}
-              onchange={(e) => updateModel(index, { name: e.currentTarget.value })} />{/snippet}
+    <section class="editorSection" aria-label="Socket labels">
+      <h3>Socket labels · Experimental</h3>
+      <HelpRow>
+        <InputCheckbox
+          label="Add socket label plates"
+          checked={layout.p.labelsEnabled}
+          onchange={(e) => update({ labelsEnabled: e.currentTarget.checked })}
+        />
+        {#if layout.p.labelsEnabled}<HelpTip label="Help: Socket label plates">
+            Plates stay behind the retaining tab and use the existing gap, extending up to 1 mm per side where spacing
+            allows. No automatic text shrinking or extra rack space. Use a short label for each model below. Stroke
+            width: {Math.max(0.8, layout.p.nozzleDiameter * 2).toFixed(1)} mm; minimum letter height: {Math.max(
+              4,
+              layout.p.nozzleDiameter * 10
+            ).toFixed(1)} mm. These conservative limits still need a test print.
+          </HelpTip>{/if}
+      </HelpRow>
+      {#if layout.p.labelsEnabled}
+        {@render numericFields(['nozzleDiameter', 'labelHeight'])}
+        <TextStyleControls
+          label="Label"
+          mode={layout.p.labelTextMode}
+          color={layout.p.labelTextColor}
+          onMode={(labelTextMode) => update({ labelTextMode })}
+          onColor={(labelTextColor) => update({ labelTextColor })}
+        />
+        {#if layout.p.sizingMode !== 'models'}
+          <FormControl label="Socket label" name="socket-labelText">
+            {#snippet input({ inputProps })}
+              <Input
+                {...inputProps}
+                value={layout.p.labelText}
+                maxlength={100}
+                onchange={(e) => update({ labelText: e.currentTarget.value })}
+              />
+            {/snippet}
           </FormControl>
-          {#if layout.p.labelsEnabled}
-            <FormControl label="Short label (blank follows model name)" name={`model-label-${model.id}`}>
-              {#snippet input({ inputProps })}<Input {...inputProps} value={model.label ?? ''}
-                placeholder={model.name} maxlength={100}
-                onchange={(e) => updateModel(index, { label: e.currentTarget.value })} />{/snippet}
-            </FormControl>
-          {/if}
-          <div class="socketFields">
-            {#each modelFields as field (field.key)}
-              {#if !(field.key === 'count' && layout.p.quantityMode === 'fill' && layout.p.fillModelId === model.id)}
-                <FormControl label={field.label} name={`model-${model.id}-${field.key}`}>
-                  {#snippet input({ inputProps })}
-                    {#if field.key === 'count'}
-                      <QuantityInput id={inputProps.id} label={`${model.name} count`} min={field.min} max={field.max} value={model.count} onChange={(count) => updateModel(index, { count })} />
-                    {:else}
-                    <Input {...inputProps} type="number" min={field.min} max={field.max}
-                      step={0.1} value={model[field.key]}
-                      onchange={(e) => {
-                        const value = Number.parseFloat(e.currentTarget.value);
-                        if (Number.isFinite(value)) updateModel(index, { [field.key]: value });
-                      }} />
-                    {/if}
-                  {/snippet}
-                  {#snippet end()}{field.key === 'count' ? '' : 'mm'}{/snippet}
-                </FormControl>
-              {/if}
-            {/each}
-          </div>
-          <button class="removeModel" onclick={() => update({ models: layout.p.models.filter((_, i) => i !== index) })}>Remove model</button>
-        </fieldset>
-      {/each}
-      <button disabled={layout.p.models.length >= 10} onclick={addModel}>+ Add miniature model</button>
-    {/if}
-  </section>
+        {/if}
+      {/if}
+    </section>
   </EditorSection>
 
-  <EditorSection title="Sockets and retention">
-  <section class="editorSection" aria-label="Sockets and retention">
-    <h3>Sockets &amp; retention</h3>
-    <p class="help">In free/grid mode, spacing is the gap between socket walls. By miniature models, it is extra clearance beyond each model's full width/depth. For arms, wings or weapons, measure the whole miniature, not just its base. X/Y can be unlinked. Large spacing still has to fit within the rack limits.</p>
-    <h4>Spacing</h4>
-    <InputCheckbox label="Use the same spacing in X and Y" checked={layout.p.linkedSpacing}
-      onchange={(e) => update({ linkedSpacing: e.currentTarget.checked })} />
-    {@render numericFields(['spacingX', 'spacingY'])}
-    <h4>Base clearance &amp; retaining tab</h4>
-    {@render numericFields(['diameterClearance', 'verticalClearance', 'tabOverlapPercent', 'tabThickness'])}
-    <p class="help">
-      Overlap: {layout.p.tabOverlapPercent.toFixed(1)}% of each base diameter.
-      {#if layout.p.sizingMode !== 'models'}For this base: {(layout.p.baseDiameter * layout.p.tabOverlapPercent / 100).toFixed(2)} mm.{/if}
-    </p>
-    <details>
-      <summary><span>Fit, handling &amp; preview</span><IconChevronDown size={16} aria-hidden="true" /></summary>
-      <p class="help">Tilt the base under the tab, then lower it into the socket without pressing. Print a two-base sample first. Retention is not a transport lock.</p>
-      <p class="help">Allow for off-centre arms and weapons. Preview miniatures shows approximate volumes, which are excluded from exports. Placement and filling may not find the densest layout.</p>
-    </details>
-  </section>
+  <EditorSection title="Content · miniatures">
+    <section class="editorSection" aria-label="Miniatures and layout">
+      <h3>Miniatures &amp; layout</h3>
+      <fieldset class="contentCard" aria-label="Distribution settings">
+        <legend>Distribution</legend>
+        <HelpRow>
+          <label class="modeLabel">
+            Layout mode
+            <span class="selectControl">
+              <select
+                value={layout.p.sizingMode}
+                onchange={(e) => {
+                  const sizingMode = e.currentTarget.value as MiniatureSocketRackParams['sizingMode'];
+                  update({
+                    sizingMode,
+                    requestedCount: layout.p.sizingMode === 'grid' ? layout.seats.length : layout.p.requestedCount,
+                    models:
+                      sizingMode === 'models' && layout.p.models.length === 0
+                        ? [
+                            {
+                              id: crypto.randomUUID(),
+                              name: 'Model 1',
+                              count: 1,
+                              baseDiameter: layout.p.baseDiameter,
+                              baseThickness: layout.p.baseThickness,
+                              width: layout.p.baseDiameter,
+                              depth: layout.p.baseDiameter,
+                              height: layout.p.miniatureHeight
+                            }
+                          ]
+                        : layout.p.models
+                  });
+                }}
+              >
+                <option value="free">Free rack</option>
+                <option value="models">By miniature models</option>
+                <option value="grid">Manual grid</option>
+              </select>
+              <IconChevronDown size={16} aria-hidden="true" />
+            </span>
+          </label>
+          {#if layout.p.sizingMode === 'models'}<HelpTip label="Help: Miniature measurements">
+              Measure the whole miniature including its base, arms and weapons. Volumes are centred on the base.
+              Automatic sizing compares individual 90° rotations to reduce the footprint; tabs and labels turn with each
+              socket.
+            </HelpTip>{/if}
+        </HelpRow>
+        {#if layout.p.sizingMode !== 'grid'}
+          <HelpRow>
+            <label class="modeLabel">
+              Quantity mode
+              <span class="selectControl">
+                <select
+                  value={layout.p.quantityMode}
+                  onchange={(e) =>
+                    update({ quantityMode: e.currentTarget.value as MiniatureSocketRackParams['quantityMode'] })}
+                >
+                  <option value="all">Fit all miniatures</option>
+                  <option value="partial">Place what fits</option>
+                  <option value="fill">Fill available space</option>
+                </select>
+                <IconChevronDown size={16} aria-hidden="true" />
+              </span>
+            </label>
+            <HelpTip label="Help: Quantity mode">
+              {#if layout.p.quantityMode === 'all'}All requested miniatures must fit.
+              {:else if layout.p.quantityMode === 'partial'}Create a rack with what fits and report the remaining
+                quantities.
+              {:else}Calculate the quantity from the available space.{/if}
+            </HelpTip>
+          </HelpRow>
+
+          {#if layout.p.quantityMode === 'fill' && layout.p.sizingMode === 'models'}
+            <HelpRow>
+              <label class="modeLabel">
+                Model to fill remaining space
+                <span class="selectControl">
+                  <select
+                    value={layout.p.fillModelId ?? ''}
+                    onchange={(e) => update({ fillModelId: e.currentTarget.value })}
+                  >
+                    {#each layout.p.models as model}<option value={model.id}>{model.name}</option>{/each}
+                  </select>
+                  <IconChevronDown size={16} aria-hidden="true" />
+                </span>
+              </label>
+              <HelpTip label="Help: Fill remaining space">
+                Place the quantities of the other models first, then fill the remaining space with this model.
+              </HelpTip>
+            </HelpRow>
+          {/if}
+        {/if}
+        <HelpRow>
+          <h4>Spacing</h4>
+          <HelpTip label="Help: Socket spacing">
+            In free/grid mode, spacing is the gap between socket walls. By miniature models, it is extra clearance
+            beyond each model's full width/depth. For arms, wings or weapons, measure the whole miniature, not just its
+            base. X/Y can be unlinked. Large spacing still has to fit within the rack limits.
+          </HelpTip>
+        </HelpRow>
+        <InputCheckbox
+          label="Use the same spacing in X and Y"
+          checked={layout.p.linkedSpacing}
+          onchange={(e) => update({ linkedSpacing: e.currentTarget.checked })}
+        />
+        {@render numericFields(['spacingX', 'spacingY'])}
+      </fieldset>
+      {#if layout.p.sizingMode !== 'models'}
+        <fieldset class="contentCard" aria-label="Miniature measurements">
+          <legend>Miniatures</legend>
+          {#if layout.p.sizingMode === 'grid' || layout.p.quantityMode !== 'fill'}
+            {@render numericFields(['requestedCount', 'rows', 'columns'])}
+          {/if}
+          {@render numericFields(['baseDiameter', 'baseThickness', 'miniatureHeight'])}
+          {#if layout.p.sizingMode === 'free'}
+            <HelpRow>
+              <p class="help">Capacity at these limits: {layout.capacity}.</p>
+              <HelpTip label="Help: Capacity">Rows and columns are calculated from the quantity.</HelpTip>
+            </HelpRow>
+          {/if}
+        </fieldset>
+      {/if}
+      {#if layout.p.sizingMode === 'models'}
+        {#each layout.p.models as model, index (model.id)}
+          {@const counts = layout.modelCounts.find((c) => c.id === model.id)}
+          <fieldset class="modelCard">
+            <legend>{model.name || `Model ${index + 1}`}</legend>
+            {#if counts}
+              <p class="modelCounts">
+                Placed: {counts.placed}{counts.requested === null
+                  ? ' · calculated fill quantity'
+                  : ` / ${counts.requested} · Remaining: ${counts.remaining}`}
+              </p>
+            {/if}
+            <FormControl label="Model name" name={`model-name-${model.id}`}>
+              {#snippet input({ inputProps })}<Input
+                  {...inputProps}
+                  value={model.name}
+                  onchange={(e) => updateModel(index, { name: e.currentTarget.value })}
+                />{/snippet}
+            </FormControl>
+            {#if layout.p.labelsEnabled}
+              <FormControl label="Short label (blank follows model name)" name={`model-label-${model.id}`}>
+                {#snippet input({ inputProps })}<Input
+                    {...inputProps}
+                    value={model.label ?? ''}
+                    placeholder={model.name}
+                    maxlength={100}
+                    onchange={(e) => updateModel(index, { label: e.currentTarget.value })}
+                  />{/snippet}
+              </FormControl>
+            {/if}
+            <div class="socketFields">
+              {#each modelFields as field (field.key)}
+                {#if !(field.key === 'count' && layout.p.quantityMode === 'fill' && layout.p.fillModelId === model.id)}
+                  {#snippet unit()}mm{/snippet}
+                  <FormControl
+                    label={field.label}
+                    name={`model-${model.id}-${field.key}`}
+                    end={field.key === 'count' ? undefined : unit}
+                  >
+                    {#snippet input({ inputProps })}
+                      {#if field.key === 'count'}
+                        <QuantityInput
+                          id={inputProps.id}
+                          label={`${model.name} count`}
+                          min={field.min}
+                          max={field.max}
+                          value={model.count}
+                          onChange={(count) => updateModel(index, { count })}
+                        />
+                      {:else}
+                        <Input
+                          {...inputProps}
+                          type="number"
+                          min={field.min}
+                          max={field.max}
+                          step={0.1}
+                          value={model[field.key]}
+                          onchange={(e) => {
+                            const value = Number.parseFloat(e.currentTarget.value);
+                            if (Number.isFinite(value)) updateModel(index, { [field.key]: value });
+                          }}
+                        />
+                      {/if}
+                    {/snippet}
+                  </FormControl>
+                {/if}
+              {/each}
+            </div>
+            <button
+              class="removeModel"
+              onclick={() => update({ models: layout.p.models.filter((_, i) => i !== index) })}
+            >
+              Remove model
+            </button>
+          </fieldset>
+        {/each}
+        <button disabled={layout.p.models.length >= 10} onclick={addModel}>+ Add miniature model</button>
+      {/if}
+    </section>
   </EditorSection>
 </div>
 
 <style>
-  .experimentalNotice { display: grid; gap: 0.4rem; padding: 0.75rem; border: 1px solid #d99522; border-radius: var(--radius-2); background: rgb(217 149 34 / 10%); font-size: 0.8125rem; line-height: 1.5; }
-  .socketEditor { display: grid; gap: 1rem; }
-  .rackSummary { display: grid; gap: 0.3rem; padding: 0.75rem; background: var(--inputBg); border: var(--borderThin); border-radius: var(--radius-2); }
-  .rackSummary span, .help, .modelCounts { color: var(--fgMuted); font-size: 0.8125rem; line-height: 1.5; }
-  .editorSection { display: grid; gap: 0.75rem; padding-top: 1rem; border-top: var(--borderThin); min-width: 0; }
-  h3 { font-size: 0.875rem; font-weight: 650; margin: 0; }
-  h4 { font-size: 0.75rem; font-weight: 600; color: var(--fgMuted); margin: 0.25rem 0 0; }
-  p { margin: 0; }
-  .socketFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-  .modeLabel { display: grid; gap: 0.4rem; font-size: 0.875rem; font-weight: 500; }
-  .selectControl { position: relative; display: block; min-width: 0; }
-  .selectControl :global(svg) { position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--fgMuted); }
-  select { appearance: none; width: 100%; min-height: 2.25rem; padding: 0.4rem 2rem 0.4rem 0.6rem; cursor: pointer; }
-  select, button { font: inherit; border: var(--borderThin); border-radius: var(--radius-2); background: var(--inputBg); color: inherit; max-width: 100%; }
-  select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-  button { padding: 0.5rem 0.75rem; cursor: pointer; }
-  button:hover { background: var(--bgHover, var(--inputBg)); }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .modelCard { display: grid; gap: 0.75rem; min-width: 0; border: var(--borderThin); border-radius: var(--radius-2); padding: 0.75rem; }
-  legend { font-size: 0.875rem; font-weight: 600; padding: 0 0.25rem; }
-  .removeModel { justify-self: start; font-size: 0.8125rem; color: var(--fgMuted); }
-  summary { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; cursor: pointer; font-size: 0.8125rem; list-style: none; }
-  details[open] > summary :global(svg) { transform: rotate(180deg); }
-  details .help { margin-top: 0.5rem; }
-  .error, .warning { padding: 0.75rem; border: 1px solid currentColor; border-radius: var(--radius-2); font-size: 0.875rem; }
-  .error { color: var(--fgDanger); }
+  .experimentalNotice {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.75rem;
+    border: 1px solid #d99522;
+    border-radius: var(--radius-2);
+    background: rgb(217 149 34 / 10%);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  .socketEditor {
+    display: grid;
+    gap: 1rem;
+  }
+  .rackSummary {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.75rem;
+    background: var(--inputBg);
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+  }
+  .rackSummary span,
+  .help,
+  .modelCounts {
+    color: var(--fgMuted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+  .editorSection {
+    display: grid;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: var(--borderThin);
+    min-width: 0;
+  }
+  h3 {
+    font-size: 0.875rem;
+    font-weight: 650;
+    margin: 0;
+  }
+  h4 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--fgMuted);
+    margin: 0.25rem 0 0;
+  }
+  p {
+    margin: 0;
+  }
+  .socketFields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .modeLabel {
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .selectControl {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+  .selectControl :global(svg) {
+    position: absolute;
+    right: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--fgMuted);
+  }
+  select {
+    appearance: none;
+    width: 100%;
+    min-height: 2.25rem;
+    padding: 0.4rem 2rem 0.4rem 0.6rem;
+    cursor: pointer;
+  }
+  select,
+  button {
+    font: inherit;
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    background: var(--inputBg);
+    color: inherit;
+    max-width: 100%;
+  }
+  select:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--fg);
+    outline-offset: 2px;
+  }
+  button {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+  }
+  button:hover {
+    background: var(--bgHover, var(--inputBg));
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .contentCard {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .modelCard {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+    border: var(--borderThin);
+    border-radius: var(--radius-2);
+    padding: 0.75rem;
+  }
+  legend {
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0 0.25rem;
+  }
+  .removeModel {
+    justify-self: start;
+    font-size: 0.8125rem;
+    color: var(--fgMuted);
+  }
+  .error,
+  .warning {
+    padding: 0.75rem;
+    border: 1px solid currentColor;
+    border-radius: var(--radius-2);
+    font-size: 0.875rem;
+  }
+  .error {
+    color: var(--fgDanger);
+  }
 </style>

@@ -39,6 +39,22 @@ import {
 } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 
+describe('empty box defaults', () => {
+  beforeEach(() => resetProjectToBlank());
+
+  it('starts empty boxes hollow and retains the fill default for boxes with trays', () => {
+    expect(addBox(undefined, 'empty').fillSolidEmpty).toBe(false);
+    expect(addBox(undefined, 'counter').fillSolidEmpty).toBe(true);
+  });
+
+  it('preserves an explicitly enabled solid fill when saving and importing', () => {
+    const box = addBox(undefined, 'empty');
+    box.fillSolidEmpty = true;
+    const restored = importProjectFromJson(exportProjectToJson(getProject()));
+    expect(restored.layers.flatMap(layer => layer.boxes).find(b => b.id === box.id)?.fillSolidEmpty).toBe(true);
+  });
+});
+
 describe('project dice sizes', () => {
   beforeEach(() => resetProject());
 

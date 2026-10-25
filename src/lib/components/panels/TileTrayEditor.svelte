@@ -37,120 +37,132 @@
 </script>
 
 <div class="panelFormSection">
-  <EditorSection title="Content and dimensions">
-  <section class="section">
-    <div class="sectionHeader">
-      <h3 class="sectionTitle">Tile Tray</h3>
-      <span class="dimensionsInfo">
-        {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
-      </span>
-    </div>
-    <Spacer size="0.5rem" />
-    <div class="formGrid">
-      <FormControl label="Tile shape" name="tileShapeId">
-        {#snippet input({ inputProps })}
-          <Select
-            {...inputProps}
-            selected={[tray.params.tileShapeId]}
-            options={tileShapes.map((shape) => ({ value: shape.id, label: shape.name }))}
-            onSelectedChange={(selected) => selected[0] && updateParam('tileShapeId', selected[0])}
-          />
-        {/snippet}
-      </FormControl>
+  <EditorSection title="Content">
+    <section class="section">
+      <div class="sectionHeader">
+        <h3 class="sectionTitle">Tile Tray</h3>
+        <span class="dimensionsInfo">
+          {dimensions.width.toFixed(1)} × {dimensions.depth.toFixed(1)} × {dimensions.height.toFixed(1)} mm
+        </span>
+      </div>
+      <Spacer size="0.5rem" />
+      <div class="formGrid">
+        <FormControl label="Tile shape" name="tileShapeId">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={[tray.params.tileShapeId]}
+              options={tileShapes.map((shape) => ({ value: shape.id, label: shape.name }))}
+              onSelectedChange={(selected) => selected[0] && updateParam('tileShapeId', selected[0])}
+            />
+          {/snippet}
+        </FormControl>
 
-      <FormControl label="Count" name="tileCount">
-        {#snippet input({ inputProps })}
-          <QuantityInput
-            id={inputProps.id}
-            label="Tile count"
-            value={tray.params.count}
-            onChange={(value) => updateParam('count', value)}
-          />
-        {/snippet}
-      </FormControl>
+        <FormControl label="Count" name="tileCount">
+          {#snippet input({ inputProps })}
+            <QuantityInput
+              id={inputProps.id}
+              label="Tile count"
+              value={tray.params.count}
+              onChange={(value) => updateParam('count', value)}
+            />
+          {/snippet}
+        </FormControl>
 
-      <FormControl label="Orientation" name="tileOrientation">
-        {#snippet input({ inputProps })}
-          <Select
-            {...inputProps}
-            selected={[tray.params.orientation]}
-            options={[
-              { value: 'vertical', label: 'Vertical' },
-              { value: 'horizontal', label: 'Horizontal' }
-            ]}
-            onSelectedChange={(selected) =>
-              selected[0] && updateParam('orientation', selected[0] as TileTrayParams['orientation'])}
-          />
-        {/snippet}
-      </FormControl>
+        <FormControl label="Orientation" name="tileOrientation">
+          {#snippet input({ inputProps })}
+            <Select
+              {...inputProps}
+              selected={[tray.params.orientation]}
+              options={[
+                { value: 'vertical', label: 'Vertical' },
+                { value: 'horizontal', label: 'Horizontal' }
+              ]}
+              onSelectedChange={(selected) =>
+                selected[0] && updateParam('orientation', selected[0] as TileTrayParams['orientation'])}
+            />
+          {/snippet}
+        </FormControl>
+      </div>
+      <Spacer size="0.75rem" />
+    </section>
+  </EditorSection>
+  <EditorSection title="Dimensions">
+    <section class="section">
+      {#if onUpdateTray}
+        <InputCheckbox
+          label="Auto-adjust height to layer"
+          checked={tray.autoHeight ?? false}
+          onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
+        />
+      {/if}
+    </section>
+  </EditorSection>
 
-      <FormControl label="Clearance" name="tileClearance">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            min="0"
-            value={tray.params.clearance}
-            onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-
-      <OuterCornerControls value={tray.params.outerCornerRadius} width={dimensions.width} depth={dimensions.depth}
-        margin={tray.params.wallThickness} onchange={(value) => updateParam('outerCornerRadius', value)} />
-      <FormControl label="Wall" name="tileWallThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            min="0.8"
-            value={tray.params.wallThickness}
-            onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-
-      <FormControl label="Floor" name="tileFloorThickness">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            min="0.8"
-            value={tray.params.floorThickness}
-            onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-
-      <FormControl label="Rim" name="tileRimHeight">
-        {#snippet input({ inputProps })}
-          <Input
-            {...inputProps}
-            type="number"
-            step="0.1"
-            min="0"
-            value={tray.params.rimHeight}
-            onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
-          />
-        {/snippet}
-        {#snippet end()}mm{/snippet}
-      </FormControl>
-    </div>
-    <Spacer size="0.75rem" />
-    {#if onUpdateTray}
-      <InputCheckbox
-        label="Auto-adjust height to layer"
-        checked={tray.autoHeight ?? false}
-        onchange={(e) => onUpdateTray({ autoHeight: e.currentTarget.checked })}
-      />
-    {/if}
-  </section>
+  <EditorSection title="Manufacturing">
+    <section class="section">
+      <div class="formGrid">
+        <FormControl label="Clearance" name="tileClearance">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              min="0"
+              value={tray.params.clearance}
+              onchange={(e) => updateParam('clearance', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Wall" name="tileWallThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              min="0.8"
+              value={tray.params.wallThickness}
+              onchange={(e) => updateParam('wallThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Floor" name="tileFloorThickness">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              min="0.8"
+              value={tray.params.floorThickness}
+              onchange={(e) => updateParam('floorThickness', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <FormControl label="Rim" name="tileRimHeight">
+          {#snippet input({ inputProps })}
+            <Input
+              {...inputProps}
+              type="number"
+              step="0.1"
+              min="0"
+              value={tray.params.rimHeight}
+              onchange={(e) => updateParam('rimHeight', parseFloat(e.currentTarget.value))}
+            />
+          {/snippet}
+          {#snippet end()}mm{/snippet}
+        </FormControl>
+        <OuterCornerControls
+          value={tray.params.outerCornerRadius}
+          width={dimensions.width}
+          depth={dimensions.depth}
+          margin={tray.params.wallThickness}
+          onchange={(value) => updateParam('outerCornerRadius', value)}
+        />
+      </div>
+    </section>
   </EditorSection>
 </div>
 

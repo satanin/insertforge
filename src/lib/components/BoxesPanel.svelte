@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpRow from '$lib/components/HelpRow.svelte';
+  import HelpTip from '$lib/components/HelpTip.svelte';
   import EditorSection from './EditorSection.svelte';
   import { Input, InputCheckbox, FormControl, Spacer, Hr, IconButton, Icon, Select, Text } from '@tableslayer/ui';
   import { IconX, IconPlus } from '@tabler/icons-svelte';
@@ -219,61 +221,16 @@
 
         <Hr class="boxDivider" />
 
-        <EditorSection title="Dimensions and lid">
+        <EditorSection title="Dimensions">
         <section class="boxSection">
           <div class="sectionHeader">
             <h4 class="sectionTitle">Options</h4>
           </div>
           <Spacer size="0.5rem" />
           <div class="formGrid">
-            <FormControl label="Tolerance" name="tolerance">
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={selectedBox.tolerance}
-                  onchange={(e) =>
-                    onUpdateBox({
-                      tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
-                    })}
-                />
-              {/snippet}
-              {#snippet end()}mm{/snippet}
-            </FormControl>
-            <FormControl label="Wall" name="wallThickness">
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  value={selectedBox.wallThickness}
-                  onchange={(e) =>
-                    onUpdateBox({
-                      wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-                    })}
-                />
-              {/snippet}
-              {#snippet end()}mm{/snippet}
-            </FormControl>
-            <FormControl label="Floor" name="floorThickness" class="formGrid__spanTwo">
-              {#snippet input({ inputProps })}
-                <Input
-                  {...inputProps}
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  value={selectedBox.floorThickness}
-                  onchange={(e) =>
-                    onUpdateBox({
-                      floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
-                    })}
-                />
-              {/snippet}
-              {#snippet end()}mm{/snippet}
-            </FormControl>
+
+
+
             <FormControl label="Width (min: {minimums.minWidth.toFixed(1)})" name="customWidth">
               {#snippet input({ inputProps })}
                 <Input
@@ -311,7 +268,6 @@
             <FormControl
               label="Total Height (min: {minTotalHeight.toFixed(1)})"
               name="customBoxHeight"
-              class="formGrid__spanTwo"
             >
               {#snippet input({ inputProps })}
                 <Input
@@ -340,13 +296,16 @@
           />
           <Spacer size="1rem" />
           <div class="buttonRow">
-            <button class="secondaryButton boxActionButton boxActionButton--danger" onclick={() => onAdaptToGap?.()}>
+            <HelpRow>
+<button class="secondaryButton boxActionButton boxActionButton--danger" onclick={() => onAdaptToGap?.()}>
               Adapt to gap
             </button>
-          </div>
-          <Text color="var(--fgMuted)" size="0.875rem">
+<HelpTip label="Help: Adapt to gap">
             {adaptToGapHelpText}
-          </Text>
+          </HelpTip>
+</HelpRow>
+          </div>
+
           <Spacer size="1rem" />
           <div class="sectionHeader">
             <h4 class="sectionTitle sectionTitle--featured">Box Size</h4>
@@ -366,7 +325,57 @@
           <div class="sectionHeader">
             <h4 class="sectionTitle">Print options</h4>
           </div>
-          <Spacer size="0.5rem" />
+          <div class="formGrid">
+<FormControl label="Tolerance" name="tolerance">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={selectedBox.tolerance}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      tolerance: parseFloat((e.target as HTMLInputElement).value) || 0.5
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+<FormControl label="Wall" name="wallThickness">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  value={selectedBox.wallThickness}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      wallThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+<FormControl label="Floor" name="floorThickness">
+              {#snippet input({ inputProps })}
+                <Input
+                  {...inputProps}
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  value={selectedBox.floorThickness}
+                  onchange={(e) =>
+                    onUpdateBox({
+                      floorThickness: parseFloat((e.target as HTMLInputElement).value) || 2.0
+                    })}
+                />
+              {/snippet}
+              {#snippet end()}mm{/snippet}
+            </FormControl>
+</div>
+<Spacer size="0.75rem" />
           <InputCheckbox
             checked={selectedBox.fillSolidEmpty ?? false}
             onchange={(e) => onUpdateBox({ fillSolidEmpty: (e.target as HTMLInputElement).checked })}
@@ -389,7 +398,11 @@
             label="Honeycomb for lid and box bottom"
           />
           <Spacer size="0.5rem" />
-          <span class={selectedBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
+          </section>
+        </EditorSection>
+<EditorSection title="Lid">
+<section class="boxSection">
+<span class={selectedBox.lidParams?.honeycombEnabled ? 'disabledOption' : ''}>
             <InputCheckbox
               checked={!selectedBox.lidParams?.honeycombEnabled && (selectedBox.lidParams?.showName ?? true)}
               disabled={selectedBox.lidParams?.honeycombEnabled ?? false}
@@ -427,8 +440,9 @@
               Lid text is disabled when honeycomb pattern is enabled
             </Text>
           {/if}
-        </section>
-        </EditorSection>
+
+</section>
+</EditorSection>
 
         {#if onDuplicateBox}
           <Hr class="boxDivider" />
