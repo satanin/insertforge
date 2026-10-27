@@ -304,7 +304,13 @@ export interface GlobalSettings {
   gameContainerHeight: number | null;
 }
 
+export type ProjectType = 'insert' | 'shelf-storage';
+
 export interface Project {
+  shelfModules?: import('$lib/models/shelfStorage').ShelfModule[];
+  selectedShelfModuleId?: string | null;
+  // Missing in older files: interpreted as an insert project.
+  projectType?: ProjectType;
   cardSleeveThicknesses?: CardSleeveThicknesses;
   diceSizes?: DiceSize[];
   inventory?: InventoryGroup[];

@@ -20,6 +20,7 @@
   import { IconChevronDown, IconChevronLeft, IconChevronRight, IconChevronUp } from '@tabler/icons-svelte';
   import NavigationMenu from '$lib/components/NavigationMenu.svelte';
   import EditorPanel from '$lib/components/EditorPanel.svelte';
+  import ShelfWorkspace from '$lib/components/ShelfWorkspace.svelte';
   import InventoryPanel from '$lib/components/InventoryPanel.svelte';
   import { inventoryUi } from '$lib/stores/inventoryUi.svelte';
   import { createCounterTray, getCounterPositions, type CounterStack } from '$lib/models/counterTray';
@@ -1376,6 +1377,7 @@
 
   async function regenerate(force = false) {
     if (!browser) return;
+    if (getProject().projectType === 'shelf-storage') return;
 
     if (shouldSkipWorkerGenerationForCurrentSelection()) {
       selectedTrayGeometry = null;
@@ -2701,6 +2703,22 @@
     generating = false;
   }
 
+  // New/open project replaces the root object; never retain the previous selection or cache.
+  let displayedProject: Project | undefined;
+  $effect(() => {
+    const current = getProject();
+    if (current === displayedProject) return;
+    displayedProject = current;
+    untrack(() => {
+      clearGeneratedGeometry();
+      selectionType = 'dimensions';
+      viewModeOverride = null;
+      if (getIsEditMode()) { cancelChanges(); exitEditMode(); }
+      if (layerLayoutEditorState.isEditMode) { cancelLayerChanges(); exitLayerEditMode(); }
+      if (current.projectType !== 'shelf-storage') scheduleRegenerate(true, 0);
+    });
+  });
+
   function handleResetProjectToBlank() {
     const confirmed = confirm(
       'Reset project and start from scratch?\n\nThis will permanently clear all layers, boxes, trays, boards, and reset the project name and game container dimensions.\n\nConsider exporting your current project JSON before resetting.'
@@ -3085,7 +3103,9 @@
 
 <InventoryPanel bind:open={inventoryUi.open} />
 
-{#if isMobile}
+{#if getProject().projectType === 'shelf-storage'}
+  <ShelfWorkspace {isMobile} />
+{:else if isMobile}
   <!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->
   <PaneGroup direction="vertical" class="paneGroup">
     <!-- Mobile Nav Pane (top) -->

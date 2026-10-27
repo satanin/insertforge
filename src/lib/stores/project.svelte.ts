@@ -1,5 +1,6 @@
 import { DEFAULT_CARD_SLEEVE_THICKNESSES, getProjectCardSizes, migrateProjectCards } from '$lib/utils/projectCards';
 import defaultProjectJson from '$lib/data/defaultProject.json';
+import { defaultShelfDrawerParams, resolveShelfDrawer, type ShelfDrawerParams, type ShelfDrawerModule, type ShelfFrameParams } from '$lib/models/shelfStorage';
 import { APP_VERSION } from '$lib/appInfo';
 import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardStorageParams, type CardStorageParams } from '$lib/models/cardStorageTray';
@@ -1152,6 +1153,7 @@ function offsetPlacement<T extends { x: number; y: number }>(placement: T, amoun
 
 function createDefaultProject(): Project {
   const project = JSON.parse(JSON.stringify(defaultProjectJson)) as Project;
+  project.projectType = 'insert';
   project.name = project.name?.trim() || DEFAULT_PROJECT_NAME;
   project.diceSizes ??= createDefaultDiceSizes();
   const existingCardSizeIds = new Set((project.cardSizes ?? []).map((size) => size.id));
@@ -1185,6 +1187,7 @@ function createBlankProject(): Project {
 
   return {
     schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+    projectType: 'insert',
     appVersion: APP_VERSION,
     name: DEFAULT_PROJECT_NAME,
     diceSizes: createDefaultDiceSizes(),
@@ -3586,6 +3589,83 @@ export function resetProject(): void {
 
 export function resetProjectToBlank(): void {
   project = createBlankProject();
+  autosave();
+}
+
+// A shelf project has no synthetic layers. Components will belong to modules.
+export function createNewProject(projectType: import('$lib/types/project').ProjectType = 'insert', name = ''): void {
+  const next = createBlankProject();
+  next.projectType = projectType;
+  next.name = name.trim() || (projectType === 'insert' ? DEFAULT_PROJECT_NAME : 'Shelf storage');
+  if (projectType === 'shelf-storage') {
+    next.shelfModules = [];
+    next.selectedShelfModuleId = null;
+    next.layers = [];
+    next.selectedLayerId = null;
+    next.globalSettings = undefined;
+  }
+  project = next;
+  saveNow(project);
+}
+
+export function addShelfModule(): ShelfDrawerModule | undefined {
+  if (project.projectType !== 'shelf-storage') return;
+  project.shelfModules ??= [];
+  const module: ShelfDrawerModule = { id: crypto.randomUUID(), type: 'card-drawer',
+    name: `Card drawer ${project.shelfModules.length + 1}`,
+    params: { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() } };
+  project.shelfModules.push(module);
+  project.selectedShelfModuleId = module.id;
+  autosave();
+  return module;
+}
+
+export function selectShelfModule(id: string): void {
+  if (!project.shelfModules?.some(m => m.id === id)) return;
+  project.selectedShelfModuleId = id;
+  autosave();
+}
+
+export function removeShelfModule(id: string): void {
+  if (project.projectType !== 'shelf-storage') return;
+  const index = project.shelfModules?.findIndex(m => m.id === id) ?? -1;
+  if (index < 0) return;
+  project.shelfModules!.splice(index, 1);
+  if (project.selectedShelfModuleId === id) {
+    project.selectedShelfModuleId = project.shelfModules![Math.min(index, project.shelfModules!.length - 1)]?.id ?? null;
+  }
+  autosave();
+}
+
+export function updateShelfModule(id: string, params: Partial<ShelfDrawerParams>, name?: string): void {
+  if (project.projectType !== 'shelf-storage') return;
+  const module = project.shelfModules?.find(m => m.id === id);
+  if (!module || module.type !== 'card-drawer') return;
+  module.params = { ...module.params, ...params };
+  if (name?.trim()) module.name = name.trim();
+  autosave();
+}
+
+export function addShelfFrame(): void {
+  if (project.projectType !== 'shelf-storage') return;
+  const source = project.shelfModules?.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
+    ?? project.shelfModules?.find(m => m.type === 'card-drawer');
+  if (!source || source.type !== 'card-drawer') return;
+  const r = resolveShelfDrawer(source.params, getProjectCardSizes(project));
+  if (!r.valid || !r.stacking) return;
+  const id = crypto.randomUUID();
+  project.shelfModules!.push({ id, type: 'open-frame', name: 'Open frame 2 × 2', params: {
+    columns: 2, rows: 2, pitchWidth: r.bodyWidth, pitchHeight: r.bodyHeight, depth: r.depth, wall: 8
+  } });
+  project.selectedShelfModuleId = id;
+  autosave();
+}
+
+export function updateShelfFrame(id: string, params: Partial<ShelfFrameParams>, name?: string): void {
+  const module = project.shelfModules?.find(m => m.id === id);
+  if (project.projectType !== 'shelf-storage' || module?.type !== 'open-frame') return;
+  module.params = { ...module.params, ...params };
+  if (name?.trim()) module.name = name.trim();
   autosave();
 }
 

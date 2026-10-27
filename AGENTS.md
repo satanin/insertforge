@@ -43,6 +43,16 @@
 
 ## Current product constraints
 
+- Estantería: asa desmontable como una U invertida continua alojada en asiento central, enrasada con la altura del cajón y dentro de sus laterales intactos; tirador compacto en L. Desmontaje hacia arriba y retirada antes de cambiar la carta identificativa. Labios interiores de captura del cajón con mínimo 2 mm de holgura nominal, sin invadir el contenido ni sustituir los apoyos inferiores. Conservar orientación de fabricación compartida con export.
+- La etiqueta frontal de estantería reserva una funda Premium independientemente de la funda del contenido: incluir envolvente y holgura de inserción, mostrar medidas efectivas y conservar material sólido suficiente a ambos lados de la ranura y bajo el apoyo de la U.
+- El montaje del asa no debe cortar la unión superior entre frontal y laterales del cajón: conservar el camino de carga continuo y adaptar la pieza desmontable alrededor de esas paredes, manteniendo continuo también su puente superior.
+- Estantería compacta: las caras con alojamientos hembra (suelo/izquierda) conservan el mínimo de respaldo del milano; techo/derecha/trasera usan el espesor solicitado. No recuperar espacio reduciendo huecos de cartas/fundas. Los cambios de paso X/Z invalidan compatibilidad de retícula con shells impresas/marcos anteriores aunque el perfil del milano se conserve; mantener snapshots de marcos sin redimensionarlos silenciosamente.
+- Sistema de estantería: todas las variantes de una unidad comparten envolvente/paso e interfaz de conexión, con o sin ventana/carta; contenido, asa y opciones interiores se adaptan a la unidad, no redimensionan su retícula. Módulos mayores ocupan múltiplos enteros del paso y alinean conectores por celda. Las medidas actuales siguen en pruebas: no declarar estándar congelado sin validación del usuario. Una vez fijado, cualquier cambio incompatible exige revisión explícita de interfaz y conservar la anterior para reproducir piezas existentes.
+
+- Estantería: priorizar ensamblajes completamente impresos; herrajes solo si no hay una solución impresa adecuada. Mirando desde la entrada, las conexiones de carcasa tienen macho arriba/derecha y hembra abajo/izquierda, dejando el lateral izquierdo sin salientes para una pared. Separar posición de uso y orientación de impresión por pieza; preview de fabricación y exports deben compartir las mismas transformaciones.
+
+- Al diseñar piezas imprimibles, revisar conjuntamente mecánica y fabricación antes de proponer geometría: caminos de carga, material residual alrededor de encajes, espesores imprimibles, orientación/capas, puentes, voladizos y soportes. No reducir paredes a restos de una sola línea por restar holguras. Mostrar refuerzos/espesores efectivos que cambien la envolvente; conservar el espacio útil. Sin perfil de impresora, declarar los márgenes de diseño y dejar pendiente laminado e impresión; un test geométrico no valida resistencia ni imprimibilidad.
+
 - Las explicaciones y tips se muestran bajo demanda mediante `HelpTip` (hover, foco, clic/táctil); evitar párrafos permanentes de ayuda. Colocar el botón junto al texto o título relacionado mediante `HelpRow`, aprovechando el ancho sin crear una fila exclusiva. En campos, situarlo junto a la etiqueta y conservar el ancho completo del input. Mantener visibles datos actuales, errores y advertencias de la configuración.
 
 - `New · Beta` es la opción predeterminada; Classic sigue disponible y se respeta su preferencia guardada. Ambas comparten estado de proyecto, geometría y visor. El modo es una preferencia del navegador, fuera del JSON del proyecto. Cambiar el aspecto no debe remontar el canvas, cambiar cámara ni reducir su tamaño/reparto inicial (75/25 en desktop). La adopción de otra librería UI queda aplazada por decisión del usuario.
@@ -63,6 +73,8 @@
 - Los exports 3MF de JSCAD deben pasar por `group3mf`, incluso sin grupos: comparte vertices exactamente coincidentes por malla para evitar trazos perdidos en Bambu Studio. Mantener un cuerpo de texto por pieza; no sustituir la prueba real de laminado por un chequeo manifold.
 
 ## Branch notes
+
+- El desarrollo de estantería vive aislado en `codex/shelf-storage`. `Project.projectType` distingue `insert` (predeterminado/archivos antiguos) y `shelf-storage`. Se elige al crear, no convierte el proyecto abierto. Los módulos de estantería no pertenecen a `Layer`; separar conjunto ensamblado y piezas de fabricación. Ver `docs/plans/shelf-storage.md`.
 
 - `codex/insertforge` es la rama estable actual.
 - El prototipo de `Game Mat Tube` vive separado en `codex/game-mat-tube`.

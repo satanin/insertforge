@@ -613,6 +613,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
     return {
       schemaVersion: CURRENT_PROJECT_SCHEMA_VERSION,
+      projectType: 'insert',
       appVersion: APP_VERSION,
       name: projectName,
       layers: [layer],
@@ -660,6 +661,7 @@ export function migrateProjectData(project: Project | LegacyProject): Project {
 
   return migrateProjectCards({
     ...project,
+    projectType: project.projectType === 'shelf-storage' ? 'shelf-storage' : 'insert',
     version: undefined,
     inventory: project.inventory ?? [],
     diceSizes: project.diceSizes ?? createDefaultDiceSizes(),

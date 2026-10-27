@@ -10,6 +10,7 @@
   import { APP_LINKS, APP_NAME, APP_VERSION } from '$lib/appInfo';
   import { ModeWatcher, toggleMode, mode } from 'mode-watcher';
   import { setContext } from 'svelte';
+  import ProjectMenu from '$lib/components/ProjectMenu.svelte';
 
   let { children } = $props();
   onMount(loadInterfacePreference);
@@ -50,6 +51,7 @@
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <ProjectMenu />
       <label class="interfacePicker">
         <span>Interface</span>
         <select aria-label="Interface" value={interfaceUi.mode} onchange={(e) => setInterfaceMode(e.currentTarget.value as InterfaceMode)}>
