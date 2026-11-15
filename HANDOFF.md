@@ -1,5 +1,7 @@
 # InsertForge Handoff
 
+- Proyecto de referencia InsertForge Kallax 4×3 Vertical v1 en `static/projects/kallax-4x3-vertical-v1.json` y en el catálogo de proyectos. Incluye ambos cajones de 380 mm y Open Frame 2×2 con paso compartido. El ensayo y repuesto de 390 mm pertenecen al historial de prototipos. Pendiente confirmación física de cierre para el milano.
+
 - Profundidad inicial de nuevas shells: 380 mm. El módulo de 390 mm conserva su configuración para exportar un tramo trasero de sustitución 10 mm más corto. El frontal ya impreso conserva su plano de junta. Pendiente comprobar la sustitución impresa.
 
 - 2026-11-15 ensayo de tabique fijo con milano vertical para cajón partido. Selector Divider dovetail y dos probetas 3MF en configuración de impresión. C+F sigue disponible y la shell usa llaves con asiento. Ensayo de holgura: hembras de shell y marco +0,1 mm por flanco, igual profundidad y paso. Compatibilidad con shells anteriores obligatoria salvo decisión explícita. Pendientes laminado, ajuste con dos vecinas y prueba de flexión del tabique.

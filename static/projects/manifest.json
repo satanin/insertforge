@@ -1,6 +1,12 @@
 {
   "projects": [
     {
+      "id": "kallax-4x3-vertical-v1",
+      "name": "InsertForge Kallax 4×3 Vertical v1",
+      "file": "kallax-4x3-vertical-v1.json",
+      "tags": ["shelf storage", "380 mm"]
+    },
+    {
       "id": "omaha",
       "name": "D-Day: Omaha Beach",
       "author": "Dave Snider",

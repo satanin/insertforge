@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { addShelfModule, addShelfFrame, updateShelfFrame, syncShelfFrames, selectShelfModule, removeShelfModule, updateShelfModule, createNewProject, getProject, importProject, initProject, resetProject } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
+import { getProjectCardSizes } from '$lib/utils/projectCards';
+import { createShelfManufacturing } from '$lib/models/shelfManufacturing';
+import referenceProject from '../../../static/projects/kallax-4x3-vertical-v1.json?raw';
 
 describe('project types', () => {
+  it('loads both printable 380 mm reference drawers on the same pitch as the open frame', () => {
+    importProject(importProjectFromJson(referenceProject));
+    const project = getProject();
+    const cards = getProjectCardSizes(project);
+    const modules = project.shelfModules ?? [];
+    const frame = modules.find(module => module.type === 'open-frame')!;
+    const drawers = modules.filter(module => module.type === 'card-drawer');
+    expect(drawers.map(drawer => drawer.params.manufacturing?.jointStyle)).toEqual(['lap-keys', 'divider-dovetail']);
+    for (const drawer of drawers) {
+      const model = createShelfManufacturing(drawer.params, cards);
+      expect(model.resolved.depth).toBe(380);
+      expect(model.resolved.bodyWidth).toBeCloseTo(frame.params.pitchWidth);
+      expect(model.resolved.bodyHeight).toBeCloseTo(frame.params.pitchHeight);
+      expect(model.items.filter(item => item.part !== 'sample').every(item => item.fits)).toBe(true);
+    }
+  });
   it('persists printer volume and split settings without resizing frame snapshots', () => {
     createNewProject('shelf-storage');
     const drawer = addShelfModule()!;

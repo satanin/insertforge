@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 3,
+  "appVersion": "1.2.35",
+  "name": "InsertForge Kallax 4×3 Vertical v1",
+  "projectType": "shelf-storage",
+  "layers": [],
+  "counterShapes": [],
+  "cardSizes": [
+    {
+      "id": "standard",
+      "name": "Standard",
+      "width": 66,
+      "length": 91,
+      "thickness": 0.3
+    }
+  ],
+  "defaultCardSizeId": "standard",
+  "cardSleeveThicknesses": {
+    "none": 0.3,
+    "normal": 0.5,
+    "premium": 0.8
+  },
+  "selectedLayerId": null,
+  "selectedBoxId": null,
+  "selectedTrayId": null,
+  "selectedShelfModuleId": "drawer-lap-keys",
+  "shelfModules": [
+    {
+      "id": "drawer-lap-keys",
+      "type": "card-drawer",
+      "name": "Drawer · Lap and keys · 380 mm",
+      "params": {
+        "cardSizeId": "standard",
+        "sleeve": "premium",
+        "orientation": "vertical",
+        "depth": 380,
+        "shellThickness": 3.6,
+        "roofThickness": 3.6,
+        "socketWebThickness": 1,
+        "drawerWall": 2,
+        "drawerFloor": 2,
+        "bottomTracks": false,
+        "slidingClearance": 0.5,
+        "cardClearance": 1,
+        "headroom": 1,
+        "stackingEnabled": true,
+        "labelWindow": true,
+        "labelWidth": 63,
+        "labelHeight": 88,
+        "handleClearance": 0.12,
+        "handleRetention": true,
+        "handleColor": "#eb003b",
+        "manufacturing": {
+          "split": true,
+          "bedWidth": 250,
+          "bedDepth": 250,
+          "buildHeight": 250,
+          "margin": 5,
+          "jointClearance": 0.15,
+          "jointStyle": "lap-keys",
+          "floorKeys": true
+        }
+      }
+    },
+    {
+      "id": "drawer-dovetail",
+      "type": "card-drawer",
+      "name": "Drawer · Dovetail · 380 mm",
+      "params": {
+        "cardSizeId": "standard",
+        "sleeve": "premium",
+        "orientation": "vertical",
+        "depth": 380,
+        "shellThickness": 3.6,
+        "roofThickness": 3.6,
+        "socketWebThickness": 1,
+        "drawerWall": 2,
+        "drawerFloor": 2,
+        "bottomTracks": false,
+        "slidingClearance": 0.5,
+        "cardClearance": 1,
+        "headroom": 1,
+        "stackingEnabled": true,
+        "labelWindow": true,
+        "labelWidth": 63,
+        "labelHeight": 88,
+        "handleClearance": 0.12,
+        "handleRetention": true,
+        "handleColor": "#2966a0",
+        "manufacturing": {
+          "split": true,
+          "bedWidth": 250,
+          "bedDepth": 250,
+          "buildHeight": 250,
+          "margin": 5,
+          "jointClearance": 0.15,
+          "jointStyle": "divider-dovetail"
+        }
+      }
+    },
+    {
+      "id": "open-frame",
+      "type": "open-frame",
+      "name": "Open Frame 2 × 2 · 380 mm",
+      "params": {
+        "columns": 2,
+        "rows": 2,
+        "pitchWidth": 80.2,
+        "pitchHeight": 109.55,
+        "depth": 380,
+        "wall": 8
+      }
+    }
+  ]
+}
