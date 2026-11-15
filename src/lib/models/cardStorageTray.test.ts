@@ -19,6 +19,38 @@ const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
 });
 
 describe('Card Storage', () => {
+  it.each([false, true])('opens both ends while retaining the floor and side rails with lid=%s', (lid) => {
+    const p = params({ lid, lidText: '', maxHeight: 60 });
+    const r = resolveCardStorage(p, cards);
+    const [body, ...parts] = createCardStorageParts(p, cards);
+    const [closedBody, ...closedParts] = createCardStorageParts({ ...p, cardAccessCutouts: false }, cards);
+    const { measureVolume } = jscad.measurements;
+    const probe = (geometry: typeof body.geometry, center: [number, number, number]) =>
+      measureVolume(jscad.booleans.intersect(geometry, jscad.primitives.cuboid({ size: [0.2, 0.2, 0.2], center })));
+
+    for (const y of [p.wallThickness / 4, r.depth - p.wallThickness / 4]) {
+      const grip: [number, number, number] = [r.width / 2, y, r.wallHeight / 2];
+      expect(probe(closedBody.geometry, grip)).toBeGreaterThan(0);
+      expect(probe(body.geometry, grip)).toBeCloseTo(0);
+    }
+    expect(probe(body.geometry, [r.width / 2, r.depth / 2, p.floorThickness / 2])).toBeGreaterThan(0);
+    expect(probe(body.geometry, [p.wallThickness / 4, r.depth / 2, r.wallHeight / 2])).toBeGreaterThan(0);
+    expect(parts).toEqual(closedParts);
+  });
+  it.each([false, true])('can omit the tilted rear support with lid=%s', (lid) => {
+    const legacy = params({ lid, lidText: '', maxHeight: 60, addTiltSupport: undefined });
+    const disabled = { ...legacy, addTiltSupport: false };
+    const layout = resolveCardStorage(legacy, cards);
+    expect(layout.angle).toBeGreaterThan(0);
+    expect(resolveCardStorage(disabled, cards)).toEqual(layout);
+
+    const [supportedBody, ...supportedParts] = createCardStorageParts(legacy, cards);
+    const [unsupportedBody, ...unsupportedParts] = createCardStorageParts(disabled, cards);
+    const { measureBoundingBox, measureVolume } = jscad.measurements;
+    expect(measureVolume(unsupportedBody.geometry)).toBeLessThan(measureVolume(supportedBody.geometry));
+    expect(measureBoundingBox(unsupportedBody.geometry)).toEqual(measureBoundingBox(supportedBody.geometry));
+    expect(unsupportedParts).toEqual(supportedParts);
+  });
   it.each([false, true])('rounds the body and lid=%s without changing capacity, guides or dividers', (lid) => {
     const p = params({ lid, lidText: '', maxHeight: 60 });
     expect(defaultCardStorageParams.outerCornerRadius).toBe(3);

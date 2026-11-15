@@ -14,7 +14,7 @@
     type CardStorageParams,
     type StorageDivider
   } from '$lib/models/cardStorageTray';
-  import { ColorPicker, ColorPickerSwatch, FormControl, Input, Popover } from '@tableslayer/ui';
+  import { ColorPicker, ColorPickerSwatch, FormControl, Input, InputCheckbox, Popover } from '@tableslayer/ui';
   import OuterCornerControls from './OuterCornerControls.svelte';
   let { tray }: { tray: CardStorageTray } = $props();
   let result = $derived(resolveCardStorage(tray.params, getCardSizes()));
@@ -154,6 +154,26 @@
   </EditorSection>
 
   <EditorSection title="Manufacturing" open={false}>
+    <HelpRow>
+      <InputCheckbox
+        label="Front and rear card openings"
+        checked={tray.params.cardAccessCutouts !== false}
+        onchange={(e) => update('cardAccessCutouts', e.currentTarget.checked)}
+      />
+      <HelpTip label="Help: Front and rear card openings">
+        Open the centre of both end walls so you can grip the cards from either end.
+      </HelpTip>
+    </HelpRow>
+    <HelpRow>
+      <InputCheckbox
+        label="Add tilted card support"
+        checked={tray.params.addTiltSupport !== false}
+        onchange={(e) => update('addTiltSupport', e.currentTarget.checked)}
+      />
+      <HelpTip label="Help: Tilted card support">
+        Adds a rear support when the maximum height requires the cards to tilt. Turning it off keeps the calculated tilt and tray dimensions.
+      </HelpTip>
+    </HelpRow>
     <div class="formGrid">
       <OuterCornerControls
         value={tray.params.outerCornerRadius}

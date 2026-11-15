@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.34`
+- Version visible actual: `1.2.35`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.35 (2026-11-16): usuario acepta las aberturas frontal y trasera redondeadas y autoriza el commit del bloque Card Storage. Aberturas y apoyo inclinado configurables en Manufacturing. 29 pruebas y check correctos. Validación impresa pendiente.
 
 - v1.2.34 (2026-10-25): usuario autoriza commit del bloque de consistencia de interfaz: categorías comunes, ayuda contextual, anchos/etiquetas/cantidades, scroll del editor y Empty Box hueca por defecto. Check/build, trece pruebas de interfaz y dos de defaults/persistencia verificados. Sin cambios de cálculos geométricos. Push no solicitado. Propuestas adicionales siguen pendientes en la [revisión y matriz de criterios](docs/plans/interface-review.md).
 

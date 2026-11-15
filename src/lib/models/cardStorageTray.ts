@@ -72,6 +72,8 @@ export interface CardStorageParams extends CardSleeveSelection {
   count: number;
   exteriorLength: number;
   maxHeight: number | null;
+  addTiltSupport?: boolean;
+  cardAccessCutouts?: boolean;
   wallThickness: number;
   floorThickness: number;
   clearance: number;
@@ -93,6 +95,7 @@ export const defaultCardStorageParams: CardStorageParams = {
   count: 100,
   exteriorLength: 150,
   maxHeight: null,
+  addTiltSupport: true,
   wallThickness: 3,
   floorThickness: 3,
   clearance: 1,
@@ -261,7 +264,7 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
   let body = p.lid
     ? createBoxWithLidGrooves(box, [], [], undefined, fit)!
     : subtract(block(0, 0, 0, W, D, H), block(w, w, f, W - 2 * w, D - 2 * w, H));
-  if (r.angle > 0) {
+  if (r.angle > 0 && p.addTiltSupport !== false) {
     const supportHeight = r.cardHeight * Math.cos(r.angle);
     const lean = supportHeight * Math.tan(r.angle);
     const wedge = extrudeLinear(
@@ -277,6 +280,50 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
     // Local polygon (height, depth), extrusion along X after rotation.
     const support = translate([W - w, D - w - c - lean, f], rotateY(-Math.PI / 2, wedge));
     body = union(body, support);
+  }
+  if (p.cardAccessCutouts !== false) {
+    const cardHeight = r.cardHeight * Math.cos(r.angle);
+    const sill = f + Math.min(cardHeight * 0.25, Math.max(3, w));
+    const halfWidth = r.cardWidth * 0.35;
+    const lowerHalfWidth = halfWidth * 0.8;
+    const shoulder = sill + halfWidth - lowerHalfWidth;
+    const top = Math.max(H, shoulder) + 1;
+    const profile: [number, number][] = [
+      [W / 2 - lowerHalfWidth, sill],
+      [W / 2 + lowerHalfWidth, sill],
+      [W / 2 + halfWidth, shoulder],
+      [W / 2 + halfWidth, top],
+      [W / 2 - halfWidth, top],
+      [W / 2 - halfWidth, shoulder]
+    ];
+    const roundedProfile = profile.flatMap((corner, index) => {
+      if (corner[1] === top) return [corner];
+      const previous = profile[(index + profile.length - 1) % profile.length];
+      const next = profile[(index + 1) % profile.length];
+      const inset = (neighbor: [number, number]): [number, number] => {
+        const dx = neighbor[0] - corner[0];
+        const dz = neighbor[1] - corner[1];
+        const fraction = Math.min(0.45, 3 / Math.hypot(dx, dz));
+        return [corner[0] + dx * fraction, corner[1] + dz * fraction];
+      };
+      const start = inset(previous);
+      const end = inset(next);
+      return Array.from({ length: 9 }, (_, step): [number, number] => {
+        const t = step / 8;
+        const u = 1 - t;
+        return [
+          u * u * start[0] + 2 * u * t * corner[0] + t * t * end[0],
+          u * u * start[1] + 2 * u * t * corner[1] + t * t * end[1]
+        ];
+      });
+    });
+    // A single slot opens both end walls and continues through the centre
+    // of the tilted support. The side rails and the floor stay continuous.
+    const opening = extrudeLinear(
+      { height: D + 2 },
+      polygon({ points: roundedProfile })
+    );
+    body = subtract(body, translate([0, D + 1, 0], rotateX(Math.PI / 2, opening)));
   }
   // Trim after adding the tilted rear support, keeping a single exterior
   // contour. Skip the Boolean for old projects and explicit square corners.
