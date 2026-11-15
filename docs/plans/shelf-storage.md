@@ -1,6 +1,48 @@
 # Proyectos de almacenamiento para estantería
 
+Validación física 2026-10-31 con cajón lleno de cartas enfundadas: el usuario confirma que el peso se nota pero no impide meter y sacar el cajón sin problemas. Quedan validados en este ensayo el espacio para cartas enfundadas y el deslizamiento con carga. Se suma al montaje revisado del cajón y encaje/robustez de shell con llaves ya confirmados. Las notas históricas que los marcan pendientes quedan superadas por esta prueba; durabilidad con uso continuado y carga máxima no evaluadas, interfaz aún no congelada.
+
+Validación física 2026-10-31 del cajón revisado: el usuario confirma que insertar las llaves del suelo desde el interior mejora mucho la facilidad de ensamblaje y el resultado queda bien. Impresión y montaje de esta revisión validados; pendientes carga, deslizamiento con peso y espacio libre real con cartas enfundadas.
+
+Pendientes confirmados por el usuario2026-10-31 para el cajón completo: carga, deslizamiento y espacio libre real con cartas enfundadas dentro; comprobar también la revisión de asientos interiores del suelo. Mantener estas comprobaciones separadas de la robustez y encaje de la shell ya validados.
+
+Validación física 2026-10-31: el usuario confirma que la shell dividida impresa con llaves encaja de maravilla y queda robusta; ensamblaje de shell validado en encaje y robustez para la prueba realizada. No se ha indicado en esta prueba si usó adhesivo. La validación no se extiende al cajón, sus nuevos asientos de suelo desde el interior ni a carga y deslizamiento del conjunto, aún pendientes.
+
 Estado: iniciado el 2026-10-26. Selector y primer módulo implementados localmente; pendiente validación del usuario y física.
+
+## División en profundidad para impresión — ensayo 2026-10-29
+
+### Llaves inferiores en suelo de 2 mm
+
+`manufacturing.floorKeys` explícito, por defecto false. Con C+F y suelo≥2 se añaden dos llaves del suelo por junta, a1/4 y3/4 del ancho; mantienen las4 laterales. Revisión2026-10-31 tras prueba física: inserción desde el interior hacia abajo, cabeza a0,1 mm bajo superficie interior y asiento a0,9 desde esa cara; el hombro ocupa1,1 mm de espesor en suelo2. Evita el techo suspendido del asiento anterior al imprimir el tramo delantero suelo abajo. Reexportar ambos tramos: no mezclar alojamientos de ambas revisiones; la llave suelta conserva su geometría. El asiento NO atraviesa la media lengüeta: reservar franjas completas hasta1,5 mm más allá del bolsillo y distribuir el solape en el resto del ancho. Sin aumentar envolvente ni reducir hueco útil. La retención normal sigue por fricción/adhesivo; el tope no es un pestillo bilateral. Laminado y prueba física pendientes.
+
+Muestras de esquina ampliadas30→42 mm para un asiento inferior y solape a sus lados, con las mismas funciones de generación que el cajón. Kit4 cuerpos: dos mitades, una llave lateral y una de suelo (dos copias idénticas si ambos espesores2). Archivo lleva `floor-keys-4-parts` para no confundir con el kit anterior. Vista ensamblada muestra llave inferior separándose hacia abajo. Los asientos inferiores introducen hombros/puentes cortos: inspección de laminado pendiente, sin prometer impresión sin soportes en cualquier perfil. Falta probar flexión, adhesivo, retención y deslizamiento a escala completa.
+
+### Suelo de 2 mm autorizado tras ensayo pegado
+
+Usuario confirma que la muestra C+F pegada no se separa al tirar fuerte de ambos lados. Esto valida esa muestra con adhesivo frente al tirón manual, no la retención sin pegamento ni flexión/carga del cajón. Shells de3,6 impresas caben con6 mm libres sobre milano superior en su hueco. Autoriza aumentar suelo1,7→2 y altura de shell+0,3, manteniendo caras útiles y holguras. Paso80,2×109,55, shell exterior82,6×111,95; 4×3=323,2×331,05. En referencia335 sobran3,95 mm verticales totales; margen visor1,5 por cara conserva12 (margen2 exigiría335,05). Muestras C+F regeneradas con labios0,95 y hueco0,1; llaves/asientos sin cambios de perfil. Marco2×2 nuevo cuerpo160,4×219,1/envolvente162,8×221,5. Cambia compatibilidad vertical con retícula anterior; sincronización explícita, no migración silenciosa ni estándar congelado.
+
+### C+F y muestras pequeñas — siguiente ensayo
+
+- Selección explícita `jointStyle: 'lap-keys'`; fallback `keys` reproduce la primera prueba F. No cambia envolvente ni retícula. Shell mantiene juntas a tope con llaves ahora con asiento; el cajón combina llaves laterales con un solape central del fondo.
+- Fondo1,7: solape12 mm (11,85 mm efectivos entre holguras de hombros), dos lengüetas0,8 y hueco vertical0,1. Bandas de ancho `drawerWall+1` bajo laterales conservan suelo completo; no hay paredes suspendidas sobre la media lengüeta. Delantero con lengua inferior impreso suelo abajo, trasero con lengua superior impreso extremo trasero abajo. No es un encaje cautivo frente a ambas direcciones de flexión.
+- Llaves C+F: cabeza0,8 mm, cara exterior retranqueada0,1 y asiento a0,9 mm. Vástago de perfil menor, hombro alrededor≥1,2 nominal, pared lateral2 conserva1,1 mm de profundidad en el asiento. Cabeza detiene inserción, no impide extracción; cuatro puntas de interferencia en el vástago aportan retención por fricción. Nuevo perfil manual con caras conectadas, sin uniones CSG en el escalón de la llave. No intercambiables con llaves F originales.
+- Muestra combinada: dos esquinas30 mm de ancho/alto y longitud máxima29,925, más una llave de pared2. Orientaciones coinciden con tramos completos. Botón `C+F corner test set · 3MF` prepara una placa con3 cuerpos independientes; cada muestra y llave sigue exportable individualmente. Vista ensamblada/explosionada de la muestra; otras muestras aíslan el fondo o el asiento de pared.
+- Ensayo dimensionado con referencia de boquilla0,4/capa0,2: labios0,8 equivalen a4 capas nominales, sin perfil de impresora confirmado. Comprobar laminado real. Muestras prueban asiento, montaje, fricción y solape local; no sustituyen carga/deslizamiento del cajón completo.
+- Calcula cama útil para delantero y altura útil para trasero, contando la lengua que sobresale6 mm de cada plano de junta; ajusta corte para respetar ambas. Primer ensayo C+F limitado a2 tramos de cajón; más tramos necesitan resolver orientación de fabricación antes de habilitarse. Muestras disponibles también cuando la profundidad elegida cabe de una pieza.
+- Export de fabricación: preparar aristas compartidas antes de triangular para evitar T-junctions en los asientos escalonados, con unión de vértices a0,0000001 mm. Sólo para export, nunca reutilizar esa malla en booleanas. 3MF pasa además por `group3mf`. Pendiente impresión/laminado/validación usuario; sin commit/push.
+
+### Intercambio de carriles inferiores por suelo más grueso
+
+Usuario autoriza conservar exactamente la envolvente actual de shell. `bottomTracks: false` elimina sólo los dos apoyos inferiores de0,5 mm; el suelo del cajón pasa1,2→1,7 y su origen baja0,5. El piso útil, altura ensamblada del frontal/asa, caras de labios superiores y holgura2 mm conservan posición. Laterales2 mm, pasos80,2×109,25 y marcos intactos. Configuraciones antiguas conservan carriles por fallback; acción explícita intercambia la misma altura, preset actual3,6 incluye nuevo suelo. Exportar pareja shell/cajón; no mezclar el cajón más grueso con shell antigua de carriles. Pendientes planitud/deslizamiento y carga; este cambio no incorpora aún solape C ni tope de profundidad en las llaves F.
+
+- El usuario adelanta esta fase para evitar ensayos largos antes de descubrir cambios necesarios en la sección. No cambiar la retícula ni los huecos útiles. Shell en curso de impresión con techo3,6; no se altera esa pieza sin activar explícitamente la división.
+- `manufacturing` opcional por cajón: cama X/Y, altura útil Z, margen por borde, división automática y holgura de llaves. Defaults250×250×250, margen5 y holgura0,15 por borde. Los archivos antiguos siguen como piezas enteras. La altura se comprueba porque las shells se fabrican sobre el extremo trasero. Se permite giro90° en cama, sin giro arbitrario ni división X/Z.
+- Juntas a tope con separación0,15 dentro de la longitud original. Llaves impresas de doble milano atravesando sólo las paredes, con ambas caras0,1 mm retranqueadas. Shell: ocho por junta, dos en cada pared, lejos de milanos exteriores/carriles/labios. Cajón: cuatro por junta en los laterales, sin cortar el fondo1,2. Cuello6 y cabezas14 mm, longitud32; llaves de espesor pared−0,2. Cuatro resaltes sacrificables generan interferencia local0,08 más allá de la holgura nominal. El doble milano resiste separación longitudinal, pero la retención normal es por fricción, sin pestillo positivo; pendiente prueba real.
+- Restricciones explícitas de sección/espesores evitan taladrar encajes o dejar restos de una línea: shell cuerpo mínimo76×96, piel/techo≥2,4; cajón laterales≥2 y altura útil lateral≥38. No se engrosa ni redimensiona silenciosamente para hacer caber las llaves.
+- Tramos equilibrados de shell según altura Z y de cajón según cama útil. Junta del cajón desplazada hasta25 mm respecto al reparto equilibrado cuando cabe, fuera de la transición frontal/asa. Ejemplo390 mm/250³: shell2×194,925; cajón167,625+217,625 con hueco0,15; mismo ancho82,6/alto111,65 y paso80,2×109,25. Cajón/shell tienen juntas desfasadas.
+- Vista de juntas con piezas separadas y llaves coloreadas; vista de fabricación individual con contorno de cama/margen. Export por tramo y tipo de llave, cantidad indicada y en nombre, una copia por archivo; 3MF siempre `group3mf`. Bloquear export entero de shell/cajón cuando la división está activada. Muestras A/B de pared con la misma orientación + llave permiten ensayo barato antes de piezas largas.
+- Riesgos pendientes: extracción/inserción de llaves, retención por fricción tras ciclos, resistencia entre capas, flexión del fondo del cajón en la junta, alineación de carriles y milanos longitudinales entre tramos. No hay unión de flexión específica en el fondo. Sin ensayo de carga ni laminado real: no declarar validado. Marcos abiertos no se dividen en esta iteración; snapshots permanecen intactos.
 
 ## Rediseño modular con orientación de impresión — vigente
 
@@ -167,6 +209,22 @@ Cada iteración técnica incluye pruebas focalizadas y `pnpm run check`. Validac
 - Mantener exportaciones 3MF mediante `group3mf` y seguir las restricciones del texto de Card Storage.
 - Las pruebas geométricas no sustituyen laminado, impresión ni ensayo de carga/apilado.
 # Revisión 2026-10-26: retención desde la shell
+
+## Actualización explícita de Open Frames (2026-10-28)
+
+Usuario pide actualizar marcos a medidas actuales. Los nuevos ya toman snapshot del cajón seleccionado; para existentes se añade `Update all frames` al seleccionar un cajón y selector `Reference drawer` + `Update from reference drawer` al editar marco. Copian sólo pasoX/Z y profundidad, preservan identidad, filas/columnas, grosor y selección. Rechazan origen inválido o sin conexiones. Cambios posteriores siguen sin alterar snapshots automáticamente. Interfaz actual de ensayo: paso80,2×108,85; marco2×2 cuerpo160,4×217,7, envolvente162,8×220,1, profundidad del cajón origen. Tests comprueban compatibilidad con todas las celdas del perímetro de las shells3,6/3,2 y persistencia de sincronización individual/global.
+
+## Ensayo 3,6 / 3,2 mm y retención del asa (2026-10-28)
+
+Usuario autoriza paredes de suelo/laterales/trasera3,6 mm, techo3,2 y material residual mínimo1 mm detrás de alojamientos. Perfil de milanos 27/30×2,4 y holgura0,2 conservados. Nuevos parámetros opcionales `roofThickness`, `socketWebThickness` permiten reproducir también la variante anterior (fallbacks techo=shellThickness, web1,2). Botón explícito de ensayo aplica estos valores, suelo cajón1,2, paredes2, headroom1, holgura deslizamiento0,5 y cartas1. Para contenido66×91 y etiquetaPremium completa: paso80,2×108,85; conjunto4×3=323,2×328,95. Visor del ensayo inicia margen0,5 por cara, editable; el margen total vertical sigue siendo sólo1,05 mm.
+
+Prueba física anterior de cajón/asa: usuario informa juego excesivo y poca sujeción. Ensayo reduce `handleClearance` de0,25 a0,12 por cara (canal mínimo1,64 con lengua1,4); no reduce el espacio de carta con funda. Nuevo `handleRetention` crea pestaña trasera de6 mm de ancho y0,8 de espesor aislada por dos ranuras abiertas de0,6, unida al puente superior. Resalte simétrico con rampas de0,3 mm encaja en rebaje0,35 mm del respaldo (queda al menos2,05 mm de respaldo sólido). Interferencia al pasar de unos0,18 mm exige flexión; no afirmar validación por ensayo de booleanos. La pestaña crece del puente al imprimir invertida, sin viga suspendida, y el resalte crece con rampas. Respaldo y U rígida transmiten el tirón; clip sólo retiene elevación y permite retirada elástica hacia arriba. Sin herrajes. Fallback sin clip y holgura0,25 mantiene disponibilidad del montaje previo; exports usan parámetros guardados.
+
+Pendiente impresión/laminado para confirmar juego, fuerza de montaje, liberación, fatiga y adhesión entre capas del clip. Paredes/paso nuevos requieren shell nueva; cajón/asa nuevos se exportan juntos. Marcos conservan snapshots y deben recrearse o actualizarse explícitamente desde esta retícula, nunca cambiar silenciosamente.
+
+## Prueba compacta y petición de espesores iguales (2026-10-28)
+
+Usuario comunica que la prueba impresa compacta ha ido bien. Quiere estudiar que techo/lateral derecho tengan el mismo grosor que suelo/izquierda. Asumiendo referencia compacta de 2 frente a 3,8 mm, conservar el interior aumenta paso 1,8 mm en X/Z: composición 4×3 de 324,8×331,35 mm sin márgenes. Ancho cabe en 330, altura no. Mantener envolvente exterior engrosando hacia dentro consume 1,8 mm de espacio útil por eje, incluyendo zona de carta/asa en altura: no aplicar silenciosamente. Aclarar la diferencia entre holgura total (4,05 mm vertical) y el incremento acumulado (5,4 mm). No hay cambio geométrico en esta revisión; prueba de carga sostenida sobre raíles para piso futuro sigue pendiente.
 
 ## Hito: Modular drawer prototype v0.1
 

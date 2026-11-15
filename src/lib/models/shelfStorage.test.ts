@@ -13,6 +13,85 @@ const overlap = (a: Geom3, b: Geom3) => volume(jscad.booleans.intersect(a, b));
 const move = (g: Geom3, x: number, y: number, z: number) => jscad.transforms.translate([x, y, z], g);
 
 describe('modular shelf card drawer', () => {
+  it('thickens the flat-floor drawer from 1.7 to 2 mm by raising the shell 0.3 mm without reducing useful clearances', () => {
+    const trial = { ...defaults, shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+      drawerFloor: 1.7, bottomTracks: false, headroom: 1 };
+    const format = [{ ...cards[0], width: 66, length: 91 }];
+    const before = resolveShelfDrawer(trial, format), after = resolveShelfDrawer({ ...trial, drawerFloor: 2 }, format);
+    expect(after.bodyHeight - before.bodyHeight).toBeCloseTo(0.3);
+    expect(after.height).toBeCloseTo(111.95);
+    expect(after.bodyWidth).toBe(before.bodyWidth);
+    expect(after.capacity).toBe(before.capacity);
+    expect(after.drawerHeight - after.labelZ).toBeCloseTo(before.drawerHeight - before.labelZ);
+    expect(after.bodyHeight - after.roofThickness - after.drawerZ - after.drawerHeight).toBeCloseTo(0.5);
+    expect(after.lipClearance).toBe(2);
+    const fit = resolveShelfFit(after, { width: 335, height: 335, depth: 390, margin: 1.5 });
+    expect(fit.total).toBe(12);
+    expect(fit.usedHeight).toBeCloseTo(331.05);
+    expect(fit.usedWidth).toBeCloseTo(323.2);
+    expect(resolveShelfFit(after, { width: 335, height: 335, depth: 390, margin: 2 }).total).toBe(8);
+  });
+  it('exchanges bottom tracks for 0.5 mm of drawer floor without changing shell pitch or useful space', () => {
+    for (const labelWindow of [true, false]) {
+      const beforeParams = { ...defaults, shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+        drawerFloor: 1.2, headroom: 1, labelWindow };
+      const before = createShelfDrawerParts(beforeParams, [{ ...cards[0], width: 66, length: 91 }]);
+      const after = createShelfDrawerParts({ ...beforeParams, drawerFloor: 1.7, bottomTracks: false },
+        [{ ...cards[0], width: 66, length: 91 }]);
+      for (const key of ['width', 'height', 'bodyWidth', 'bodyHeight', 'depth', 'capacity', 'cardWidth', 'cardHeight', 'lipZ'] as const)
+        expect(after.resolved[key]).toBeCloseTo(before.resolved[key]);
+      expect(after.resolved.drawerZ + 1.7).toBeCloseTo(before.resolved.drawerZ + 1.2);
+      expect(after.resolved.drawerZ + after.resolved.drawerHeight)
+        .toBeCloseTo(before.resolved.drawerZ + before.resolved.drawerHeight);
+      expect(after.resolved.trackHeight).toBe(0);
+      expect(volume(after.guideLips)).toBeCloseTo(volume(before.guideLips));
+      expect(volume(after.shell)).toBeLessThan(volume(before.shell));
+      expect(volume(after.drawer)).toBeGreaterThan(volume(before.drawer));
+      const [x, y, z] = after.drawerOffset;
+      for (const distance of [0, 20, 100])
+        expect(overlap(after.shell, move(after.drawer, x, y - distance, z))).toBeLessThan(1e-5);
+    }
+    expect(resolveShelfDrawer(defaults, cards).bottomTracks).toBe(true);
+  });
+  it('supports the 3.6 mm trial with 1 mm socket backing and twelve modules at 2 mm fitting margin', () => {
+    const p = { ...defaults, shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+      drawerFloor: 1.2, headroom: 1, handleClearance: 0.12, handleRetention: true };
+    const parts = createShelfDrawerParts(p, [{ ...cards[0], width: 66, length: 91 }]);
+    const r = parts.resolved;
+    expect(r.panelThickness).toBeCloseTo(3.6);
+    expect(r.shellSkin).toBeCloseTo(3.6);
+    expect(r.roofThickness).toBeCloseTo(3.6);
+    expect(r.socketWeb).toBeCloseTo(1);
+    const fit = resolveShelfFit(r, { width: 335, height: 335, depth: 390, margin: 2 });
+    expect(fit.total).toBe(12);
+    expect(fit.usedWidth).toBeCloseTo(323.2);
+    expect(fit.usedHeight).toBeCloseTo(330.15);
+    const [x, y, z] = parts.drawerOffset;
+    for (const distance of [0, 20, 100]) {
+      expect(overlap(parts.shell, move(parts.drawer, x, y - distance, z))).toBeLessThan(1e-5);
+      expect(overlap(parts.shell, move(parts.handle, x, y - distance, z))).toBeLessThan(1e-5);
+    }
+  });
+  it('seats the tighter handle without interference and engages a rear clip pocket during lifting', () => {
+    const parts = createShelfDrawerParts({ ...defaults, handleClearance: 0.12, handleRetention: true }, cards);
+    const { drawer, handle, retentionClip, resolved: r } = parts;
+    expect(r.handleClearance).toBe(0.12);
+    expect(r.labelSlotDepth).toBeCloseTo(1.64);
+    expect(overlap(drawer, handle)).toBeLessThan(1e-5);
+    expect(retentionClip).not.toBeNull();
+    const rigid = jscad.booleans.subtract(handle, retentionClip!);
+    expect(overlap(drawer, move(handle, 0, 0, 0.5))).toBeGreaterThan(0.001);
+    // The interference is local to the spring tongue, not the rigid U.
+    expect(overlap(drawer, move(rigid, 0, 0, 0.5))).toBeLessThan(1e-5);
+    expect(overlap(drawer, move(retentionClip!, 0, 0.2, 0.5))).toBeLessThan(1e-5);
+    expect(overlap(drawer, move(handle, 0, 0, r.handleHeight + 1))).toBeLessThan(1e-5);
+    for (const direction of [-1, 1])
+      expect(overlap(drawer, move(rigid, 0, direction, 0))).toBeGreaterThan(1);
+    const label = jscad.primitives.cuboid({ size: [r.labelWidth, r.premiumThickness, r.labelHeight],
+      center: [r.drawerWidth / 2, r.labelSlotY + r.labelSlotDepth / 2, r.labelZ + r.labelHeight / 2] });
+    expect(overlap(label, handle)).toBeLessThan(1e-5);
+    expect(overlap(label, drawer)).toBeLessThan(1e-5);
+  });
   it('fits 4 columns by 3 rows in a 330 mm opening without shrinking Premium card spaces', () => {
     const actualCards = [{ ...cards[0], width: 66, length: 91 }];
     const compact = { ...defaults, shellThickness: 2, drawerFloor: 1.2, headroom: 1, sleeve: 'premium' as const };
@@ -51,15 +130,16 @@ describe('modular shelf card drawer', () => {
     expect(shelfExplodeOffsets(200, r.drawerDepth, r.handleHeight)).toEqual(end);
   });
   it('preserves card space while reserving room for the independent identification window', () => {
-    const r = resolveShelfDrawer(defaults, cards);
+    const fixture = { ...defaults, depth: 240 };
+    const r = resolveShelfDrawer(fixture, cards);
     expect(r.valid).toBe(true);
-    expect(r.depth).toBe(240);
+    expect(defaultShelfDrawerParams.depth).toBe(380);
     expect(r.drawerWidth).toBeGreaterThanOrEqual(r.cardWidth + 2 * (defaults.drawerWall + defaults.cardClearance));
     expect(r.drawerWidth).toBeGreaterThanOrEqual(r.labelWidth + 0.6 + 2 * defaults.drawerWall);
     expect(r.drawerHeight).toBeGreaterThanOrEqual(r.labelZ + r.labelHeight + 2);
     expect(r.panelThickness).toBeCloseTo(3.8);
     expect(r.capacity).toBe(740);
-    const sleeved = resolveShelfDrawer({ ...defaults, sleeve: 'premium' }, cards);
+    const sleeved = resolveShelfDrawer({ ...fixture, sleeve: 'premium' }, cards);
     expect(sleeved.capacity).toBe(277);
     const noWindow = resolveShelfDrawer({ ...defaults, labelWindow: false }, cards);
     expect(noWindow.capacity).toBeGreaterThan(r.capacity); // Solid backing reserves 1.2 mm additional depth.

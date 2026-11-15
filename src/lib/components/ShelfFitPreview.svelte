@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { resolveShelfFit, type ShelfEnvelope } from '$lib/models/shelfFit';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
-  let { module, capacity, color, onclose }: { module: ShelfEnvelope; capacity: number; color: string; onclose: () => void } = $props();
-  let width = $state(330), height = $state(330), depth = $state(390), margin = $state(2);
+  let { module, capacity, color, onclose, initialMargin = 2 }: { module: ShelfEnvelope; capacity: number; color: string; onclose: () => void; initialMargin?: number } = $props();
+  let width = $state(335), height = $state(335), depth = $state(390);
+  // Capture the trial's starting margin once; the user can then edit it freely.
+  let margin = $state(untrack(() => initialMargin));
   const fit = $derived(resolveShelfFit(module, { width, height, depth, margin }));
-  const viewWidth = $derived(fit.valid ? width : 330);
-  const viewHeight = $derived(fit.valid ? height : 330);
-  function preset() { width = 330; height = 330; depth = 390; margin = 2; }
+  const viewWidth = $derived(fit.valid ? width : 335);
+  const viewHeight = $derived(fit.valid ? height : 335);
+  function preset() { width = 335; height = 335; depth = 390; margin = 2; }
 </script>
 
 <div class="fitPreview" aria-label="Shelf fit preview">
@@ -19,7 +22,7 @@
     <label>Usable depth (mm)<input type="number" min="1" max="2000" bind:value={depth} /></label>
     <label>Fitting margin (mm)<input type="number" min="0" max="100" step="0.5" bind:value={margin} /></label>
   </div>
-  <HelpRow><span>One opening · current drawer repeated</span><HelpTip label="About shelf dimensions">Kallax reference: 330 × 330 × 390 mm, based on IKEA's published opening dimensions. Measure your own opening. Margin is reserved on each side, above/below, and behind. Connected modules share their body pitch; only the exposed top/right connectors add to the overall envelope. Changing this preview does not resize the drawer or affect exports. This is a space check, not a shelf load rating.</HelpTip></HelpRow>
+  <HelpRow><span>One opening · current drawer repeated</span><HelpTip label="About shelf dimensions">Kallax reference: 335 × 335 × 390 mm, based on IKEA's published opening dimensions. Measure your own opening. Margin is reserved on each side, above/below, and behind. Connected modules share their body pitch; only the exposed top/right connectors add to the overall envelope. Changing this preview does not resize the drawer or affect exports. This is a space check, not a shelf load rating.</HelpTip></HelpRow>
   {#if fit.valid}
     <div class="results" aria-live="polite"><strong>{fit.columns} columns × {fit.rows} rows = {fit.total} drawers</strong><span>≈ {fit.total * capacity} cards</span><span>Free width: {fit.freeWidth.toFixed(1)} mm · free height: {fit.freeHeight.toFixed(1)} mm</span></div>
     <div class="drawings">

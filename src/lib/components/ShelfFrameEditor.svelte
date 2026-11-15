@@ -1,13 +1,16 @@
 <script lang="ts">
   import type { ShelfFrameModule, ShelfFrameParams } from '$lib/models/shelfStorage';
   import { resolveShelfFrame } from '$lib/models/shelfFrame';
-  import { updateShelfFrame } from '$lib/stores/project.svelte';
+  import { getProject, updateShelfFrame, syncShelfFrames } from '$lib/stores/project.svelte';
   import { exportShelfModule } from '$lib/utils/exportShelfModule';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
   let { module }: { module: ShelfFrameModule } = $props();
   const r = $derived(resolveShelfFrame(module.params));
   let busy = $state(false), error = $state('');
+  let sourceId = $state('');
+  const drawers = $derived((getProject().shelfModules ?? []).filter(m => m.type === 'card-drawer'));
+  const source = $derived(drawers.find(m => m.id === sourceId) ?? drawers[0]);
   const fields = [
     { key: 'columns', label: 'Columns', min: 1, max: 8, step: 1 },
     { key: 'rows', label: 'Rows', min: 1, max: 8, step: 1 },
@@ -28,8 +31,11 @@
   <div class="grid">{#each fields as field}
     <label>{field.label}<input type="number" min={field.min} max={field.max} step={field.step} value={module.params[field.key]} onchange={e => change(field.key, e.currentTarget)} /></label>
   {/each}</div>
-  <output>Cell pitch: {module.params.pitchWidth.toFixed(1)} × {module.params.pitchHeight.toFixed(1)} mm</output>
-  <HelpRow><span>Compatibility snapshot</span><HelpTip label="About frame compatibility">Cell pitch and depth are copied from the selected Card Drawer when creating the frame. Later changes to that drawer do not resize this frame. One connection per boundary cell matches the original drawer grid: male above/right, female below/left. Assemble by sliding from the rear; allow access behind the composition during assembly.</HelpTip></HelpRow>
+  <output>Cell pitch: {module.params.pitchWidth.toFixed(2)} × {module.params.pitchHeight.toFixed(2)} mm</output>
+  <label>Reference drawer<select value={source?.id ?? ''} onchange={e => sourceId = e.currentTarget.value} disabled={!drawers.length}>
+    {#each drawers as drawer}<option value={drawer.id}>{drawer.name}</option>{/each}
+  </select></label>
+  <HelpRow><button disabled={!source} onclick={() => { error = source && syncShelfFrames(source.id, module.id) ? '' : 'Choose a valid drawer with dovetail connections enabled.'; }}>Update from reference drawer</button><HelpTip label="About frame compatibility">Copies cell pitch and depth from the reference drawer now, retaining this frame's columns, rows and wall thickness. Later drawer changes do not resize saved frames automatically. Connections stay aligned to each cell. Male above/right, female below/left. Assemble by sliding from the rear; allow access behind the composition.</HelpTip></HelpRow>
   {#if r.valid}
     <output>Exterior: {r.width.toFixed(1)} × {r.depth.toFixed(1)} × {r.height.toFixed(1)} mm</output>
     <output>Clear opening: {r.openingWidth.toFixed(1)} × {r.openingHeight.toFixed(1)} mm</output>
@@ -43,5 +49,5 @@
 </section>
 <style>
   section { padding:1rem; display:flex; flex-direction:column; gap:0.85rem; } h3 { margin:0.5rem 0 0; font-size:0.95rem; } label { display:flex; flex-direction:column; gap:0.35rem; } .grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
-  input, button { width:100%; box-sizing:border-box; min-width:0; font:inherit; color:var(--fg); background:var(--inputBg); border:var(--borderThin); padding:0.45rem; border-radius:0.3rem; } button { cursor:pointer; } output, .status { font-size:0.8rem; } .status { color:var(--fgMuted); } [role='alert'] { color:#ef987d; }
+  input, select, button { width:100%; box-sizing:border-box; min-width:0; font:inherit; color:var(--fg); background:var(--inputBg); border:var(--borderThin); padding:0.45rem; border-radius:0.3rem; } button { cursor:pointer; } output, .status { font-size:0.8rem; } .status { color:var(--fgMuted); } [role='alert'] { color:#ef987d; }
 </style>

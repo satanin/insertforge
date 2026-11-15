@@ -149,6 +149,7 @@
     triangleCornerRadius?: number;
     showReferenceLabels?: boolean;
     showPreviewSizes?: boolean;
+    partCote?: import('$lib/models/shelfStorage').ShelfPreviewCote;
     hidePrintBed?: boolean;
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
@@ -216,6 +217,7 @@
     triangleCornerRadius = 1.5,
     showReferenceLabels = false,
     showPreviewSizes = false,
+    partCote,
     hidePrintBed = false,
     viewTitle = '',
     onCaptureReady,
@@ -319,6 +321,7 @@
       {triangleCornerRadius}
       {showReferenceLabels}
       {showPreviewSizes}
+      {partCote}
       {hidePrintBed}
       {viewTitle}
       {onCaptureReady}

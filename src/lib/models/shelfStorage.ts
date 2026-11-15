@@ -3,6 +3,7 @@ import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import type { CardSize, ProjectCardSleeve } from '$lib/types/project';
 import { defaultCardStorageParams, resolveCardStorage } from './cardStorageTray';
 import { DEFAULT_CARD_SLEEVE_THICKNESSES } from '$lib/utils/projectCards';
+import type { ShelfManufacturingSettings } from './shelfManufacturing';
 
 export interface ShelfDrawerParams {
   cardSizeId: string; sleeve: ProjectCardSleeve; orientation: 'vertical' | 'horizontal';
@@ -10,14 +11,18 @@ export interface ShelfDrawerParams {
   slidingClearance: number; cardClearance: number; headroom: number;
   stackingEnabled?: boolean; labelWindow?: boolean; labelWidth?: number; labelHeight?: number;
   handleColor?: string;
+  roofThickness?: number; socketWebThickness?: number; handleClearance?: number; handleRetention?: boolean;
+  manufacturing?: ShelfManufacturingSettings;
+  bottomTracks?: boolean;
 }
 export interface ShelfDrawerModule { id: string; name: string; type: 'card-drawer'; params: ShelfDrawerParams; }
 export interface ShelfFrameParams { columns: number; rows: number; pitchWidth: number; pitchHeight: number; depth: number; wall: number; }
 export interface ShelfFrameModule { id: string; name: string; type: 'open-frame'; params: ShelfFrameParams; }
 export type ShelfModule = ShelfDrawerModule | ShelfFrameModule;
 export type ShelfPartId = 'shell' | 'drawer' | 'handle';
+export const STANDARD_SHELF_DEPTH = 380;
 export const defaultShelfDrawerParams: ShelfDrawerParams = {
-  cardSizeId: 'standard', sleeve: 'none', orientation: 'vertical', depth: 240,
+  cardSizeId: 'standard', sleeve: 'none', orientation: 'vertical', depth: STANDARD_SHELF_DEPTH,
   shellThickness: 3, drawerWall: 2, drawerFloor: 2, slidingClearance: 0.5,
   cardClearance: 1, headroom: 8, stackingEnabled: true,
   labelWindow: true, labelWidth: 63, labelHeight: 88, handleColor: '#df9756'
@@ -40,7 +45,17 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
       errors.push(`${key}: choose a value between ${min} and ${max} mm.`);
   }
   const stacking = p.stackingEnabled !== false;
-  const panelThickness = stacking ? Math.max(p.shellThickness, JOINT_HEIGHT + JOINT_GAP + MIN_STACK_SOCKET_WEB) : p.shellThickness;
+  const socketWebThickness = p.socketWebThickness ?? MIN_STACK_SOCKET_WEB;
+  const roofThickness = p.roofThickness ?? p.shellThickness;
+  const handleClearance = p.handleClearance ?? HANDLE_GAP;
+  for (const [name, value, min, max] of [
+    ['Socket backing', socketWebThickness, 1, 3], ['Roof thickness', roofThickness, 1.2, 10],
+    ['Handle clearance', handleClearance, 0.08, 0.5]
+  ] as [string, number, number, number][]) {
+    if (!Number.isFinite(value) || value < min || value > max) errors.push(`${name}: choose ${min}–${max} mm.`);
+  }
+  const handleRetention = p.handleRetention === true;
+  const panelThickness = stacking ? Math.max(p.shellThickness, JOINT_HEIGHT + JOINT_GAP + socketWebThickness) : p.shellThickness;
   const labelWindow = p.labelWindow !== false;
   // Reserve a Premium-sleeved label independently of the stored card sleeve.
   const premiumThickness = Math.max(DEFAULT_CARD_SLEEVE_THICKNESSES.premium,
@@ -48,13 +63,13 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
       .map(card => card.sleeveThicknesses?.premium ?? 0).filter(value => Number.isFinite(value) && value > 0));
   const labelFaceWall = 2.4, labelBackWall = 2.4;
   const handleTongueThickness = 1.4;
-  const labelSlotDepth = Math.max(handleTongueThickness + 2 * HANDLE_GAP, premiumThickness + 0.6);
+  const labelSlotDepth = Math.max(handleTongueThickness + 2 * handleClearance, premiumThickness + 0.6);
   const labelSlotY = labelFaceWall;
   const frontThickness = Math.max(labelWindow ? labelFaceWall + labelSlotDepth + labelBackWall : 3, p.drawerWall);
   const handleWall = 2.4, handleDrop = 8;
   const handleRise = 0, handleStopHeight = 3, handleStopWidth = 3;
   const handleSeatDepth = handleWall + HANDLE_GAP;
-  const handleBayDepth = handleWall + 3 * HANDLE_GAP;
+  const handleBayDepth = handleWall + 3 * handleClearance;
   const frontReserve = frontThickness + handleBayDepth;
   const shellSkin = p.shellThickness;
   const drawerDepth = p.depth - shellSkin - 2 * p.slidingClearance;
@@ -79,7 +94,8 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
   const drawerHeight = Math.max(content.height + p.headroom,
     labelWindow ? labelZ + labelHeight + handleDrop + labelHandleGap : 0);
   const handleStopZ = drawerHeight - handleWall - HANDLE_GAP;
-  const trackHeight = 0.5, trackWidth = Math.max(3, p.drawerWall);
+  const bottomTracks = p.bottomTracks !== false;
+  const trackHeight = bottomTracks ? 0.5 : 0, trackWidth = Math.max(3, p.drawerWall);
   if (2 * trackWidth >= drawerWidth || drawerWidth < 26 || drawerHeight < p.drawerFloor + 30 || content.cardHeight < 14)
     errors.push('Card format is too small for the handle and bearing tracks.');
   const lipClearance = 2, lipThickness = 2.4;
@@ -89,7 +105,7 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
   const bodyWidth = drawerWidth + panelThickness + shellSkin + 2 * sideGap;
   const drawerZ = panelThickness + trackHeight;
   // Only bottom/left contain female sockets and need the thicker backing.
-  const bodyHeight = drawerZ + drawerHeight + p.slidingClearance + shellSkin;
+  const bodyHeight = drawerZ + drawerHeight + p.slidingClearance + roofThickness;
   const sideHeight = p.drawerFloor + content.cardHeight * 0.5;
   const rampStart = Math.min(drawerDepth * 0.15, frontThickness + 14);
   const rampEnd = Math.min(drawerDepth - p.drawerWall, rampStart + Math.min(55, drawerDepth * 0.35));
@@ -100,10 +116,11 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
     width: bodyWidth + stackKeyHeight, depth: p.depth, height: bodyHeight + stackKeyHeight,
     bodyWidth, bodyHeight, drawerWidth, drawerDepth, drawerHeight, drawerZ,
     capacity: content.capacity, cardWidth: content.cardWidth, cardHeight: content.cardHeight,
-    cardThickness: content.cardThickness, frontThickness, panelThickness, shellSkin, trackHeight, trackWidth,
+    cardThickness: content.cardThickness, frontThickness, panelThickness, shellSkin, roofThickness, socketWebThickness, bottomTracks, trackHeight, trackWidth,
     frontReserve, handleWall, handleTongueThickness, handleDrop, handleRise, handleSeatDepth, handleBayDepth,
     handleStopHeight, handleStopWidth, handleStopZ, labelHandleGap,
     handleHeight: handleDrop, sideGap, frontOverhang,
+    handleClearance, handleRetention,
     sideHeight, rampStart, rampEnd, lipStart, lipClearance, lipThickness, lipRootThickness, lipZ,
     stacking, stackKeyHeight, stackClearance: JOINT_GAP,
     socketWeb: stacking ? panelThickness - JOINT_HEIGHT - JOINT_GAP : 0,
@@ -131,6 +148,11 @@ export function jointProfile(clearance = 0) {
     [JOINT_HEAD / 2, JOINT_HEIGHT], [-JOINT_HEAD / 2, JOINT_HEIGHT]] });
   return clearance ? jscad.expansions.expand({ delta: clearance, corners: 'chamfer' }, shape) : shape;
 }
+export function shelfSocketProfile() {
+  // Widen each flank by 0.1 mm without deepening the socket or changing its stop.
+  const socket = jointProfile(JOINT_GAP);
+  return jscad.hulls.hull(...[-0.1, 0.1].map(x => jscad.transforms.translate([x, 0], socket)));
+}
 function handleRgb(hex: string | undefined): [number, number, number] {
   const value = /^#[0-9a-f]{6}$/i.test(hex ?? '') ? hex! : '#df9756';
   return [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16) / 255) as [number, number, number];
@@ -144,14 +166,14 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
   const w = r.drawerWidth, d = r.drawerDepth, h = r.drawerHeight;
   const floor = block(0, 0, 0, r.bodyWidth, p.depth, s);
   const skin = r.shellSkin;
-  const leftWall = block(0, 0, s, s, p.depth, r.bodyHeight - s - skin);
-  const rightWall = block(r.bodyWidth - skin, 0, s, skin, p.depth, r.bodyHeight - s - skin);
-  const back = block(s, p.depth - skin, s, r.bodyWidth - s - skin, skin, r.bodyHeight - s - skin);
-  const roof = block(0, 0, r.bodyHeight - skin, r.bodyWidth, p.depth, skin);
+  const leftWall = block(0, 0, s, s, p.depth, r.bodyHeight - s - r.roofThickness);
+  const rightWall = block(r.bodyWidth - skin, 0, s, skin, p.depth, r.bodyHeight - s - r.roofThickness);
+  const back = block(s, p.depth - skin, s, r.bodyWidth - s - skin, skin, r.bodyHeight - s - r.roofThickness);
+  const roof = block(0, 0, r.bodyHeight - r.roofThickness, r.bodyWidth, p.depth, r.roofThickness);
   const drawerX = s + r.sideGap;
-  const tracks = [drawerX, drawerX + w - r.trackWidth].map(x => sideProfile(x, r.trackWidth, [
+  const tracks = r.bottomTracks ? [drawerX, drawerX + w - r.trackWidth].map(x => sideProfile(x, r.trackWidth, [
     [0, s], [p.depth - s, s], [p.depth - s, s + r.trackHeight], [4, s + r.trackHeight], [0, s + 0.2]
-  ]));
+  ])) : [];
   // Capture the existing side-wall tops, without adding ledges to the drawer.
   // Start behind the tall front transition; extraction moves that transition
   // away from the lips. Join the back wall for rear-face-down printing.
@@ -170,7 +192,7 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
   const male: Geom3[] = [], female: Geom3[] = [];
   if (r.stacking) {
     const rail = alongY(jointProfile(), r.jointStart, p.depth);
-    const socket = alongY(jointProfile(JOINT_GAP), r.jointStart - JOINT_GAP, p.depth + 0.1);
+    const socket = alongY(shelfSocketProfile(), r.jointStart - JOINT_GAP, p.depth + 0.1);
     male.push(translate([r.bodyWidth / 2, 0, r.bodyHeight], rail));
     male.push(translate([r.bodyWidth, 0, r.bodyHeight / 2], rotateY(Math.PI / 2, rail)));
     female.push(translate([r.bodyWidth / 2, 0, 0], socket));
@@ -200,7 +222,8 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
     sideProfile(w - t, t, sidePoints));
   // Recess only the central frontal edge. Both full-height side-wall junctions
   // stay continuous, and their inner faces guide the removable handle sideways.
-  const handleLeft = Math.max(t, r.labelWindow ? r.labelSlotX : t) + HANDLE_GAP;
+  const fit = r.handleClearance;
+  const handleLeft = Math.max(t, r.labelWindow ? r.labelSlotX : t) + fit;
   const handleWidth = w - 2 * handleLeft;
   const recessedDrawer = subtract(drawerBase,
     block(t, -0.1, h - r.handleSeatDepth, w - 2 * t, r.frontThickness + 0.1, r.handleSeatDepth + 0.1));
@@ -211,15 +234,15 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
   const stops = [t, w - t - r.handleStopWidth].flatMap(x => stopBands.map(([y, depth]) =>
     block(x, y, r.handleStopZ - r.handleStopHeight - 0.1, r.handleStopWidth, depth,
       r.handleStopHeight + 0.1)));
-  const drawer = union(recessedDrawer, ...stops);
-  const outerFront = r.labelWindow ? r.labelSlotY + HANDLE_GAP : -HANDLE_GAP - r.handleWall;
+  let drawer = union(recessedDrawer, ...stops);
+  const outerFront = r.labelWindow ? r.labelSlotY + fit : -fit - r.handleWall;
   const innerFront = outerFront + (r.labelWindow ? r.handleTongueThickness : r.handleWall);
-  const outerBack = r.frontThickness + HANDLE_GAP + r.handleWall;
+  const outerBack = r.frontThickness + fit + r.handleWall;
   const low = h - r.handleDrop, cap = h - r.handleWall;
   // The U bridge sits flush with the drawer top, entirely between its sides.
   const saddle = sideProfile(handleLeft, handleWidth, [
     [outerFront, low], [innerFront, low], [innerFront, cap],
-    [r.frontThickness + HANDLE_GAP, cap], [r.frontThickness + HANDLE_GAP, low],
+    [r.frontThickness + fit, cap], [r.frontThickness + fit, low],
     [outerBack, low], [outerBack, h], [outerFront, h]
   ]);
   // A short L grip replaces the tall wedge. Its continuous flat top is the
@@ -229,8 +252,28 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
     [-16 + r.handleWall, cap], [outerFront + 0.1, cap],
     [outerFront + 0.1, h], [-16, h]
   ]);
-  const handle = jscad.colors.colorize([...handleRgb(p.handleColor), 1], union(saddle, grip));
-  return { shell, shellCutaway, drawer, handle, guideLips,
+  let handleBody = union(saddle, grip);
+  let retentionClip: Geom3 | null = null;
+  if (r.handleRetention) {
+    // Rear spring tongue grows directly from the U bridge when printed inverted.
+    // Thicken toward the rear relief, preserving the mating face and bump.
+    // Two open-ended slots isolate the flexure; no suspended beam is added.
+    const clipThickness = 1.2;
+    const clipX = w / 2 - 3, clipY = r.frontThickness + fit;
+    const clipZ = low + 1;
+    handleBody = subtract(handleBody,
+      block(clipX - 0.6, clipY - 0.01, low - 0.1, 0.6, r.handleWall + 0.02, cap - low + 0.1),
+      block(clipX + 6, clipY - 0.01, low - 0.1, 0.6, r.handleWall + 0.02, cap - low + 0.1),
+      block(clipX, clipY + clipThickness, low - 0.1, 6, r.handleWall - clipThickness + 0.01, cap - low + 0.1));
+    const bump = sideProfile(clipX, 6, [[clipY + 0.01, clipZ - 0.5],
+      [clipY + 0.01, clipZ + 0.5], [clipY - 0.3, clipZ]]);
+    retentionClip = union(block(clipX, clipY, low, 6, clipThickness, cap - low), bump);
+    handleBody = union(handleBody, bump);
+    drawer = subtract(drawer,
+      block(clipX - 0.2, r.frontThickness - 0.35, clipZ - 0.65, 6.4, 0.36, 1.3));
+  }
+  const handle = jscad.colors.colorize([...handleRgb(p.handleColor), 1], handleBody);
+  return { shell, shellCutaway, drawer, handle, guideLips, retentionClip,
     drawerOffset: [drawerX, g, r.drawerZ] as [number, number, number], resolved: r };
 }
 
@@ -250,8 +293,10 @@ export function shelfExplodeOffsets(amount: number, drawerDepth: number, handleH
   };
 }
 
+export type ShelfPreviewCote = { part: string; bounds: [[number, number, number], [number, number, number]] };
+
 export function createShelfPreview(p: ShelfDrawerParams, cards: CardSize[], extraction: number, contents: boolean,
-  options: { cutaway?: boolean; stack?: boolean; adjacent?: boolean; print?: boolean } = {}) {
+  options: { cutaway?: boolean; stack?: boolean; adjacent?: boolean; print?: boolean; cotes?: ShelfPreviewCote[] } = {}) {
   const parts = createShelfDrawerParts(p, cards), r = parts.resolved;
   const color = (geom: Geom3, rgb: [number, number, number]) => jscad.colors.colorize([...rgb, 1], geom);
   const geoms: Geom3[] = [];
@@ -268,6 +313,11 @@ export function createShelfPreview(p: ShelfDrawerParams, cards: CardSize[], extr
     offset[1] -= exploded.drawerTravel;
     const handleOffset = [...offset] as [number, number, number];
     handleOffset[2] += exploded.handleLift;
+    if (options.cotes) {
+      const measured = { Shell: parts.shell, Drawer: translate(offset, parts.drawer), Handle: translate(handleOffset, parts.handle) };
+      for (const [part, geom] of Object.entries(measured))
+        options.cotes.push({ part, bounds: jscad.measurements.measureBoundingBox(geom) });
+    }
     geoms.push(color(options.cutaway ? parts.shellCutaway : parts.shell, [0.2, 0.3, 0.43]),
       color(translate(offset, parts.drawer), [0.52, 0.65, 0.76]), color(translate(handleOffset, parts.handle), handleRgb(p.handleColor)));
     const neighbours = [...(options.stack && r.stacking ? [[0, 0, r.bodyHeight]] : []),

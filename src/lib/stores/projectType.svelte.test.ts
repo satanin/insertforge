@@ -1,8 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import { addShelfModule, addShelfFrame, updateShelfFrame, selectShelfModule, removeShelfModule, updateShelfModule, createNewProject, getProject, importProject, initProject, resetProject } from './project.svelte';
+import { addShelfModule, addShelfFrame, updateShelfFrame, syncShelfFrames, selectShelfModule, removeShelfModule, updateShelfModule, createNewProject, getProject, importProject, initProject, resetProject } from './project.svelte';
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 
 describe('project types', () => {
+  it('persists printer volume and split settings without resizing frame snapshots', () => {
+    createNewProject('shelf-storage');
+    const drawer = addShelfModule()!;
+    addShelfFrame();
+    const before = structuredClone($state.snapshot(getProject().shelfModules!.find(m => m.type === 'open-frame')!.params));
+    updateShelfModule(drawer.id, { manufacturing: { split: true, bedWidth: 250, bedDepth: 220,
+      buildHeight: 240, margin: 5, jointClearance: 0.15 } });
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    const restored = getProject().shelfModules!.find(m => m.id === drawer.id)!;
+    expect(restored.type === 'card-drawer' && restored.params.manufacturing).toEqual({ split: true,
+      bedWidth: 250, bedDepth: 220, buildHeight: 240, margin: 5, jointClearance: 0.15 });
+    expect(getProject().shelfModules!.find(m => m.type === 'open-frame')!.params).toEqual(before);
+  });
+  it('explicitly updates all frame snapshots to the trial unit without losing structure or selection', () => {
+    createNewProject('shelf-storage');
+    const drawer = addShelfModule()!;
+    addShelfFrame();
+    const first = getProject().selectedShelfModuleId!;
+    updateShelfFrame(first, { columns: 3, rows: 1, wall: 10 }, 'Wide frame');
+    addShelfFrame();
+    const second = getProject().selectedShelfModuleId!;
+    updateShelfModule(drawer.id, { shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+      drawerFloor: 2, bottomTracks: false, headroom: 1, depth: 180, handleClearance: 0.12, handleRetention: true });
+    expect(syncShelfFrames('missing')).toBe(0);
+    expect(syncShelfFrames(drawer.id)).toBe(2);
+    const frames = getProject().shelfModules!.filter(m => m.type === 'open-frame');
+    for (const frame of frames) {
+      expect(frame.params.pitchWidth).toBeCloseTo(80.2);
+      expect(frame.params.pitchHeight).toBeCloseTo(109.55);
+      expect(frame.params.depth).toBe(180);
+    }
+    expect(frames.find(m => m.id === first)).toMatchObject({ name: 'Wide frame', params: { columns: 3, rows: 1, wall: 10 } });
+    expect(getProject().selectedShelfModuleId).toBe(second);
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    expect(getProject().shelfModules?.find(m => m.id === second)?.params.depth).toBe(180);
+    updateShelfModule(drawer.id, { depth: 250 });
+    expect(syncShelfFrames(drawer.id, first)).toBe(1);
+    expect(getProject().shelfModules?.find(m => m.id === first)?.params.depth).toBe(250);
+    expect(getProject().shelfModules?.find(m => m.id === second)?.params.depth).toBe(180);
+  });
   it('removes modules with a valid surviving selection and persists an empty list', () => {
     createNewProject('shelf-storage');
     const first = addShelfModule()!;
@@ -44,6 +84,9 @@ describe('project types', () => {
     updateShelfModule(first.id, { depth: 180, labelWindow: true, labelWidth: 63, labelHeight: 88, handleColor: '#123456' }, 'Magic');
     const second = addShelfModule()!;
     expect(second.id).not.toBe(first.id);
+    expect(second.params).toEqual({ ...getProject().shelfModules?.[0].params, depth: 380 });
+    updateShelfModule(second.id, { depth: 250 });
+    expect(getProject().shelfModules?.[0].params.depth).toBe(180);
     importProject(importProjectFromJson(exportProjectToJson(getProject())));
     expect(getProject().layers).toEqual([]);
     expect(getProject().shelfModules?.[0].name).toBe('Magic');

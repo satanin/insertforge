@@ -3611,9 +3611,12 @@ export function createNewProject(projectType: import('$lib/types/project').Proje
 export function addShelfModule(): ShelfDrawerModule | undefined {
   if (project.projectType !== 'shelf-storage') return;
   project.shelfModules ??= [];
+  const reference = project.shelfModules.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
+    ?? project.shelfModules.find(m => m.type === 'card-drawer');
   const module: ShelfDrawerModule = { id: crypto.randomUUID(), type: 'card-drawer',
     name: `Card drawer ${project.shelfModules.length + 1}`,
-    params: { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() } };
+    params: reference?.type === 'card-drawer' ? { ...structuredClone($state.snapshot(reference.params)), depth: defaultShelfDrawerParams.depth }
+      : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() } };
   project.shelfModules.push(module);
   project.selectedShelfModuleId = module.id;
   autosave();
@@ -3667,6 +3670,22 @@ export function updateShelfFrame(id: string, params: Partial<ShelfFrameParams>, 
   module.params = { ...module.params, ...params };
   if (name?.trim()) module.name = name.trim();
   autosave();
+}
+
+export function syncShelfFrames(sourceId: string, frameId?: string): number {
+  if (project.projectType !== 'shelf-storage') return 0;
+  const source = project.shelfModules?.find(m => m.id === sourceId);
+  if (source?.type !== 'card-drawer') return 0;
+  const r = resolveShelfDrawer(source.params, getProjectCardSizes(project));
+  if (!r.valid || !r.stacking) return 0;
+  let count = 0;
+  for (const module of project.shelfModules ?? []) {
+    if (module.type !== 'open-frame' || (frameId && module.id !== frameId)) continue;
+    module.params = { ...module.params, pitchWidth: r.bodyWidth, pitchHeight: r.bodyHeight, depth: r.depth };
+    count++;
+  }
+  if (count) autosave();
+  return count;
 }
 
 // Move a tray to a different box (or create a new box in the same layer)

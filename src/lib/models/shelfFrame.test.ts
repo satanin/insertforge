@@ -9,6 +9,25 @@ const parts = createShelfDrawerParts(defaultShelfDrawerParams, cards);
 const p = { columns: 2, rows: 2, pitchWidth: parts.resolved.bodyWidth, pitchHeight: parts.resolved.bodyHeight, depth: parts.resolved.depth, wall: 8 };
 const volume = (g: ReturnType<typeof createShelfFrame>) => Math.abs(jscad.measurements.measureVolume(g));
 describe('open modular frame', () => {
+  it('matches the current 3.6 mm shell grid on every perimeter cell', () => {
+    const trial = createShelfDrawerParts({ ...defaultShelfDrawerParams, shellThickness: 3.6,
+      roofThickness: 3.6, socketWebThickness: 1, drawerFloor: 2, bottomTracks: false, headroom: 1 },
+      [{ ...cards[0], width: 66, length: 91 }]);
+    const reference = { ...p, pitchWidth: trial.resolved.bodyWidth, pitchHeight: trial.resolved.bodyHeight };
+    const frame = createShelfFrame(reference), r = resolveShelfFrame(reference);
+    expect(r.bodyWidth).toBeCloseTo(160.4);
+    expect(r.bodyHeight).toBeCloseTo(219.1);
+    expect(r.width).toBeCloseTo(162.8);
+    expect(r.height).toBeCloseTo(221.5);
+    for (let cell = 0; cell < 2; cell++) {
+      for (const pos of [[cell * reference.pitchWidth, 0, -reference.pitchHeight],
+        [cell * reference.pitchWidth, 0, r.bodyHeight],
+        [-reference.pitchWidth, 0, cell * reference.pitchHeight],
+        [r.bodyWidth, 0, cell * reference.pitchHeight]]) {
+        expect(volume(jscad.booleans.intersect(frame, jscad.transforms.translate(pos as [number, number, number], trial.shell)))).toBeLessThan(1e-5);
+      }
+    }
+  });
   it('matches every neighbouring drawer cell on all four sides', () => {
     const frame = createShelfFrame(p), r = resolveShelfFrame(p);
     const positions: [number, number, number][] = [];

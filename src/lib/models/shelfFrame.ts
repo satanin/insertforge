@@ -1,5 +1,5 @@
 import jscad from '@jscad/modeling';
-import { jointProfile, type ShelfFrameParams } from './shelfStorage';
+import { jointProfile, shelfSocketProfile, type ShelfFrameParams } from './shelfStorage';
 const { cuboid } = jscad.primitives;
 const { union, subtract } = jscad.booleans;
 const { translate, rotateX, rotateY } = jscad.transforms;
@@ -27,7 +27,7 @@ export function createShelfFrame(p: ShelfFrameParams, print = false) {
   const rail = translate([0, p.depth, 0], rotateX(Math.PI / 2,
     jscad.extrusions.extrudeLinear({ height: p.depth - 10 }, jointProfile())));
   const socket = translate([0, p.depth + 0.1, 0], rotateX(Math.PI / 2,
-    jscad.extrusions.extrudeLinear({ height: p.depth + 0.1 - 9.8 }, jointProfile(0.2))));
+    jscad.extrusions.extrudeLinear({ height: p.depth + 0.1 - 9.8 }, shelfSocketProfile())));
   const males = [], sockets = [];
   for (let col = 0; col < p.columns; col++) {
     const x = (col + 0.5) * p.pitchWidth;
