@@ -2,7 +2,10 @@
   import { T, useTask, useThrelte } from '@threlte/core';
   import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
   import SceneLighting from './SceneLighting.svelte';
-  import { DEFAULT_COUNTER_SHAPES, type TrayType } from '$lib/stores/project.svelte';
+  import { DEFAULT_CARD_SIZES, DEFAULT_COUNTER_SHAPES, type TrayType } from '$lib/stores/project.svelte';
+  import { createCardStoragePreview, defaultCardStorageParams } from '$lib/models/cardStorageTray';
+  import { DEFAULT_CARD_SIZE_IDS } from '$lib/models/counterTray';
+  import { createDiceTrayBody, defaultDiceTrayParams } from '$lib/models/diceTray';
   import {
     DEFAULT_MINIATURE_RACK_BASE_DEPTH,
     DEFAULT_MINIATURE_RACK_BASE_HEIGHT_TOLERANCE,
@@ -68,6 +71,28 @@
     center: THREE.Vector3;
     tileStacks: TileTrayPosition[];
   } | null {
+    if (type === 'dice') {
+      return {
+        ...centerGeometry(jscadToBufferGeometry(createDiceTrayBody(defaultDiceTrayParams))),
+        tileStacks: []
+      };
+    }
+
+    if (type === 'cardStorage') {
+      const geometry = createCardStoragePreview(
+        {
+          ...defaultCardStorageParams,
+          cardSizeId: DEFAULT_CARD_SIZE_IDS.standard,
+          dividers: [{ id: 'preview-divider', label: '', tab: 'center' }]
+        },
+        DEFAULT_CARD_SIZES
+      );
+      return {
+        ...centerGeometry(jscadToBufferGeometry(geometry)),
+        tileStacks: []
+      };
+    }
+
     if (type === 'tile') {
       const params = {
         ...defaultTileTrayParams,
