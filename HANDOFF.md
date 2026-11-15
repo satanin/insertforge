@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.35`
+- Version visible actual: `1.2.36`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.36 (2026-11-16): usuario acepta el modo vertical de Card Storage y autoriza commit y push junto con v1.2.35. La altura máxima limita las paredes en modo vertical. 31 pruebas y check correctos. Validación impresa pendiente.
 
 - v1.2.35 (2026-11-16): usuario acepta las aberturas frontal y trasera redondeadas y autoriza el commit del bloque Card Storage. Aberturas y apoyo inclinado configurables en Manufacturing. 29 pruebas y check correctos. Validación impresa pendiente.
 

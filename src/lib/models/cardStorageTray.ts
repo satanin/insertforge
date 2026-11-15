@@ -72,6 +72,7 @@ export interface CardStorageParams extends CardSleeveSelection {
   count: number;
   exteriorLength: number;
   maxHeight: number | null;
+  cardAngleMode?: 'fit' | 'upright';
   addTiltSupport?: boolean;
   cardAccessCutouts?: boolean;
   wallThickness: number;
@@ -144,9 +145,12 @@ export function resolveCardStorage(p: CardStorageParams, cards: CardSize[]) {
   const tallest = h + (p.dividers.length ? p.tabHeight : 0);
   const plateThickness = Math.max(thickness, p.dividers.length ? p.dividerThickness : 0);
   const overhead = p.floorThickness + (p.lid ? p.lidThickness + p.lidClearance : 0);
+  const upright = !p.lid && p.cardAngleMode === 'upright';
+  if (upright && p.maxHeight !== null && p.maxHeight <= p.floorThickness)
+    errors.push('Maximum height must leave room for walls above the floor.');
   const projectedHeight = (a: number) => tallest * Math.cos(a) + plateThickness * Math.sin(a);
   let angle = 0;
-  if (p.maxHeight !== null && projectedHeight(0) + overhead > p.maxHeight) {
+  if (!upright && p.maxHeight !== null && projectedHeight(0) + overhead > p.maxHeight) {
     // Limit to 60 degrees from upright to retain useful support and a finite pitch.
     const limit = Math.PI / 3;
     if (projectedHeight(limit) + overhead > p.maxHeight) {
@@ -175,14 +179,18 @@ export function resolveCardStorage(p: CardStorageParams, cards: CardSize[]) {
       : Math.max(0, Math.floor(((p.exteriorLength - fixedDepth) * cos) / thickness + 1e-8));
   const depth = p.sizing === 'length' ? p.exteriorLength : fixedDepth + (capacity * thickness) / cos;
   if (capacity < 1) errors.push('Exterior length cannot fit the separators and at least one card at this height.');
-  const height = overhead + projectedHeight(angle);
-  const wallHeight = p.lid ? height - p.lidThickness : p.floorThickness + h * cos + thickness * sin;
+  const loadedHeight = overhead + projectedHeight(angle);
+  const wallHeight = upright
+    ? Math.min(p.maxHeight ?? Infinity, p.floorThickness + h)
+    : p.lid ? loadedHeight - p.lidThickness : p.floorThickness + h * cos + thickness * sin;
+  const height = upright ? wallHeight : loadedHeight;
   const finiteDimension = (n: number) => (Number.isFinite(n) && n > 0 ? n : 1);
   return {
     width: finiteDimension(w + 2 * (p.clearance + p.wallThickness)),
     depth: finiteDimension(depth),
     height: finiteDimension(height),
     wallHeight,
+    cardOverhang: upright ? Math.max(0, p.floorThickness + h - wallHeight) : 0,
     capacity: Number.isFinite(capacity) ? capacity : 0,
     angle,
     cardWidth: w,
@@ -283,7 +291,7 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
   }
   if (p.cardAccessCutouts !== false) {
     const cardHeight = r.cardHeight * Math.cos(r.angle);
-    const sill = f + Math.min(cardHeight * 0.25, Math.max(3, w));
+    const sill = f + Math.min(cardHeight * 0.25, (H - f) / 2, Math.max(3, w));
     const halfWidth = r.cardWidth * 0.35;
     const lowerHalfWidth = halfWidth * 0.8;
     const shoulder = sill + halfWidth - lowerHalfWidth;

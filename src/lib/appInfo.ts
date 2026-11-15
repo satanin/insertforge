@@ -1,5 +1,5 @@
 export const APP_NAME = 'InsertForge';
-export const APP_VERSION = '1.2.35';
+export const APP_VERSION = '1.2.36';
 
 export const APP_LINKS = {
   changelog: '/changelog',

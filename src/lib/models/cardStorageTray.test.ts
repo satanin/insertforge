@@ -19,6 +19,29 @@ const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
 });
 
 describe('Card Storage', () => {
+  it('limits the open tray walls while showing cards upright above them', () => {
+    const p = params({ cardAngleMode: 'upright', maxHeight: 30, addTiltSupport: true });
+    const r = resolveCardStorage(p, cards);
+    expect(r.valid).toBe(true);
+    expect(r.angle).toBe(0);
+    expect(r.height).toBe(30);
+    expect(r.cardOverhang).toBe(p.floorThickness + r.cardHeight - 30);
+    const [body] = createCardStorageParts(p, cards);
+    expect(jscad.measurements.measureBoundingBox(body.geometry)[1][2]).toBeCloseTo(30);
+    expect(createCardStorageParts({ ...p, addTiltSupport: false }, cards)[0].geometry).toEqual(body.geometry);
+    const [stack] = getCardStoragePositions(p, cards);
+    expect(stack.cardDividerTiltAngle).toBe(0);
+    expect(stack.cardDividerProjectedHeight).toBe(r.cardHeight);
+    expect(resolveCardStorage({ ...p, maxHeight: p.floorThickness }, cards).valid).toBe(false);
+  });
+
+  it('uses the height-fitting angle when a sliding lid is present', () => {
+    const p = params({ lid: true, maxHeight: 60, cardAngleMode: 'upright' });
+    const fit = resolveCardStorage({ ...p, cardAngleMode: 'fit' }, cards);
+    expect(fit.valid).toBe(true);
+    expect(fit.angle).toBeGreaterThan(0);
+    expect(resolveCardStorage(p, cards)).toEqual(fit);
+  });
   it.each([false, true])('opens both ends while retaining the floor and side rails with lid=%s', (lid) => {
     const p = params({ lid, lidText: '', maxHeight: 60 });
     const r = resolveCardStorage(p, cards);
