@@ -275,13 +275,15 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
   if (r.angle > 0 && p.addTiltSupport !== false) {
     const supportHeight = r.cardHeight * Math.cos(r.angle);
     const lean = supportHeight * Math.tan(r.angle);
+    const back = lean + c + w / 2;
     const wedge = extrudeLinear(
       { height: W - 2 * w },
       polygon({
         points: [
           [0, 0],
           [supportHeight, lean],
-          [0, lean]
+          [supportHeight, back],
+          [0, back]
         ]
       })
     );

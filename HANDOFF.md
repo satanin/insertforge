@@ -6,7 +6,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.37`
+- Version visible actual: `1.2.38`
 
 ## Desarrollo local
 
@@ -36,6 +36,8 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.38 (2026-11-17): cerrado el hueco entre el reposo inclinado de Card Storage y la pared. 33 pruebas y check correctos. Usuario autoriza commit y push.
 
 - v1.2.37 (2026-11-16): añadidas vistas previas rotatorias de Dice Tray y Card Storage en Add loose tray. Usuario solicita commit y push.
 

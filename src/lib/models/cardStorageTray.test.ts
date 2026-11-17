@@ -74,6 +74,16 @@ describe('Card Storage', () => {
     expect(measureBoundingBox(unsupportedBody.geometry)).toEqual(measureBoundingBox(supportedBody.geometry));
     expect(unsupportedParts).toEqual(supportedParts);
   });
+  it.each([false, true])('fills the gap between the tilted support and end wall with lid=%s', (lid) => {
+    const p = params({ lid, lidText: '', maxHeight: 60 });
+    const r = resolveCardStorage(p, cards);
+    const [body] = createCardStorageParts(p, cards);
+    const probe = jscad.primitives.cuboid({
+      size: [0.2, 0.2, 0.2],
+      center: [p.wallThickness + 5, r.depth - p.wallThickness - p.clearance / 2, p.floorThickness + 5]
+    });
+    expect(jscad.measurements.measureVolume(jscad.booleans.intersect(body.geometry, probe))).toBeCloseTo(0.008, 6);
+  });
   it.each([false, true])('rounds the body and lid=%s without changing capacity, guides or dividers', (lid) => {
     const p = params({ lid, lidText: '', maxHeight: 60 });
     expect(defaultCardStorageParams.outerCornerRadius).toBe(3);
