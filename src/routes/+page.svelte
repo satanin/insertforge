@@ -94,7 +94,7 @@
     saveManualLayout,
     clearManualLayout
   } from '$lib/stores/project.svelte';
-  import type { Box, CupTray, Project, Tray } from '$lib/types/project';
+  import type { Box, CupTray, Project, ProjectType, Tray } from '$lib/types/project';
   import type { BufferGeometry } from 'three';
   import { onDestroy, untrack } from 'svelte';
   import jscad from '@jscad/modeling';
@@ -140,7 +140,8 @@
   interface CommunityProject {
     id: string;
     name: string;
-    author: string;
+    author?: string;
+    projectType?: ProjectType;
     file: string;
     description?: string;
     game?: string;
@@ -611,6 +612,8 @@
   let allLayersExplosionAmount = $state(50); // Default to current behavior (20mm separation)
   let showCounters = $state(false);
   let communityProjects = $state<CommunityProject[]>([]);
+  const matchingCommunityProjects = $derived(communityProjects.filter(entry =>
+    (entry.projectType ?? 'insert') === (getProject().projectType ?? 'insert')));
   let showReferenceLabels = $state(false);
   let showPreviewSizes = $state(false);
   let showLidPreview = $state(true);
@@ -811,7 +814,8 @@
         throw new Error(`Project request failed (${res.status})`);
       }
 
-      const data = (await res.json()) as Project;
+      const data = importProjectFromJson(await res.text());
+      checkImportType(data);
       globalGeometryCache = null;
       selectedGeometryCache.clear();
       layerGeometryCache.clear();
@@ -2526,6 +2530,13 @@
     }
   }
 
+  function checkImportType(data: Project) {
+    const type = data.projectType ?? 'insert';
+    if (type !== (getProject().projectType ?? 'insert')) {
+      throw new Error(`Open ${type === 'shelf-storage' ? 'Shelf storage' : 'an Insert project'} to import this file.`);
+    }
+  }
+
   async function handleImportJson(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -2534,6 +2545,7 @@
     try {
       const text = await file.text();
       const data = importProjectFromJson(text);
+      checkImportType(data);
       globalGeometryCache = null;
       selectedGeometryCache.clear();
       layerGeometryCache.clear();
@@ -2542,6 +2554,7 @@
       error = '';
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to import JSON';
+      addToast({ data: { title: 'Import failed', body: error, type: 'danger' } });
       console.error('Import JSON error:', e);
     }
 
@@ -3104,7 +3117,23 @@
 <InventoryPanel bind:open={inventoryUi.open} />
 
 {#if getProject().projectType === 'shelf-storage'}
-  <ShelfWorkspace {isMobile} />
+  <input bind:this={jsonFileInput} type="file" accept=".json" onchange={handleImportJson} hidden />
+  <ShelfWorkspace {isMobile}>
+    {#snippet projectFiles()}
+      <Popover>
+        {#snippet trigger()}
+          <Button variant="special">Import / Export <Icon Icon={IconChevronDown} /></Button>
+        {/snippet}
+        {#snippet content()}
+          {#each matchingCommunityProjects as entry (entry.id)}
+            <Button variant="ghost" onclick={() => loadCommunityProject(entry)}>Load {entry.name}</Button>
+          {/each}
+          <Button variant="ghost" onclick={() => jsonFileInput?.click()}>Import project JSON</Button>
+          <Button variant="ghost" onclick={handleExportJson}>Export project JSON</Button>
+        {/snippet}
+      </Popover>
+    {/snippet}
+  </ShelfWorkspace>
 {:else if isMobile}
   <!-- MOBILE LAYOUT: Vertical PaneGroup with manual collapse control -->
   <PaneGroup direction="vertical" class="paneGroup">
@@ -3278,14 +3307,14 @@
               {/snippet}
               {#snippet content()}
                 <div class="popoverMenu">
-                  {#if communityProjects.length > 0}
+                  {#if matchingCommunityProjects.length > 0}
                     <FormControl label="Load community project" name="communityProject">
                       {#snippet input({ inputProps })}
                         <Select
                           selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
+                          options={matchingCommunityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
                           onSelectedChange={(selected) => {
-                            const project = communityProjects.find((p) => p.id === selected[0]);
+                            const project = matchingCommunityProjects.find((p) => p.id === selected[0]);
                             if (project) {
                               loadCommunityProject(project);
                             }
@@ -3561,14 +3590,14 @@
               {/snippet}
               {#snippet content()}
                 <div class="popoverMenu">
-                  {#if communityProjects.length > 0}
+                  {#if matchingCommunityProjects.length > 0}
                     <FormControl label="Load community project" name="communityProject">
                       {#snippet input({ inputProps })}
                         <Select
                           selected={[]}
-                          options={communityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
+                          options={matchingCommunityProjects.map((p) => ({ value: p.id, label: getCommunityProjectOptionLabel(p) }))}
                           onSelectedChange={(selected) => {
-                            const project = communityProjects.find((p) => p.id === selected[0]);
+                            const project = matchingCommunityProjects.find((p) => p.id === selected[0]);
                             if (project) {
                               loadCommunityProject(project);
                             }

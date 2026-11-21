@@ -13,6 +13,26 @@ const overlap = (a: Geom3, b: Geom3) => volume(jscad.booleans.intersect(a, b));
 const move = (g: Geom3, x: number, y: number, z: number) => jscad.transforms.translate([x, y, z], g);
 
 describe('modular shelf card drawer', () => {
+  it('keeps the same shell and handle when closing the identification window', () => {
+    const p = { ...defaults, handleClearance: 0.12, handleRetention: true };
+    const open = createShelfDrawerParts(p, cards);
+    const closed = createShelfDrawerParts({ ...p, labelWindow: false }, cards);
+    expect(closed.shell).toEqual(open.shell);
+    expect(closed.handle).toEqual(open.handle);
+    expect(closed.drawerOffset).toEqual(open.drawerOffset);
+    expect(closed.resolved.capacity).toBe(open.resolved.capacity);
+    expect(overlap(closed.drawer, closed.handle)).toBeLessThan(1e-5);
+    expect(volume(closed.drawer)).toBeGreaterThan(volume(open.drawer));
+    const r = closed.resolved;
+    const probe = (y: number, z: number) => jscad.primitives.cuboid({ size: [0.2, 0.2, 0.2], center: [r.drawerWidth / 2, y, z] });
+    expect(overlap(closed.drawer, probe(r.labelFaceWall / 2, r.drawerHeight / 2))).toBeCloseTo(0.008);
+    expect(overlap(closed.drawer, probe(r.frontThickness - 0.5, r.drawerHeight / 2))).toBeCloseTo(0);
+    expect(overlap(closed.drawer, probe(r.frontThickness - 0.5, r.drawerHeight - r.handleDrop - 1))).toBeCloseTo(0.008);
+    const [x, y, z] = closed.drawerOffset;
+    for (const travel of [0, 50, 200]) {
+      expect(overlap(closed.shell, move(closed.drawer, x, y - travel, z))).toBeLessThan(1e-5);
+    }
+  });
   it('thickens the flat-floor drawer from 1.7 to 2 mm by raising the shell 0.3 mm without reducing useful clearances', () => {
     const trial = { ...defaults, shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
       drawerFloor: 1.7, bottomTracks: false, headroom: 1 };
@@ -141,9 +161,9 @@ describe('modular shelf card drawer', () => {
     expect(r.capacity).toBe(740);
     const sleeved = resolveShelfDrawer({ ...fixture, sleeve: 'premium' }, cards);
     expect(sleeved.capacity).toBe(277);
-    const noWindow = resolveShelfDrawer({ ...defaults, labelWindow: false }, cards);
-    expect(noWindow.capacity).toBeGreaterThan(r.capacity); // Solid backing reserves 1.2 mm additional depth.
-    expect(noWindow.drawerHeight).toBeLessThan(r.drawerHeight);
+    const noWindow = resolveShelfDrawer({ ...fixture, labelWindow: false }, cards);
+    expect(noWindow.capacity).toBe(r.capacity);
+    expect(noWindow.drawerHeight).toBe(r.drawerHeight);
     expect(r.drawerHeight).toBeCloseTo(101.85);
     expect(r.labelZ).toBeLessThan(defaults.drawerFloor + 18);
   });

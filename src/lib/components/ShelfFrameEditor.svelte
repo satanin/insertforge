@@ -48,6 +48,10 @@
   {#if error}<p role="alert">{error}</p>{/if}
 </section>
 <style>
-  section { padding:1rem; display:flex; flex-direction:column; gap:0.85rem; } h3 { margin:0.5rem 0 0; font-size:0.95rem; } label { display:flex; flex-direction:column; gap:0.35rem; } .grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
-  input, select, button { width:100%; box-sizing:border-box; min-width:0; font:inherit; color:var(--fg); background:var(--inputBg); border:var(--borderThin); padding:0.45rem; border-radius:0.3rem; } button { cursor:pointer; } output, .status { font-size:0.8rem; } .status { color:var(--fgMuted); } [role='alert'] { color:#ef987d; }
+  section { padding:1rem; display:flex; flex-direction:column; gap:0.85rem; } h3 { margin:0.5rem 0 0; font-size:1.05rem; } label { display:flex; flex-direction:column; gap:0.35rem; min-width:0; } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.75rem; }
+  input, select, button { width:100%; box-sizing:border-box; min-width:0; min-height:2.5rem; font:inherit; color:var(--fg); background:var(--inputBg); border:var(--borderThin); padding:0.45rem 0.6rem; border-radius:0.4rem; }
+  select { appearance:auto; }
+  button, select { cursor:pointer; }
+  output, .status { font-size:0.9375rem; }
+  .status { color:var(--fgMuted); } [role='alert'] { color:#ef987d; }
 </style>

@@ -65,7 +65,7 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
   const handleTongueThickness = 1.4;
   const labelSlotDepth = Math.max(handleTongueThickness + 2 * handleClearance, premiumThickness + 0.6);
   const labelSlotY = labelFaceWall;
-  const frontThickness = Math.max(labelWindow ? labelFaceWall + labelSlotDepth + labelBackWall : 3, p.drawerWall);
+  const frontThickness = Math.max(labelFaceWall + labelSlotDepth + labelBackWall, p.drawerWall);
   const handleWall = 2.4, handleDrop = 8;
   const handleRise = 0, handleStopHeight = 3, handleStopWidth = 3;
   const handleSeatDepth = handleWall + HANDLE_GAP;
@@ -81,18 +81,18 @@ export function resolveShelfDrawer(p: ShelfDrawerParams, cards: CardSize[]) {
   }, cards);
   errors.push(...content.errors);
   const labelCardWidth = p.labelWidth ?? 63, labelCardHeight = p.labelHeight ?? 88;
-  if (labelWindow && (!Number.isFinite(labelCardWidth) || labelCardWidth < 20 || labelCardWidth > 150 ||
-    !Number.isFinite(labelCardHeight) || labelCardHeight < 20 || labelCardHeight > 180))
+  if (!Number.isFinite(labelCardWidth) || labelCardWidth < 20 || labelCardWidth > 150 ||
+    !Number.isFinite(labelCardHeight) || labelCardHeight < 20 || labelCardHeight > 180)
     errors.push('Identification card must be 20–150 mm wide and 20–180 mm high.');
   // 1.5 mm per edge is an explicit sleeve envelope allowance, not a universal sleeve standard.
   const labelSleeveMargin = 1.5;
   const labelWidth = labelCardWidth + 2 * labelSleeveMargin;
   const labelHeight = labelCardHeight + 2 * labelSleeveMargin;
   const labelZ = p.drawerFloor;
-  const drawerWidth = Math.max(content.width, labelWindow ? labelWidth + 0.6 + 2 * p.drawerWall : 0);
+  const drawerWidth = Math.max(content.width, labelWidth + 0.6 + 2 * p.drawerWall);
   const labelHandleGap = 0.85;
   const drawerHeight = Math.max(content.height + p.headroom,
-    labelWindow ? labelZ + labelHeight + handleDrop + labelHandleGap : 0);
+    labelZ + labelHeight + handleDrop + labelHandleGap);
   const handleStopZ = drawerHeight - handleWall - HANDLE_GAP;
   const bottomTracks = p.bottomTracks !== false;
   const trackHeight = bottomTracks ? 0.5 : 0, trackWidth = Math.max(3, p.drawerWall);
@@ -216,6 +216,16 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
     front = subtract(frontBase,
       block(r.labelSlotX, r.labelSlotY, r.labelZ, r.labelSlotWidth, r.labelSlotDepth, h - r.labelZ + 0.1),
       block(r.labelSlotX + 3, -0.1, r.labelZ + 3, r.labelSlotWidth - 6, r.labelFaceWall + 0.2, h - r.labelZ - 3 + 0.1));
+  } else {
+    const faceThickness = Math.min(r.frontThickness, Math.max(t, r.labelFaceWall));
+    const reinforcementBottom = h - r.handleDrop - r.handleClearance - r.labelBackWall;
+    const rampBottom = reinforcementBottom - (r.frontThickness - faceThickness);
+    // Grow the upper socket backing at 45 degrees from the thin front wall.
+    // The solid band extends one backing-wall thickness below the tongue seat.
+    front = sideProfile(faceLeft, faceWidth, [
+      [0, f], [faceThickness, f], [faceThickness, rampBottom],
+      [r.frontThickness, reinforcementBottom], [r.frontThickness, h], [0, h]
+    ]);
   }
   const drawerBase = union(block(0, 0, 0, w, d, f), block(faceLeft, 0, 0, faceWidth, r.frontThickness, f), front,
     block(0, d - t, f, w, t, sideHeight - f), sideProfile(0, t, sidePoints),
@@ -223,20 +233,22 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
   // Recess only the central frontal edge. Both full-height side-wall junctions
   // stay continuous, and their inner faces guide the removable handle sideways.
   const fit = r.handleClearance;
-  const handleLeft = Math.max(t, r.labelWindow ? r.labelSlotX : t) + fit;
+  const handleLeft = Math.max(t, r.labelSlotX) + fit;
   const handleWidth = w - 2 * handleLeft;
   const recessedDrawer = subtract(drawerBase,
-    block(t, -0.1, h - r.handleSeatDepth, w - 2 * t, r.frontThickness + 0.1, r.handleSeatDepth + 0.1));
+    block(t, -0.1, h - r.handleSeatDepth, w - 2 * t, r.frontThickness + 0.1, r.handleSeatDepth + 0.1),
+    block(r.labelSlotX, r.labelSlotY, h - r.handleDrop - fit,
+      r.labelSlotWidth, r.labelSlotDepth, r.handleDrop + fit + 0.1));
   // The tall backing remains the load path between the two U legs. Shoulders
   // support the bridge at its ends, behind (never inside) the card channel.
-  const stopBands = r.labelWindow ? [
-    [r.labelSlotY + r.labelSlotDepth, r.frontThickness - r.labelSlotY - r.labelSlotDepth]] : [[0, r.frontThickness]];
+  const stopBands = [
+    [r.labelSlotY + r.labelSlotDepth, r.frontThickness - r.labelSlotY - r.labelSlotDepth]];
   const stops = [t, w - t - r.handleStopWidth].flatMap(x => stopBands.map(([y, depth]) =>
     block(x, y, r.handleStopZ - r.handleStopHeight - 0.1, r.handleStopWidth, depth,
       r.handleStopHeight + 0.1)));
   let drawer = union(recessedDrawer, ...stops);
-  const outerFront = r.labelWindow ? r.labelSlotY + fit : -fit - r.handleWall;
-  const innerFront = outerFront + (r.labelWindow ? r.handleTongueThickness : r.handleWall);
+  const outerFront = r.labelSlotY + fit;
+  const innerFront = outerFront + r.handleTongueThickness;
   const outerBack = r.frontThickness + fit + r.handleWall;
   const low = h - r.handleDrop, cap = h - r.handleWall;
   // The U bridge sits flush with the drawer top, entirely between its sides.

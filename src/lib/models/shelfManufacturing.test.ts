@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import jscad from '@jscad/modeling';
-import { createShelfManufacturing, defaultShelfManufacturing, resolveShelfManufacturing, shelfCornerSamplePlate, shelfDividerRearReplacement } from './shelfManufacturing';
+import { createShelfManufacturing, defaultShelfManufacturing, resolveShelfManufacturing, shelfCornerSamplePlate, shelfDividerRearReplacement, shelfManufacturingSets, shelfClosedFrontSample } from './shelfManufacturing';
 import { createShelfDrawerParts, defaultShelfDrawerParams } from './shelfStorage';
 import { buildShelfManufacturingExport, buildShelfModuleExport, buildShelfCornerSampleExport } from '$lib/utils/exportShelfModule';
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
@@ -11,7 +11,7 @@ import { prepareShelfMesh } from '$lib/utils/prepareShelfMesh';
 const cards = [{ id: 'standard', name: 'Standard', width: 66, length: 91, thickness: 0.3 }];
 const params = { ...defaultShelfDrawerParams, depth: 390, shellThickness: 3.6, roofThickness: 3.6,
   socketWebThickness: 1, drawerFloor: 2, bottomTracks: false, headroom: 1, handleClearance: 0.12, handleRetention: true,
-  manufacturing: { ...defaultShelfManufacturing, split: true } };
+  manufacturing: { ...defaultShelfManufacturing, split: true, jointStyle: 'keys' as const } };
 const volume = jscad.measurements.measureVolume;
 const bounds = jscad.measurements.measureBoundingBox;
 // @jscad/modeling's declaration exposes a module where runtime exports a function.
@@ -19,6 +19,47 @@ const generalize = jscad.modifiers.generalize as unknown as (options: { snap: bo
 
 describe('depth section manufacturing', () => {
   const hybridParams = { ...params, manufacturing: { ...params.manufacturing, jointStyle: 'lap-keys' as const } };
+  it('cuts a short full-height closed front with the exact handle socket', () => {
+    const p = { ...hybridParams, labelWindow: true };
+    const sample = shelfClosedFrontSample(p, cards);
+    const parts = createShelfDrawerParts({ ...p, labelWindow: false }, cards);
+    expect(p.labelWindow).toBe(true);
+    expect(sample.fits).toBe(true);
+    for (const [axis, expected] of [parts.resolved.drawerWidth, 25, parts.resolved.drawerHeight].entries())
+      expect(sample.size[axis]).toBeCloseTo(expected, 6);
+    expect(Math.abs(volume(jscad.booleans.subtract(sample.geometry, parts.drawer)))).toBeLessThan(1e-6);
+    expect(Math.abs(volume(jscad.booleans.intersect(sample.geometry, parts.handle)))).toBeLessThan(1e-6);
+    const mesh = prepareShelfMesh(sample.printGeometry);
+    jscad.geometries.geom3.validate(generalize({ snap: true, triangulate: true }, mesh));
+    expect(volume(mesh)).toBeCloseTo(volume(sample.geometry), 4);
+  });
+  it('exports a shell set with both sections and eight separate joining keys', async () => {
+    const model = createShelfManufacturing(hybridParams, cards);
+    const set = shelfManufacturingSets(model)[0];
+    expect(set.pieces).toHaveLength(10);
+    expect(set.plates).toBe(1);
+    for (let i = 0; i < set.pieces.length; i++) {
+      const a = bounds(set.pieces[i].geometry);
+      expect(a[0][2]).toBeCloseTo(0);
+      expect(a[0][0]).toBeGreaterThanOrEqual(model.settings.margin - 1e-6);
+      expect(a[1][0]).toBeLessThanOrEqual(model.settings.bedWidth - model.settings.margin + 1e-6);
+      expect(a[1][1]).toBeLessThanOrEqual(model.settings.bedDepth - model.settings.margin + 1e-6);
+      for (let j = 0; j < i; j++) {
+        const b = bounds(set.pieces[j].geometry);
+        expect(a[0][0] >= b[1][0] || b[0][0] >= a[1][0] ||
+          a[0][1] >= b[1][1] || b[0][1] >= a[1][1]).toBe(true);
+      }
+    }
+    const result = await buildShelfManufacturingExport({ id: 'set', name: 'Test', type: 'card-drawer', params: hybridParams }, cards, 'set-shell', '3mf');
+    const reader = new ZipReader(new BlobReader(result.blob));
+    const entries = await reader.getEntries();
+    const entry = entries.find(entry => entry.filename === '3D/3dmodel.model');
+    if (!entry || entry.directory) throw new Error('Missing model entry.');
+    const xml = await entry.getData!(new TextWriter());
+    expect(xml.match(/<object\s/g)).toHaveLength(10);
+    await reader.close();
+    expect(shelfManufacturingSets(model)[1].pieces).toHaveLength(6);
+  });
   it('prints the divider joint flat without drawer keys and preserves the shell', () => {
     const model = createShelfManufacturing({ ...hybridParams, manufacturing: {
       ...hybridParams.manufacturing, jointStyle: 'divider-dovetail'

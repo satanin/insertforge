@@ -1,20 +1,22 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { PaneGroup, Pane, PaneResizer } from 'paneforge';
   import { getProject, addShelfModule, addShelfFrame, selectShelfModule, removeShelfModule, updateShelfModule, syncShelfFrames } from '$lib/stores/project.svelte';
   import { getProjectCardSizes } from '$lib/utils/projectCards';
   import { resolveShelfDrawer, createShelfPreview, type ShelfDrawerParams, type ShelfPartId, type ShelfPreviewCote } from '$lib/models/shelfStorage';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
   import { exportShelfModule } from '$lib/utils/exportShelfModule';
+  import { buildShelfProjectExport, planShelfProjectPlates, shelfProjectPreview } from '$lib/utils/exportShelfProject';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
   import ShelfFitPreview from './ShelfFitPreview.svelte';
   import ShelfFrameEditor from './ShelfFrameEditor.svelte';
   import ShelfManufacturingEditor from './ShelfManufacturingEditor.svelte';
-  import { createShelfManufacturing, shelfJointPreview, shelfBedPreview } from '$lib/models/shelfManufacturing';
+  import { createShelfManufacturing, defaultShelfManufacturing, shelfJointPreview, shelfManufacturingSets } from '$lib/models/shelfManufacturing';
   import { createShelfFrame, resolveShelfFrame } from '$lib/models/shelfFrame';
   import type { BufferGeometry } from 'three';
 
-  let { isMobile = false }: { isMobile?: boolean } = $props();
+  let { isMobile = false, projectFiles }: { isMobile?: boolean; projectFiles?: Snippet } = $props();
   const project = $derived(getProject());
   const modules = $derived(project.shelfModules ?? []);
   const selected = $derived(modules.find(m => m.id === project.selectedShelfModuleId) ?? modules[0]);
@@ -32,30 +34,42 @@
   let frameSyncMessage = $state('');
   let busy = $state(false);
   let exportError = $state('');
+  let projectExportMessage = $state('');
+  let projectExportWarnings = $state<string[]>([]);
+  const printerReference = $derived(selected?.type === 'card-drawer' ? selected : modules.find(module => module.type === 'card-drawer'));
+  const projectPrintSettings = $derived({ ...defaultShelfManufacturing, ...printerReference?.params.manufacturing });
+  let showProjectPreview = $state(false);
+  const projectPreview = $derived.by(() => {
+    if (!showProjectPreview) return null;
+    try { return { plan: planShelfProjectPlates(project, projectPrintSettings), error: '' }; }
+    catch (error) { return { plan: null, error: error instanceof Error ? error.message : 'Preview failed.' }; }
+  });
   let unlockedModuleId = $state<string | null>(null);
   const systemEditing = $derived(!!selected && unlockedModuleId === selected.id);
   let geometry = $state<BufferGeometry | null>(null);
   let cotes = $state<ShelfPreviewCote[]>([]);
-  let measuredPart = $state('');
-  const partCote = $derived(cotes.find(cote => cote.part === measuredPart));
+  let showDimensions = $state(false);
+  const partCotes = $derived(showDimensions ? cotes : []);
   let manufacturingPart = $state('shell-1');
   let jointPreview = $state(false), jointSeparation = $state(25);
   const manufacturingModel = $derived.by(() => {
     if (selected?.type !== 'card-drawer' || !selected.params.manufacturing) return null;
     try { return createShelfManufacturing(selected.params, cards); } catch { return null; }
   });
-  const manufacturingItems = $derived(manufacturingModel?.items.filter(item => item.part !== 'sample') ?? []);
+  const manufacturingItems = $derived(manufacturingModel ? shelfManufacturingSets(manufacturingModel) : []);
   const manufacturingItem = $derived(manufacturingItems.find(item => item.id === manufacturingPart) ?? manufacturingItems[0]);
   $effect(() => {
     const nextCotes: ShelfPreviewCote[] = [];
-    const next = selected?.type === 'open-frame' && frameResolved?.valid
+    const next = showProjectPreview && projectPreview?.plan
+      ? jscadToBufferGeometry(shelfProjectPreview(projectPreview.plan, projectPrintSettings))
+      : selected?.type === 'open-frame' && frameResolved?.valid
       ? jscadToBufferGeometry(createShelfFrame(selected.params, print))
       : selected?.type === 'card-drawer' && resolved?.valid
-        ? jscadToBufferGeometry(print && manufacturingItem && manufacturingModel ? shelfBedPreview(manufacturingItem, manufacturingModel.settings)
+        ? jscadToBufferGeometry(print && manufacturingItem && manufacturingModel ? manufacturingItem.geometry
           : jointPreview && manufacturingModel ? shelfJointPreview(manufacturingModel, jointSeparation, nextCotes)
           : createShelfPreview(selected.params, cards, extraction, contents, { cutaway, stack, adjacent, print, cotes: nextCotes })) : null;
     geometry = next;
-    cotes = nextCotes;
+    cotes = showProjectPreview ? [] : print && manufacturingItem ? manufacturingItem.pieces.map(piece => ({ part: piece.name, bounds: piece.bounds })) : nextCotes;
     return () => next?.dispose();
   });
 
@@ -81,7 +95,49 @@
     catch (e) { exportError = e instanceof Error ? e.message : 'Export failed.'; }
     finally { busy = false; }
   }
+  async function downloadProject() {
+    busy = true;
+    exportError = '';
+    projectExportMessage = '';
+    projectExportWarnings = [];
+    try {
+      const result = await buildShelfProjectExport(project, projectPrintSettings);
+      const url = URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      projectExportMessage = `${result.plateCount} plates exported. Open as a project in Bambu Studio.`;
+      projectExportWarnings = result.warnings;
+    } catch (error) {
+      exportError = error instanceof Error ? error.message : 'Project export failed.';
+    } finally { busy = false; }
+  }
 </script>
+
+{#snippet projectExportPanel()}
+  <details open>
+    <summary>Export project</summary>
+    <section>
+      <div class="actions">
+        <button disabled={busy || !modules.length} onclick={() => { showProjectPreview = true; shelfFit = false; }}>Preview all plates</button>
+        <button disabled={busy || !modules.length} onclick={downloadProject}>{busy ? 'Preparing export…' : 'Download project · 3MF'}</button>
+      </div>
+      <HelpRow><output>{projectPrintSettings.bedWidth} × {projectPrintSettings.bedDepth} × {projectPrintSettings.buildHeight} mm</output><HelpTip label="About project plates">Includes every module, its handle and the required joining keys. Uses the printer volume from {printerReference?.name ?? 'the default configuration'}. Smaller beds use additional plates. Open as a project in Bambu Studio and select your printer and filament before slicing.</HelpTip></HelpRow>
+      {#if projectPreview?.error}<p role="alert">{projectPreview.error}</p>{/if}
+      {#if projectPreview?.plan}
+        <details><summary>{projectPreview.plan.plates.length} plates</summary><section>
+          {#each projectPreview.plan.plates as plate, index}<output>{index + 1}. {plate.name} · {plate.pieces.length} parts</output>{/each}
+        </section></details>
+        {#each projectPreview.plan.warnings as warning}<output class="printReview">{warning}</output>{/each}
+      {/if}
+      {#if projectExportMessage}<output>{projectExportMessage}</output>{/if}
+      {#each projectExportWarnings as warning}<output class="printReview">{warning}</output>{/each}
+      {#if exportError}<p role="alert">{exportError}</p>{/if}
+    </section>
+  </details>
+{/snippet}
 
 <PaneGroup direction={isMobile ? 'vertical' : 'horizontal'} class="shelfPanes">
   <Pane defaultSize={75} minSize={30}>
@@ -110,20 +166,21 @@
       {#if selected}
         <div class="modelCanvas" class:modelHidden={shelfFit}>
         {#await import('./TrayViewer.svelte') then { default: TrayViewer }}
-          <TrayViewer {geometry} {partCote} selectedTrayId={selected.id} gameContainerWidth={Math.max(selected.params.depth * 1.8, (resolved?.height ?? 100) * 2)}
-            gameContainerDepth={selected.params.depth} selectionType="tray" hidePrintBed={true} />
+          <TrayViewer {geometry} {partCotes} selectedTrayId={selected.id} gameContainerWidth={showProjectPreview && projectPreview?.plan ? Math.ceil(Math.sqrt(projectPreview.plan.plates.length)) * projectPrintSettings.bedWidth * 1.2 : Math.max(selected.params.depth * 1.8, (resolved?.height ?? 100) * 2)}
+            gameContainerDepth={showProjectPreview && projectPreview?.plan ? Math.ceil(Math.sqrt(projectPreview.plan.plates.length)) * projectPrintSettings.bedDepth * 1.2 : selected.params.depth} selectionType="tray" hidePrintBed={true} />
         {/await}
         </div>
         <div class="previewControls">
-          {#if !print && cotes.length}
-            <label>Dimensions <select aria-label="Part dimensions" value={partCote?.part ?? ''} onchange={e => measuredPart = e.currentTarget.value}>
-              <option value="">Off</option>
-              {#each cotes as cote}<option value={cote.part}>{cote.part}</option>{/each}
-            </select></label>
+          {#if showProjectPreview}
+            <output>Project preview · {projectPreview?.plan?.plates.length ?? 0} plates</output>
+            <button onclick={() => showProjectPreview = false}>Back to module</button>
+          {:else}
+          {#if cotes.length}
+            <label><input type="checkbox" bind:checked={showDimensions} /> Dimensions</label>
           {/if}
           {#if selected.type === 'card-drawer' && resolved?.valid}
             {#if print && manufacturingItem}
-              <output>{manufacturingItem.name} · X × Y × Z: {manufacturingItem.size.map(v => v.toFixed(2)).join(' × ')} mm</output>
+              <output>{manufacturingItem.name} · {manufacturingItem.pieces.length} printable parts · {selected.params.depth} mm shell</output>
             {:else}
               <output>Depth · Shell {resolved.depth.toFixed(2)} mm · Drawer assembled {resolved.drawerDepth.toFixed(2)} mm without handle</output>
             {/if}
@@ -150,6 +207,7 @@
           <label><input type="checkbox" bind:checked={adjacent} disabled={!resolved?.stacking || print} /> Preview adjacent</label>
           {/if}
           {/if}
+          {/if}
         </div>
         {#if shelfFit && selected.type === 'card-drawer' && resolved?.valid}
           <ShelfFitPreview module={resolved} capacity={resolved.capacity} color={selected.params.handleColor ?? '#df9756'} initialMargin={selected.params.bottomTracks === false && selected.params.drawerFloor >= 2 ? 1.5 : 2} onclose={() => shelfFit = false} />
@@ -163,8 +221,10 @@
   <Pane defaultSize={25} minSize={20}>
     <aside class="shelfEditor" aria-label="Shelf module editor">
       <header><small>SHELF STORAGE · EXPERIMENTAL</small><h2>{selected?.name ?? 'New module'}</h2></header>
+      {@render projectFiles?.()}
       {#if selected?.type === 'open-frame'}
         <ShelfFrameEditor module={selected} />
+        {@render projectExportPanel()}
       {:else if selected?.type === 'card-drawer' && resolved}
         <section>
           <label>Name <input value={selected.name} onchange={e => updateShelfModule(selected.id, {}, e.currentTarget.value)} /></label>
@@ -172,7 +232,8 @@
           <button onclick={() => unlockedModuleId = systemEditing ? null : selected.id}>{systemEditing ? 'Lock system settings' : 'Unlock prototype settings'}</button>
           {#if systemEditing}<output>Prototype editing: changes can break compatibility with printed parts.</output>{/if}
         </section>
-        <details open><summary>Content</summary><section>
+        <details open={systemEditing}><summary>Cards and label</summary><section>
+          <HelpRow><label class="checkField"><input type="checkbox" checked={selected.params.labelWindow !== false} onchange={e => updateShelfModule(selected.id, { labelWindow: e.currentTarget.checked })} /> Identification window</label><HelpTip label="About window options">The closed front retains a short top-loading handle socket. Both options use the same handle and shell dimensions.</HelpTip></HelpRow>
           {#if systemEditing}
           <label>Card format <select value={selected.params.cardSizeId} onchange={e => updateShelfModule(selected.id, { cardSizeId: e.currentTarget.value })}>
             {#each project.cardSizes as card}<option value={card.id}>{card.name} · {card.width} × {card.length} mm</option>{/each}
@@ -186,7 +247,6 @@
             </select></label>
           </div>
           <output>Estimated capacity: {resolved.valid ? resolved.capacity : '—'} cards</output>
-          <label class="checkField"><input type="checkbox" checked={selected.params.labelWindow !== false} onchange={e => updateShelfModule(selected.id, { labelWindow: e.currentTarget.checked })} /> Identification card window</label>
           {#if resolved.labelWindow}
             <div class="fieldGrid">
               <label>Bare label card width (mm)<input type="number" min="20" max="150" value={selected.params.labelWidth ?? 63} onchange={e => numeric('labelWidth', e.currentTarget)} /></label>
@@ -198,7 +258,6 @@
           {:else}
             <output>Card format: {cards.find(card => card.id === selected.params.cardSizeId)?.name ?? selected.params.cardSizeId} · {selected.params.orientation}</output>
             <output>Sleeve: {selected.params.sleeve} · estimated capacity: {resolved.valid ? resolved.capacity : '—'} cards</output>
-            <output>Identification window: {resolved.labelWindow ? 'Yes' : 'No'}</output>
             {#if resolved.labelWindow}<output>Premium label allowance: {resolved.labelWidth.toFixed(1)} × {resolved.labelHeight.toFixed(1)} mm · slot: {resolved.labelSlotDepth.toFixed(2)} mm</output>{/if}
           {/if}
         </section></details>
@@ -208,17 +267,21 @@
           {/if}
           <div class="fieldGrid">
             <label>Exterior depth (mm)<input type="number" min="45" max="1000" step="1" value={selected.params.depth} onchange={e => numeric('depth', e.currentTarget)} /></label>
-            {#if systemEditing}<label>Headroom (mm)<input type="number" min="0" max="40" step="1" value={selected.params.headroom} onchange={e => numeric('headroom', e.currentTarget)} /></label>{:else}<output>Headroom: {selected.params.headroom} mm</output>{/if}
+            {#if systemEditing}<label>Headroom (mm)<input type="number" min="0" max="40" step="1" value={selected.params.headroom} onchange={e => numeric('headroom', e.currentTarget)} /></label>{/if}
           </div>
           {#if resolved.valid}
-            <output>Carcass: {resolved.width.toFixed(1)} × {resolved.depth.toFixed(1)} × {resolved.height.toFixed(1)} mm</output>
-            <output>Depth with handle: {(resolved.depth + resolved.handleProjection).toFixed(1)} mm</output>
-            <output>Drawer assembled without handle (W × D × H): {resolved.drawerWidth.toFixed(2)} × {resolved.drawerDepth.toFixed(2)} × {resolved.drawerHeight.toFixed(2)} mm</output>
-            {#if resolved.stacking}<output>Module pitch: {resolved.bodyWidth.toFixed(1)} × {resolved.bodyHeight.toFixed(1)} mm · males project right and up</output>{/if}
+            <div class="dimensionSummary">
+              <output><strong>Shell</strong> {resolved.width.toFixed(2)} × {resolved.depth.toFixed(2)} × {resolved.height.toFixed(2)} mm</output>
+              <output><strong>Drawer</strong> {resolved.drawerWidth.toFixed(2)} × {resolved.drawerDepth.toFixed(2)} × {resolved.drawerHeight.toFixed(2)} mm</output>
+              <HelpRow><small>Width × depth × height</small><HelpTip label="About dimensions">The drawer dimensions are for the assembled body without its handle. The total depth with the handle is {(resolved.depth + resolved.handleProjection).toFixed(2)} mm.</HelpTip></HelpRow>
+            </div>
           {/if}
-          <HelpRow><span>Automatic width and height</span><HelpTip label="About module dimensions">Width and height follow the card format, headroom, walls and sliding clearances. Depth measures the carcass; the handle projects beyond the front. Capacity is an estimate based on the project card thickness.</HelpTip></HelpRow>
         </section></details>
-        <details open><summary>Manufacturing</summary><section>
+        {#if !resolved.valid}<section role="alert">{#each resolved.errors as error}<p>{error}</p>{/each}</section>{/if}
+        <ShelfManufacturingEditor module={selected} {cards} model={manufacturingModel} projectExport={projectExportPanel} onpreview={id => { showProjectPreview = false; manufacturingPart = id; print = true; shelfFit = false; }} />
+        <details open={systemEditing}><summary>Construction details</summary><section>
+          {#if resolved.stacking}<output>Module pitch: {resolved.bodyWidth.toFixed(2)} × {resolved.bodyHeight.toFixed(2)} mm</output>{/if}
+          {#if !systemEditing}<output>Headroom: {selected.params.headroom} mm</output>{/if}
           {#if systemEditing}
           <div class="fieldGrid">
             {#each manufacturing as field}
@@ -239,6 +302,7 @@
             <output>Handle retention clip: {resolved.handleRetention ? 'Yes' : 'No'} · dovetail connections: {resolved.stacking ? 'Yes' : 'No'}</output>
           {/if}
           <output>Reinforced front: {resolved.frontThickness.toFixed(1)} mm · {resolved.bottomTracks ? `bearing tracks: ${resolved.trackWidth.toFixed(1)} × ${resolved.trackHeight.toFixed(1)} mm` : 'flat shell floor · no bottom tracks'}</output>
+          {#if !resolved.labelWindow}<output>Closed front wall: {Math.min(resolved.frontThickness, Math.max(selected.params.drawerWall, resolved.labelFaceWall)).toFixed(2)} mm · upper handle reinforcement with 45° transition</output>{/if}
           {#if systemEditing}<HelpRow><button disabled={!resolved.bottomTracks} onclick={transferBottomTracks}>Transfer bottom tracks to drawer floor</button><HelpTip label="About floor thickness transfer">Removes the bottom tracks and transfers their height to the drawer floor. Export both shell and drawer; older shells with tracks are incompatible.</HelpTip></HelpRow>{/if}
           {#if resolved.labelWindow}<output>Window support: {resolved.labelFaceWall.toFixed(1)} mm front · at least {resolved.labelBackWall.toFixed(1)} mm solid back</output>{/if}
           <output>Shell lip clearance: {resolved.lipClearance.toFixed(1)} mm · flat rail thickness: {resolved.lipRootThickness.toFixed(1)} mm</output>
@@ -250,9 +314,7 @@
           <HelpRow><span>Connection and stop direction</span><HelpTip label="About stacking">Male dovetails are above and right when looking into the front; sockets are below and left, keeping the left exterior free of projections beside a wall. Rails stop 10 mm before the front; sockets open at the back. The blind end stops the female module moving backwards; forward movement can undo assembly. As agreed, no rear lock is fitted for this first trial. The undercut resists pulling modules directly apart vertically or sideways. These connections are not certified for unsupported arrangements.</HelpTip></HelpRow>
           <p class="printReview">Trial without shell rear lock: a female module can slide forward to disconnect. {resolved.handleRetention ? 'Handle clip fit and elastic release require physical testing.' : 'With the drawer open, the handle lifts off without a snap latch.'}</p>
         </section></details>
-        {#if !resolved.valid}<section role="alert">{#each resolved.errors as error}<p>{error}</p>{/each}</section>{/if}
-        <ShelfManufacturingEditor module={selected} {cards} model={manufacturingModel} onpreview={id => { manufacturingPart = id; print = true; shelfFit = false; }} />
-        {#if !manufacturingModel}
+        {#if !manufacturingModel && !selected.params.manufacturing?.split}
         <details open><summary>Export parts</summary><section>
           <div class="fieldGrid">
             {#each ['shell', 'drawer', 'handle'] as part}
@@ -262,7 +324,6 @@
               </div></div>
             {/each}
           </div>
-          {#if selected.params.manufacturing?.split}<output>Export numbered sections and joining keys from Printer &amp; depth sections above.</output>{/if}
           <HelpRow><span>Print orientation</span><HelpTip label="About print orientation">Shell: rear face down, opening up; lips and rails grow from the rear wall. Drawer: flat floor down, wide frontal base on the bed, card slot and handle seat open upwards. Handle: flat upper face down, U legs and finger lip growing from the bed without a suspended bridge. Preview and exports share transforms and Z=0. Parts are separated, not packed onto a specific printer bed. Slicing and physical validation remain required.</HelpTip></HelpRow>
           <p class="prototypeStatus">Prototype: fit, printability and load capacity unvalidated. No drawer extraction stop yet.</p>
           {#if exportError}<p role="alert">{exportError}</p>{/if}
@@ -288,24 +349,30 @@
   .removePrompt { display:flex; flex-direction:column; gap:0.4rem; font-size:0.8rem; }
   .removePrompt div { display:flex; gap:0.4rem; }
   button:disabled { opacity: 0.4; cursor: default; }
-  .shelfEditor { height: 100%; overflow-y: auto; background: var(--bg); font-size: 0.85rem; }
+  .shelfEditor { height: 100%; overflow-y: auto; background: var(--bg); font-size: max(16px, 1rem); line-height: 1.45; }
   header { padding: 1rem; border-bottom: var(--borderThin); }
-  h2 { font-size: 1.15rem; margin: 0.5rem 0 0; }
+  h2 { font-size: 1.35rem; line-height: 1.2; margin: 0.35rem 0 0; }
   small, .prototypeStatus { color: var(--fgMuted); }
   section { padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
   details { border-bottom: var(--borderThin); }
-  summary { padding: 0.85rem 1rem; font-weight: 600; cursor: pointer; }
+  .shelfEditor :global(summary) { display: list-item; list-style: disclosure-closed inside; padding: 0.8rem 1rem; font-weight: 650; cursor: pointer; background: var(--contrastLow); }
+  .shelfEditor :global(details[open] > summary) { list-style-type: disclosure-open; }
+  .shelfEditor :global(summary::marker) { color: var(--fgPrimary); }
+  .shelfEditor :global(summary:hover) { color: var(--fgPrimary); }
+  .dimensionSummary { display: grid; gap: 0.35rem; padding: 0.7rem; background: var(--contrastLow); border-radius: 0.4rem; font-variant-numeric: tabular-nums; }
   label { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
   .checkField { flex-direction: row; align-items: center; }
   .checkField input, .previewControls input[type='checkbox'] { appearance: auto; position: static; opacity: 1; width: 1rem; height: 1rem; margin: 0; flex: 0 0 auto; accent-color: #9fb8d5; }
-  input:not([type='checkbox'], [type='range']), select { width: 100%; min-width: 0; box-sizing: border-box; border: var(--borderThin); border-radius: 0.3rem; padding: 0.4rem; background: var(--inputBg); }
+  input:not([type='checkbox'], [type='range']), select { width: 100%; min-width: 0; box-sizing: border-box; border: var(--borderThin); border-radius: 0.4rem; min-height: 2.5rem; padding: 0.45rem 0.6rem; background: var(--inputBg); }
+  select { appearance: auto; cursor: pointer; }
   .shelfEditor input[type='color'] { height: 2.1rem; padding: 0.15rem; }
   .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
-  output { display: block; font-size: 0.8rem; }
-  .previewControls { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.75rem; width: max-content; max-width: calc(100% - 2rem); box-sizing: border-box; padding: 0.75rem; background: var(--bg); border: var(--borderThin); border-radius: 0.5rem; font-size: 0.8rem; }
+  output { display: block; font-size: 0.9375em; }
+  .previewControls { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; width: max-content; max-width: calc(100% - 2rem); box-sizing: border-box; padding: 0.75rem; background: var(--bg); border: var(--borderThin); border-radius: 0.5rem; font-size: 0.9375rem; }
   .previewControls label { flex-direction: row; align-items: center; white-space: nowrap; }
   .emptyState { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .partExport { display: flex; flex-direction: column; gap: 0.5rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .prototypeStatus { font-size: 0.75rem; margin: 0; }
   .printReview { font-size: 0.75rem; margin: 0; color: #edc68c; line-height: 1.5; }
   [role='alert'] { color: #ef987d; }

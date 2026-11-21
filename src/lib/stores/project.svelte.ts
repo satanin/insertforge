@@ -3613,10 +3613,13 @@ export function addShelfModule(): ShelfDrawerModule | undefined {
   project.shelfModules ??= [];
   const reference = project.shelfModules.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
     ?? project.shelfModules.find(m => m.type === 'card-drawer');
+  const params = reference?.type === 'card-drawer'
+    ? { ...structuredClone($state.snapshot(reference.params)), depth: defaultShelfDrawerParams.depth }
+    : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() };
+  if (params.manufacturing) params.manufacturing.jointStyle = 'divider-dovetail';
   const module: ShelfDrawerModule = { id: crypto.randomUUID(), type: 'card-drawer',
     name: `Card drawer ${project.shelfModules.length + 1}`,
-    params: reference?.type === 'card-drawer' ? { ...structuredClone($state.snapshot(reference.params)), depth: defaultShelfDrawerParams.depth }
-      : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() } };
+    params };
   project.shelfModules.push(module);
   project.selectedShelfModuleId = module.id;
   autosave();

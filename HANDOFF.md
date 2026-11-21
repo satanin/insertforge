@@ -1,5 +1,25 @@
 # InsertForge Handoff
 
+- 2026-11-21 muestra de frontal cerrado con asiento/clip real, ancho/alto completos y25 mm de fondo. Botón Closed front fit test3MF bajo Drawer en Export parts. Descargada para Kallax Poker72×25×101,85 mm. Usar asa existente y orientación suelo abajo; prueba física pendiente.
+
+- 2026-11-21 frontal sin ventana aligerado a2,4 mm (o drawerWall si mayor) salvo banda superior del asiento del asa. Refuerzo crece con transición45° y conserva2,4 mm de raíz bajo la lengüeta. Misma envolvente y asa; revisión/impresión de variante cerrada pendientes.
+
+- 2026-11-21 Export project colocado justo encima de Export parts. Preview all plates muestra todas las bandejas con bases y cuerpos coloreados usando las mismas posiciones del3MF; Back to module recupera vista individual. Comprobados controles y disposición en navegador con Kallax Poker (3 bandejas).
+
+- 2026-11-21 export de proyecto completo3MF con bandejas Bambu identificadas por módulo/conjunto. Shell2 tramos incluye8 llaves. Usa volumen del cajón seleccionado o primero y distribuye en más bandejas si hace falta. Incluye JSON del proyecto. Open Frame380 excede altura250 y se avisa. Configuración genérica0,4/PLA para abrir contenedor, seleccionar impresora/material antes de laminar. Pruebas de import/export BambuCLI2.6.1.55 conservan7 bandejas/33 cuerpos del proyecto de referencia. Revisión GUI usuario pendiente.
+
+- 2026-11-21 usuario valida encaje de ocho shells con sus cajones y asas. Ventana opcional accesible sin desbloquear prototipo: frontal cerrado conserva alojamiento corto del asa, misma shell/paso/asa y capacidad que variante con ventana. Pendiente prueba física del frontal cerrado.
+
+- 2026-11-21 corregir color de preview de conjuntos: colores azul/gris por tramo, llaves doradas, asa conserva su color. La combinación anterior perdía colores de polígonos al copiar geometrías sin color global. Pendiente revisión visual usuario.
+
+- 2026-11-21 orientar primer tramo de shell sobre boca y último sobre trasera para dejar ambas juntas de llaves arriba. Preview y export comparten orientación. Pendiente revisión de laminado del primer tramo con labios interiores creciendo desde la boca.
+
+- 2026-11-21 ensayo UI de conjuntos de fabricación: una vista y descarga3MF por Shell/Drawer/Handle. Incluye todos los tramos y cantidades de llaves por conjunto, cotas de cada tramo y profundidad en nombre. Preview/export comparten distribución con6 mm entre objetos. Si necesita varias camas se indica número y se colocan grupos separados para ordenar en slicer. Pruebas geométricas/export correctas, revisión visual y apertura Bambu pendientes.
+
+- 2026-11-21 usuario valida shell con holgura adicional de0,1 mm por flanco en hembras: montaje mucho más sencillo y unión sigue siendo muy buena. Ajuste de encaje validado físicamente.
+
+- Dovetail es la unión predeterminada para cajones nuevos y la selección inicial del proyecto Kallax. Lap and keys sigue como alternativa. Se retiran las llaves pasantes del selector durante el prototipo.
+
 - Proyecto de referencia InsertForge Kallax 4×3 Vertical v1 en `static/projects/kallax-4x3-vertical-v1.json` y en el catálogo de proyectos. Incluye ambos cajones de 380 mm y Open Frame 2×2 con paso compartido. El ensayo y repuesto de 390 mm pertenecen al historial de prototipos. Pendiente confirmación física de cierre para el milano.
 
 - Profundidad inicial de nuevas shells: 380 mm. El módulo de 390 mm conserva su configuración para exportar un tramo trasero de sustitución 10 mm más corto. El frontal ya impreso conserva su plano de junta. Pendiente comprobar la sustitución impresa.

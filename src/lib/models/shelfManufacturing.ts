@@ -14,7 +14,8 @@ export interface ShelfManufacturingSettings {
   floorKeys?: boolean;
 }
 export const defaultShelfManufacturing: ShelfManufacturingSettings = {
-  split: false, bedWidth: 250, bedDepth: 250, buildHeight: 250, margin: 5, jointClearance: 0.15
+  split: false, bedWidth: 250, bedDepth: 250, buildHeight: 250, margin: 5, jointClearance: 0.15,
+  jointStyle: 'divider-dovetail'
 };
 export interface ShelfManufacturingItem {
   id: string; name: string; part: ShelfPartId | 'key' | 'sample'; quantity: number;
@@ -251,8 +252,13 @@ export function createShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[]
         const joint = dividerJoint(r.drawerWidth, cuts[0], p.drawerFloor, r.sideHeight, s.jointClearance);
         g = union(g, i === 0 ? joint.front : joint.rear);
       }
+      // Front shell rests on its opening rim, rear shell on its back.
+      // Both mating ends face upward for the two-section shell.
+      let oriented = g;
+      if (part === 'shell') oriented = rotateX(i === 0 ? Math.PI / 2 : -Math.PI / 2, g);
+      else if (plan.hybrid && i === 1) oriented = rotateX(-Math.PI / 2, g);
       add(`${part}-${i + 1}`, `${part === 'shell' ? 'Shell' : 'Drawer'} · section ${i + 1}/${boundaries.length - 1}`, part,
-        g, part === 'shell' || (plan.hybrid && part === 'drawer' && i === 1) ? rotateX(-Math.PI / 2, g) : g);
+        g, oriented);
       if (dividerDrawer) {
         const coupon = intersect(g, block(-1, cuts[0] - 24, -1, r.drawerWidth + 2, 48, r.drawerHeight + 2));
         add(`divider-test-${i + 1}`, `Divider test · section ${i + 1}`, 'sample', coupon, coupon);
@@ -337,6 +343,14 @@ export function shelfDividerRearReplacement(p: ShelfDrawerParams, cards: CardSiz
     target.resolved.drawerDepth - start, r.height + 2));
   const joint = dividerJoint(r.drawerWidth, seam, p.drawerFloor, r.sideHeight, plan.settings.jointClearance);
   return fitShelfPrint(union(body, joint.rear), plan.settings);
+}
+
+export function shelfClosedFrontSample(p: ShelfDrawerParams, cards: CardSize[]) {
+  const parts = createShelfDrawerParts({ ...p, labelWindow: false }, cards);
+  const r = parts.resolved;
+  const depth = Math.min(r.drawerDepth, Math.max(25, r.frontReserve + 5));
+  const sample = intersect(parts.drawer, block(-1, -1, -1, r.drawerWidth + 2, depth + 1, r.drawerHeight + 2));
+  return { geometry: sample, ...fitShelfPrint(sample, { ...defaultShelfManufacturing, ...p.manufacturing }) };
 }
 
 export function shelfCornerSamplePlate(model: ReturnType<typeof createShelfManufacturing>) {
@@ -436,4 +450,49 @@ export function shelfBedPreview(item: ShelfManufacturingItem, s: ShelfManufactur
   const part = jscad.colors.colorize(item.fits ? [0.52, 0.65, 0.76, 1] : [0.9, 0.3, 0.25, 1],
     translate([s.margin, s.margin, 0], item.printGeometry));
   return combined([bed, margin, part]);
+}
+
+export function shelfManufacturingSets(model: ReturnType<typeof createShelfManufacturing>) {
+  return (['shell', 'drawer', 'handle'] as const).map(part => {
+    const items = model.items.filter(item => item.part === part);
+    const pieces = items.map(item => ({ name: item.name, geometry: item.printGeometry, size: item.size, key: false }));
+    if (part !== 'handle') {
+      const keys = model.assembly.filter(item => item.part === 'key' && item.owner === part);
+      for (const item of model.items.filter(item => item.part === 'key')) {
+        const count = keys.filter(key => {
+          const size = dimensions(key.geometry);
+          return Math.abs(Math.min(...size) - item.size[2]) < 0.001;
+        }).length;
+        for (let i = 0; i < count; i++) pieces.push({
+          name: item.name, geometry: item.printGeometry, size: item.size, key: true
+        });
+      }
+    }
+    // Shared preview/export layout. Keep distinct objects and their bed orientation.
+    const s = model.settings, width = s.bedWidth - 2 * s.margin, depth = s.bedDepth - 2 * s.margin;
+    let x = s.margin, y = s.margin, rowDepth = 0, plate = 0;
+    const placed = [...pieces].sort((a, b) => b.size[1] - a.size[1]).map(piece => {
+      if (x > s.margin && x + piece.size[0] > s.margin + width) {
+        x = s.margin; y += rowDepth + 6; rowDepth = 0;
+      }
+      if (y + piece.size[1] > s.margin + depth && y > s.margin) {
+        plate++; x = s.margin; y = s.margin; rowDepth = 0;
+      }
+      const geometry = translate([x + plate * (s.bedWidth + 20), y, 0], piece.geometry);
+      x += piece.size[0] + 6;
+      rowDepth = Math.max(rowDepth, piece.size[1]);
+      return { ...piece, geometry, plateIndex: plate, bounds: jscad.measurements.measureBoundingBox(geometry) };
+    });
+    return {
+      id: `set-${part}`, name: part === 'shell' ? 'Shell' : part === 'drawer' ? 'Drawer' : 'Handle',
+      part, items, pieces: placed, plates: plate + 1,
+      fits: items.every(item => item.fits),
+      geometry: combined(placed.map((piece, index) => {
+        const color: [number, number, number] | [number, number, number, number] = piece.key ? [0.95, 0.64, 0.25, 1]
+          : part === 'handle' ? (piece.geometry.color ?? [0.87, 0.59, 0.34, 1])
+          : index % 2 ? [0.52, 0.65, 0.76, 1] : [0.28, 0.39, 0.51, 1];
+        return jscad.colors.colorize(color, piece.geometry);
+      }))
+    };
+  });
 }

@@ -6,7 +6,7 @@ import type { CardSize } from '$lib/types/project';
 import { group3mf } from './group3mf';
 import { sanitizeExportName } from './exportNames';
 import { createShelfFrame } from '$lib/models/shelfFrame';
-import { createShelfManufacturing, shelfCornerSamplePlate, shelfDividerRearReplacement } from '$lib/models/shelfManufacturing';
+import { createShelfManufacturing, shelfCornerSamplePlate, shelfDividerRearReplacement, shelfManufacturingSets, shelfClosedFrontSample } from '$lib/models/shelfManufacturing';
 import { prepareShelfMesh } from './prepareShelfMesh';
 
 export async function buildShelfModuleExport(module: ShelfModule, cards: CardSize[], part: ShelfPartId, format: 'stl' | '3mf') {
@@ -24,6 +24,14 @@ export async function buildShelfModuleExport(module: ShelfModule, cards: CardSiz
 
 export async function buildShelfManufacturingExport(module: ShelfModule, cards: CardSize[], itemId: string, format: 'stl' | '3mf') {
   if (module.type !== 'card-drawer') throw new Error('Depth splitting currently supports card drawers only.');
+  if (itemId === 'closed-front-fit-test') {
+    const sample = shelfClosedFrontSample(module.params, cards);
+    if (!sample.fits) throw new Error('The front sample exceeds the print volume.');
+    const geometry = prepareShelfMesh(sample.printGeometry);
+    const blob = format === 'stl' ? new Blob(stl.serialize({ binary: true }, geometry))
+      : await group3mf(new Blob(threemf.serialize({ unit: 'millimeter', metadata: true, compress: true }, geometry)), []);
+    return { filename: `${sanitizeExportName(module.name)}-closed-front-fit-test-${sample.size.map(value => value.toFixed(2)).join('x')}mm.${format}`, blob };
+  }
   if (itemId === 'divider-rear-replacement-380') {
     const replacement = shelfDividerRearReplacement(module.params, cards);
     if (!replacement.fits) throw new Error('The replacement exceeds the configured print volume.');
@@ -33,6 +41,15 @@ export async function buildShelfManufacturingExport(module: ShelfModule, cards: 
     return { filename: `divider-rear-replacement-390-to-380mm.${format}`, blob };
   }
   const model = createShelfManufacturing(module.params, cards);
+  if (itemId.startsWith('set-')) {
+    const set = shelfManufacturingSets(model).find(set => set.id === itemId);
+    if (!set || !set.fits) throw new Error('The selected set contains a part outside the print volume.');
+    const geometry = set.pieces.map(piece => prepareShelfMesh(piece.geometry));
+    const filename = `${sanitizeExportName(module.name)}-${set.part}-${module.params.depth}mm-${set.part === 'drawer' ? model.settings.jointStyle : 'set'}.${format}`;
+    const blob = format === 'stl' ? new Blob(stl.serialize({ binary: true }, ...geometry))
+      : await group3mf(new Blob(threemf.serialize({ unit: 'millimeter', metadata: true, compress: true }, ...geometry)), []);
+    return { filename, blob };
+  }
   const item = model.items.find(item => item.id === itemId);
   if (!item) throw new Error('Select an available manufacturing part.');
   if (!item.fits) throw new Error('This part exceeds the configured print volume.');

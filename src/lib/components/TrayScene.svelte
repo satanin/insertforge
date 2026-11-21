@@ -164,7 +164,7 @@
     triangleCornerRadius?: number;
     showReferenceLabels?: boolean;
     showPreviewSizes?: boolean;
-    partCote?: import('$lib/models/shelfStorage').ShelfPreviewCote;
+    partCotes?: import('$lib/models/shelfStorage').ShelfPreviewCote[];
     hidePrintBed?: boolean;
     viewTitle?: string;
     onCaptureReady?: (captureFunc: (options: CaptureOptions) => string) => void;
@@ -236,7 +236,7 @@
     triangleCornerRadius = 1.5,
     showReferenceLabels = false,
     showPreviewSizes = false,
-    partCote,
+    partCotes = [],
     hidePrintBed = false,
     viewTitle = '',
     onCaptureReady,
@@ -1814,7 +1814,7 @@
         side={THREE.DoubleSide}
       />
     </T.Mesh>
-    {#if partCote}
+    {#each partCotes as partCote}
       {@const [min, max] = partCote.bounds}
       <T.Group position.y={min[2]}>
         <DimensionOverlay
@@ -1827,7 +1827,7 @@
           {monoFont}
         />
       </T.Group>
-    {/if}
+    {/each}
     </T.Group>
   {/if}
 {/if}
