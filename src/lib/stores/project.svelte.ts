@@ -3608,7 +3608,7 @@ export function createNewProject(projectType: import('$lib/types/project').Proje
   saveNow(project);
 }
 
-export function addShelfModule(): ShelfDrawerModule | undefined {
+export function addShelfModule(columns: 1 | 2 = 1): ShelfDrawerModule | undefined {
   if (project.projectType !== 'shelf-storage') return;
   project.shelfModules ??= [];
   const reference = project.shelfModules.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
@@ -3616,9 +3616,16 @@ export function addShelfModule(): ShelfDrawerModule | undefined {
   const params = reference?.type === 'card-drawer'
     ? { ...structuredClone($state.snapshot(reference.params)), depth: defaultShelfDrawerParams.depth }
     : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() };
+  params.columns = columns;
+  params.centerDivider = columns === 2;
+  if (!reference && columns === 2) Object.assign(params, {
+    shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+    drawerFloor: 2, bottomTracks: false, headroom: 1,
+    handleClearance: 0.12, handleRetention: true
+  });
   if (params.manufacturing) params.manufacturing.jointStyle = 'divider-dovetail';
   const module: ShelfDrawerModule = { id: crypto.randomUUID(), type: 'card-drawer',
-    name: `Card drawer ${project.shelfModules.length + 1}`,
+    name: `${columns === 2 ? 'Double drawer 2×1' : 'Card drawer'} ${project.shelfModules.length + 1}`,
     params };
   project.shelfModules.push(module);
   project.selectedShelfModuleId = module.id;
@@ -3661,7 +3668,7 @@ export function addShelfFrame(): void {
   if (!r.valid || !r.stacking) return;
   const id = crypto.randomUUID();
   project.shelfModules!.push({ id, type: 'open-frame', name: 'Open frame 2 × 2', params: {
-    columns: 2, rows: 2, pitchWidth: r.bodyWidth, pitchHeight: r.bodyHeight, depth: r.depth, wall: 8
+    columns: 2, rows: 2, pitchWidth: r.cellWidth, pitchHeight: r.bodyHeight, depth: r.depth, wall: 8
   } });
   project.selectedShelfModuleId = id;
   autosave();
@@ -3684,7 +3691,7 @@ export function syncShelfFrames(sourceId: string, frameId?: string): number {
   let count = 0;
   for (const module of project.shelfModules ?? []) {
     if (module.type !== 'open-frame' || (frameId && module.id !== frameId)) continue;
-    module.params = { ...module.params, pitchWidth: r.bodyWidth, pitchHeight: r.bodyHeight, depth: r.depth };
+    module.params = { ...module.params, pitchWidth: r.cellWidth, pitchHeight: r.bodyHeight, depth: r.depth };
     count++;
   }
   if (count) autosave();

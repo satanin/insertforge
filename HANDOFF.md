@@ -1,5 +1,25 @@
 # InsertForge Handoff
 
+- 2026-11-23 cajón doble en impresión por el usuario; pendientes calidad de impresión, montaje de ambos milanos y deslizamiento en shell. Probar vacío y con carga. Se conserva tabique8 mm.
+
+- 2026-11-23 usuario confirma buena impresión del cajón simple con tabique hembra Dovetail reducido a7 mm y resistencia inicial aparentemente buena. Pendiente prueba con cartas cargadas prevista hoy; no dar por validada aún resistencia bajo carga/durabilidad. Doble sigue con8 mm.
+
+- 2026-11-22 usuario confirma impresión de shell doble y encaje perfecto con módulos previamente impresos; compatibilidad exterior2×1 validada físicamente en este ensayo (foto en conversación). Cajón con tabique hembra reducido pendiente de impresión:7 mm sólo en simple, doble sigue8 mm. No implica validación de carga/flexión del conjunto doble.
+
+- 2026-11-22 doble:1/2 ventanas (dos sólo con separador longitudinal) y asa normal/ancha. Puente/trasera continuos, lengüetas sólo dentro de sockets reales. Corregidos import intersect ausente que bloqueaba previews y valor numérico/string del selector.39 tests de geometría/fabricación pasan; navegador confirma dos ventanas/asa147,96 mm y preview módulo5 bandejas. Shell/retícula intactas; impresión/encaje nuevas variantes pendientes.
+
+- 2026-11-21 separar Preview module plates (sólo seleccionado, shell/cajón/asa/llaves) de Preview complete project plates bajo Complete project. Ambos reutilizan planificación3MF; visor identifica alcance/nombre. Navegador: simple3 bandejas, proyecto con doble8; revisión usuario pendiente.
+
+- 2026-11-21 ensayo autorizado en cajón simple completo: tabique hembra Dovetail8→7 mm, perfil/macho/holguras y envolvente conservados. Preview, export y espacio de cartas comparten medida. Doble permanece8 mm hasta validar. Descargar Drawer completo con Dovetail para imprimir; pendiente prueba física nocturna.
+
+- 2026-11-21 cajón doble Dovetail pasa a dos perfiles iguales al simple, centrados a1/4 y3/4 del ancho. Conserva tabique, envolvente, holguras y orientación; simple y shells intactos. Reexportar ambos tramos del doble: no emparejar con revisión previa de un encaje central. Pendiente montaje e impresión físicos.
+
+- 2026-11-21 preview de cartas repartida en huecos útiles antes/después del tabique Dovetail, con holgura y cantidades enteras por compartimento. Capacidad estimada descuenta la unión. Pendiente revisión visual del usuario.
+
+- 2026-11-21 vista de conjunto usa los tramos y llaves del cajón ensamblados al activar partición, en vez del cajón base sin uniones. Cambiar Dovetail/Lap and keys refleja tabique transversal, también al extraer y en vecinos. Revisión visual del usuario pendiente.
+
+- 2026-11-21 módulo doble2×1 mediante Add double drawer. Comparte paso de celda y altura con singles, conectores arriba/abajo por celda. Interior con o sin separador longitudinal; ambos permiten Dovetail (con tabique transversal) o Lap and keys. Cambiar interior conserva ensamblaje elegido, por petición del usuario. Shell doble12 llaves por junta. Marcos referencian cellWidth al sincronizar desde doble. Pendiente validación física de flexión/carga de techo y suelo dobles, encajes y montaje.
+
 - 2026-11-21 muestra de frontal cerrado con asiento/clip real, ancho/alto completos y25 mm de fondo. Botón Closed front fit test3MF bajo Drawer en Export parts. Descargada para Kallax Poker72×25×101,85 mm. Usar asa existente y orientación suelo abajo; prueba física pendiente.
 
 - 2026-11-21 frontal sin ventana aligerado a2,4 mm (o drawerWall si mayor) salvo banda superior del asiento del asa. Refuerzo crece con transición45° y conserva2,4 mm de raíz bajo la lengüeta. Misma envolvente y asa; revisión/impresión de variante cerrada pendientes.

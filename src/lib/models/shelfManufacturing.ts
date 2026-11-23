@@ -28,6 +28,18 @@ const KEY_HEIGHT = 7, SEAM_GAP = 0.15;
 const KEY_HEAD = 0.8, KEY_SETBACK = 0.1, KEY_SHOULDER = 1.2;
 const LAP_LENGTH = 12, LAP_GAP = 0.1, MIN_LAP_WEB = 0.8;
 const DIVIDER_DEPTH = 8;
+/** Usable card spans in drawer-local Y, excluding the complete depth joint. */
+export function shelfCardSpans(plan: ReturnType<typeof resolveShelfManufacturing>, clearance: number): [number, number][] {
+  const r = plan.resolved;
+  const spans: [number, number][] = [];
+  let start = r.frontReserve + clearance;
+  if (plan.divider) for (const seam of plan.drawerCuts) {
+    spans.push([start, seam - plan.dividerDepth - clearance]);
+    start = seam + SEAM_GAP / 2 - 0.01 + 2.4 + clearance;
+  }
+  spans.push([start, r.drawerDepth - plan.drawerWall - clearance]);
+  return spans.filter(([start, end]) => end > start);
+}
 function block(x: number, y: number, z: number, w: number, d: number, h: number) {
   return cuboid({ size: [w, d, h], center: [x + w / 2, y + d / 2, z + h / 2] });
 }
@@ -113,7 +125,7 @@ export function resolveShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[
     if (drawerCuts.length && (drawerCuts[0] < r.rampEnd + 20 || r.drawerDepth - drawerCuts.at(-1)! < 35))
       errors.push('Drawer sections leave insufficient material beside the front or back. Choose a larger bed.');
   }
-  return { valid: !errors.length, errors, settings, shellCuts, drawerCuts, hybrid, divider, floorKeys, lapWeb, dividerDepth: DIVIDER_DEPTH,
+  return { valid: !errors.length, errors, settings, shellCuts, drawerCuts, hybrid, divider, floorKeys, lapWeb, dividerDepth: r.columns === 1 ? 7 : DIVIDER_DEPTH,
     lapLength: LAP_LENGTH, lapGap: LAP_GAP, keySeatDepth: KEY_HEAD + KEY_SETBACK, drawerWall: p.drawerWall,
     drawerFloor: p.drawerFloor, sampleWidth: floorKeys ? 42 : 30,
     shellCount: shellCuts.length + 1, drawerCount: drawerCuts.length + 1, resolved: r };
@@ -180,8 +192,9 @@ function placeKey(g: Geom3, site: KeySite) {
   return translate([site.x, site.y, site.z], oriented);
 }
 
-function dividerJoint(width: number, seam: number, floor: number, height: number, clearance: number) {
-  const half = width / 2;
+function dividerJoint(width: number, seam: number, floor: number, height: number, clearance: number, columns = 1, femaleDepth = DIVIDER_DEPTH) {
+  const centers = columns === 2 ? [width / 4, 3 * width / 4] : [width / 2];
+  const joints = centers.map(half => {
   const profile = polygon({ points: [[half - 7, seam + 0.2], [half - 11, seam - 5],
     [half + 11, seam - 5], [half + 7, seam + 0.2]] });
   const extrude = (shape: typeof profile, z: number, length: number) =>
@@ -193,10 +206,16 @@ function dividerJoint(width: number, seam: number, floor: number, height: number
   const high = block(half - 12, seam - 5.01, floor + clearance + 5.05, 24, 5.2, height - floor - clearance - 5.05);
   const ramp = jscad.hulls.hull(low, high);
   return {
-    front: subtract(block(0, seam - DIVIDER_DEPTH, floor - 0.1, width, DIVIDER_DEPTH, height - floor + 0.1),
-      extrude(pocket, floor, height - floor + 0.1)),
+    pocket: extrude(pocket, floor, height - floor + 0.1),
+    male: intersect(ramp, extrude(profile, floor + clearance, height - floor - clearance))
+  };
+  });
+  const pocket = union(...joints.map(joint => joint.pocket));
+  return {
+    pocket,
+    front: subtract(block(0, seam - femaleDepth, floor - 0.1, width, femaleDepth, height - floor + 0.1), pocket),
     rear: union(block(0, seam + SEAM_GAP / 2 - 0.01, floor - 0.1, width, 2.4, height - floor + 0.1),
-      intersect(ramp, extrude(profile, floor + clearance, height - floor - clearance)))
+      ...joints.map(joint => joint.male))
   };
 }
 export function createShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[]) {
@@ -223,7 +242,9 @@ export function createShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[]
           sites.push({ id: `s${seam}`, wall: 'side', x: 0, y, z, thickness: r.panelThickness },
             { id: `s${seam}`, wall: 'side', x: r.bodyWidth - r.shellSkin, y, z, thickness: r.shellSkin, outerMax: true });
         }
-        for (const x of [r.bodyWidth * 0.2, r.bodyWidth * 0.8]) {
+        const horizontalSites = Array.from({ length: r.columns }, (_, column) =>
+          [column * r.cellWidth + r.cellWidth * 0.2, column * r.cellWidth + r.cellWidth * 0.8]).flat();
+        for (const x of horizontalSites) {
           sites.push({ id: `s${seam}`, wall: 'horizontal', x, y, z: 0, thickness: r.panelThickness },
             { id: `s${seam}`, wall: 'horizontal', x, y, z: r.bodyHeight - r.roofThickness, thickness: r.roofThickness, outerMax: true });
         }
@@ -249,7 +270,8 @@ export function createShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[]
       if (plan.hybrid && part === 'drawer') g = lapDrawerSection(keyed, g, i, cuts[0], r.drawerWidth, p.drawerWall, p.drawerFloor, plan.lapWeb,
         plan.floorKeys ? floorKeyBands(r.drawerWidth, s.jointClearance) : []);
       if (dividerDrawer) {
-        const joint = dividerJoint(r.drawerWidth, cuts[0], p.drawerFloor, r.sideHeight, s.jointClearance);
+        const joint = dividerJoint(r.drawerWidth, cuts[0], p.drawerFloor, r.sideHeight, s.jointClearance, r.columns, plan.dividerDepth);
+        if (i === 0 && r.centerDivider) g = subtract(g, joint.pocket);
         g = union(g, i === 0 ? joint.front : joint.rear);
       }
       // Front shell rests on its opening rim, rear shell on its back.
@@ -341,7 +363,7 @@ export function shelfDividerRearReplacement(p: ShelfDrawerParams, cards: CardSiz
   const r = plan.resolved;
   const body = intersect(target.drawer, block(-1, start, -1, r.width + 2,
     target.resolved.drawerDepth - start, r.height + 2));
-  const joint = dividerJoint(r.drawerWidth, seam, p.drawerFloor, r.sideHeight, plan.settings.jointClearance);
+  const joint = dividerJoint(r.drawerWidth, seam, p.drawerFloor, r.sideHeight, plan.settings.jointClearance, r.columns, plan.dividerDepth);
   return fitShelfPrint(union(body, joint.rear), plan.settings);
 }
 

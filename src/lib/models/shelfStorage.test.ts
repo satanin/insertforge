@@ -13,6 +13,49 @@ const overlap = (a: Geom3, b: Geom3) => volume(jscad.booleans.intersect(a, b));
 const move = (g: Geom3, x: number, y: number, z: number) => jscad.transforms.translate([x, y, z], g);
 
 describe('modular shelf card drawer', () => {
+  it('fits standard and wide handles with one or two double-drawer label sockets', () => {
+    const p = { ...defaults, columns: 2 as const, centerDivider: true, handleRetention: true };
+    const base = createShelfDrawerParts(p, cards);
+    for (const labelWindows of [1, 2] as const) for (const wideHandle of [false, true]) for (const labelWindow of [false, true]) {
+      const parts = createShelfDrawerParts({ ...p, labelWindows, wideHandle, labelWindow }, cards);
+      expect(parts.resolved.valid).toBe(true);
+      expect(parts.resolved.width).toBe(base.resolved.width);
+      expect(parts.resolved.height).toBe(base.resolved.height);
+      expect(volume(jscad.booleans.subtract(parts.shell, base.shell))).toBeLessThan(1e-5);
+      expect(overlap(parts.handle, parts.drawer)).toBeLessThan(1e-5);
+      const rigid = parts.retentionClip ? jscad.booleans.subtract(parts.handle, parts.retentionClip) : parts.handle;
+      for (const lift of [1, 5, 12]) expect(overlap(move(rigid, 0, 0, lift), parts.drawer)).toBeLessThan(1e-5);
+      expect(parts.resolved.labelSlotXs).toHaveLength(labelWindows);
+      const print = shelfPrintGeometry(parts, 'handle');
+      const generalize = jscad.modifiers.generalize as unknown as (options: { snap: boolean; triangulate: boolean }, geometry: Geom3) => Geom3;
+      jscad.geometries.geom3.validate(generalize({ snap: true, triangulate: true }, print));
+    }
+    expect(resolveShelfDrawer({ ...p, centerDivider: false, labelWindows: 2 }, cards).labelWindows).toBe(1);
+  });
+  it('aligns a double shell to two single cells with a configurable longitudinal divider', () => {
+    const p = { ...defaults, shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+      bottomTracks: false, sleeve: 'premium' as const, headroom: 1 };
+    const single = createShelfDrawerParts(p, cards);
+    const double = createShelfDrawerParts({ ...p, columns: 2 }, cards);
+    const open = createShelfDrawerParts({ ...p, columns: 2, centerDivider: false }, cards);
+    const r = double.resolved;
+    expect(r.bodyWidth).toBeCloseTo(single.resolved.bodyWidth * 2);
+    expect(r.bodyHeight).toBe(single.resolved.bodyHeight);
+    expect(r.capacity).toBe(single.resolved.capacity * 2);
+    expect(double.shell).toEqual(open.shell);
+    expect(double.handle).toEqual(open.handle);
+    expect(volume(double.drawer)).toBeGreaterThan(volume(open.drawer));
+    expect(overlap(double.drawer, double.handle)).toBeLessThan(1e-5);
+    for (const column of [0, 1]) {
+      expect(overlap(double.shell, move(single.shell, column * r.cellWidth, 0, r.bodyHeight))).toBeLessThan(1e-5);
+      expect(overlap(single.shell, move(double.shell, -column * r.cellWidth, 0, r.bodyHeight))).toBeLessThan(1e-5);
+    }
+    for (const parts of [double, open]) {
+      const [x, y, z] = parts.drawerOffset;
+      for (const travel of [0, 25, 100, 250])
+        expect(overlap(parts.shell, move(parts.drawer, x, y - travel, z))).toBeLessThan(1e-5);
+    }
+  });
   it('keeps the same shell and handle when closing the identification window', () => {
     const p = { ...defaults, handleClearance: 0.12, handleRetention: true };
     const open = createShelfDrawerParts(p, cards);

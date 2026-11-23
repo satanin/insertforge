@@ -12,9 +12,10 @@
   import ShelfFitPreview from './ShelfFitPreview.svelte';
   import ShelfFrameEditor from './ShelfFrameEditor.svelte';
   import ShelfManufacturingEditor from './ShelfManufacturingEditor.svelte';
-  import { createShelfManufacturing, defaultShelfManufacturing, shelfJointPreview, shelfManufacturingSets } from '$lib/models/shelfManufacturing';
+  import { createShelfManufacturing, defaultShelfManufacturing, shelfJointPreview, shelfManufacturingSets, shelfCardSpans } from '$lib/models/shelfManufacturing';
   import { createShelfFrame, resolveShelfFrame } from '$lib/models/shelfFrame';
   import type { BufferGeometry } from 'three';
+  import jscad from '@jscad/modeling';
 
   let { isMobile = false, projectFiles }: { isMobile?: boolean; projectFiles?: Snippet } = $props();
   const project = $derived(getProject());
@@ -39,9 +40,11 @@
   const printerReference = $derived(selected?.type === 'card-drawer' ? selected : modules.find(module => module.type === 'card-drawer'));
   const projectPrintSettings = $derived({ ...defaultShelfManufacturing, ...printerReference?.params.manufacturing });
   let showProjectPreview = $state(false);
+  let platePreviewScope = $state<'module' | 'project'>('project');
   const projectPreview = $derived.by(() => {
     if (!showProjectPreview) return null;
-    try { return { plan: planShelfProjectPlates(project, projectPrintSettings), error: '' }; }
+    const previewProject = platePreviewScope === 'module' ? { ...project, shelfModules: selected ? [selected] : [] } : project;
+    try { return { plan: planShelfProjectPlates(previewProject, projectPrintSettings), error: '' }; }
     catch (error) { return { plan: null, error: error instanceof Error ? error.message : 'Preview failed.' }; }
   });
   let unlockedModuleId = $state<string | null>(null);
@@ -57,6 +60,14 @@
     try { return createShelfManufacturing(selected.params, cards); } catch { return null; }
   });
   const manufacturingItems = $derived(manufacturingModel ? shelfManufacturingSets(manufacturingModel) : []);
+  const cardSpans = $derived(manufacturingModel && selected?.type === 'card-drawer'
+    ? shelfCardSpans(manufacturingModel, selected.params.cardClearance) : undefined);
+  const previewCapacity = $derived(resolved?.valid && cardSpans
+    ? cardSpans.reduce((total, [start, end]) => total + Math.floor((end - start) / resolved.cardThickness), 0) * resolved.columns
+    : resolved?.capacity);
+  const assembledDrawer = $derived(manufacturingModel && selected?.type === 'card-drawer' && selected.params.manufacturing?.split
+    ? jscad.geometries.geom3.create(manufacturingModel.assembly.filter(item => item.owner === 'drawer')
+      .flatMap(item => jscad.geometries.geom3.toPolygons(item.geometry))) : undefined);
   const manufacturingItem = $derived(manufacturingItems.find(item => item.id === manufacturingPart) ?? manufacturingItems[0]);
   $effect(() => {
     const nextCotes: ShelfPreviewCote[] = [];
@@ -67,7 +78,8 @@
       : selected?.type === 'card-drawer' && resolved?.valid
         ? jscadToBufferGeometry(print && manufacturingItem && manufacturingModel ? manufacturingItem.geometry
           : jointPreview && manufacturingModel ? shelfJointPreview(manufacturingModel, jointSeparation, nextCotes)
-          : createShelfPreview(selected.params, cards, extraction, contents, { cutaway, stack, adjacent, print, cotes: nextCotes })) : null;
+          : createShelfPreview(selected.params, cards, extraction, contents, { cutaway, stack, adjacent, print, cotes: nextCotes, assembledDrawer,
+            cardSpans })) : null;
     geometry = next;
     cotes = showProjectPreview ? [] : print && manufacturingItem ? manufacturingItem.pieces.map(piece => ({ part: piece.name, bounds: piece.bounds })) : nextCotes;
     return () => next?.dispose();
@@ -118,15 +130,22 @@
 
 {#snippet projectExportPanel()}
   <details open>
-    <summary>Export project</summary>
+    <summary>Module plates · {selected?.name ?? 'Selected module'}</summary>
+    <section>
+      <button disabled={busy || !selected} onclick={() => { platePreviewScope = 'module'; showProjectPreview = true; shelfFit = false; }}>Preview module plates</button>
+      <HelpRow><span>Selected module only</span><HelpTip label="About module plates">Shows all printable parts of the selected module together, including shell, drawer, handle and joining keys, distributed across the required plates.</HelpTip></HelpRow>
+    </section>
+  </details>
+  <details open>
+    <summary>Complete project</summary>
     <section>
       <div class="actions">
-        <button disabled={busy || !modules.length} onclick={() => { showProjectPreview = true; shelfFit = false; }}>Preview all plates</button>
+        <button disabled={busy || !modules.length} onclick={() => { platePreviewScope = 'project'; showProjectPreview = true; shelfFit = false; }}>Preview complete project plates</button>
         <button disabled={busy || !modules.length} onclick={downloadProject}>{busy ? 'Preparing export…' : 'Download project · 3MF'}</button>
       </div>
       <HelpRow><output>{projectPrintSettings.bedWidth} × {projectPrintSettings.bedDepth} × {projectPrintSettings.buildHeight} mm</output><HelpTip label="About project plates">Includes every module, its handle and the required joining keys. Uses the printer volume from {printerReference?.name ?? 'the default configuration'}. Smaller beds use additional plates. Open as a project in Bambu Studio and select your printer and filament before slicing.</HelpTip></HelpRow>
       {#if projectPreview?.error}<p role="alert">{projectPreview.error}</p>{/if}
-      {#if projectPreview?.plan}
+      {#if projectPreview?.plan && platePreviewScope === 'project'}
         <details><summary>{projectPreview.plan.plates.length} plates</summary><section>
           {#each projectPreview.plan.plates as plate, index}<output>{index + 1}. {plate.name} · {plate.pieces.length} parts</output>{/each}
         </section></details>
@@ -157,6 +176,7 @@
           {/if}
         {/each}
         <button onclick={() => addShelfModule()}>+ Add card drawer</button>
+        <button onclick={() => addShelfModule(2)}>+ Add double drawer · 2×1</button>
         <button disabled={!modules.some(m => m.type === 'card-drawer' && m.params.stackingEnabled !== false)} onclick={() => { shelfFit = false; addShelfFrame(); }}>+ Add open frame</button>
         {#if selected?.type === 'card-drawer' && modules.some(m => m.type === 'open-frame')}
           <HelpRow><button disabled={!resolved?.valid || !resolved.stacking} onclick={() => { const count = syncShelfFrames(selected.id); frameSyncMessage = `${count} frame(s) updated from ${selected.name}`; }}>Update all frames</button><HelpTip label="About updating all frames">Copies this drawer's current cell pitch and depth to every open frame in this project. Keeps each frame's columns, rows, walls and name. Use after a deliberate revision of the system unit; saved frames never resize silently.</HelpTip></HelpRow>
@@ -172,7 +192,7 @@
         </div>
         <div class="previewControls">
           {#if showProjectPreview}
-            <output>Project preview · {projectPreview?.plan?.plates.length ?? 0} plates</output>
+            <output>{platePreviewScope === 'module' ? `Module preview · ${selected.name}` : 'Complete project preview'} · {projectPreview?.plan?.plates.length ?? 0} plates</output>
             <button onclick={() => showProjectPreview = false}>Back to module</button>
           {:else}
           {#if cotes.length}
@@ -232,8 +252,28 @@
           <button onclick={() => unlockedModuleId = systemEditing ? null : selected.id}>{systemEditing ? 'Lock system settings' : 'Unlock prototype settings'}</button>
           {#if systemEditing}<output>Prototype editing: changes can break compatibility with printed parts.</output>{/if}
         </section>
-        <details open={systemEditing}><summary>Cards and label</summary><section>
+        <details open={systemEditing || resolved.columns === 2}><summary>Cards and label</summary><section>
+          {#if resolved.columns === 2}
+            <HelpRow><label>Drawer interior<select value={resolved.centerDivider ? 'cards' : 'open'} onchange={e => {
+              const centerDivider = e.currentTarget.value === 'cards';
+              contents = centerDivider;
+              updateShelfModule(selected.id, { centerDivider });
+            }}>
+              <option value="cards">Two card rows · centre divider</option>
+              <option value="open">No centre divider</option>
+            </select></label><HelpTip label="About double drawer interiors">Two card rows adds a longitudinal divider. The Dovetail depth joint creates a fixed transverse divider with either interior. Choose Lap and keys for a split drawer without transverse dividers.</HelpTip></HelpRow>
+          {/if}
           <HelpRow><label class="checkField"><input type="checkbox" checked={selected.params.labelWindow !== false} onchange={e => updateShelfModule(selected.id, { labelWindow: e.currentTarget.checked })} /> Identification window</label><HelpTip label="About window options">The closed front retains a short top-loading handle socket. Both options use the same handle and shell dimensions.</HelpTip></HelpRow>
+          {#if resolved.columns === 2}
+            {#if resolved.labelWindow && resolved.centerDivider}
+              <label>Identification windows<select value={String(resolved.labelWindows)} onchange={e => updateShelfModule(selected.id, { labelWindows: Number(e.currentTarget.value) as 1 | 2 })}>
+                <option value="1">One central window</option><option value="2">Two windows · one per row</option>
+              </select></label>
+            {/if}
+            <HelpRow><label>Handle width<select value={resolved.wideHandle ? 'wide' : 'standard'} onchange={e => updateShelfModule(selected.id, { wideHandle: e.currentTarget.value === 'wide' })}>
+              <option value="standard">Standard</option><option value="wide">Wide · double drawer</option>
+            </select></label><HelpTip label="About wide handles">One continuous wider handle. Its front tongues follow the identification sockets; the rear leg and upper bridge remain continuous. Shell size is unchanged. Print the matching drawer and handle together when changing these options.</HelpTip></HelpRow>
+          {/if}
           {#if systemEditing}
           <label>Card format <select value={selected.params.cardSizeId} onchange={e => updateShelfModule(selected.id, { cardSizeId: e.currentTarget.value })}>
             {#each project.cardSizes as card}<option value={card.id}>{card.name} · {card.width} × {card.length} mm</option>{/each}
@@ -257,11 +297,12 @@
           {/if}
           {:else}
             <output>Card format: {cards.find(card => card.id === selected.params.cardSizeId)?.name ?? selected.params.cardSizeId} · {selected.params.orientation}</output>
-            <output>Sleeve: {selected.params.sleeve} · estimated capacity: {resolved.valid ? resolved.capacity : '—'} cards</output>
+            <output>Sleeve: {selected.params.sleeve} · estimated capacity: {resolved.valid ? previewCapacity : '—'} cards</output>
             {#if resolved.labelWindow}<output>Premium label allowance: {resolved.labelWidth.toFixed(1)} × {resolved.labelHeight.toFixed(1)} mm · slot: {resolved.labelSlotDepth.toFixed(2)} mm</output>{/if}
           {/if}
         </section></details>
         <details open><summary>Dimensions</summary><section>
+          {#if resolved.columns === 2}<output>System size: 2×1 · cell pitch {resolved.cellWidth.toFixed(2)} × {resolved.bodyHeight.toFixed(2)} mm</output>{/if}
           {#if systemEditing}
           <HelpRow><button onclick={() => updateShelfModule(selected.id, { shellThickness: 2, roofThickness: 2, socketWebThickness: 1.2, handleClearance: 0.25, handleRetention: false, drawerFloor: 1.2, bottomTracks: true, drawerWall: 2, slidingClearance: 0.5, cardClearance: 1, headroom: 1 })}>Compact for Kallax</button><HelpTip label="About compact preset">Restores the earlier compact trial: shell skin/roof 2 mm, socket backing 1.2 mm, handle clearance 0.25 mm without clip, drawer floor 1.2 mm, drawer walls 2 mm, sliding clearance 0.5 mm, card clearance 1 mm and headroom 1 mm. Bottom/left keep at least 3.8 mm for the tested dovetail sockets. The 8 mm handle leaves the entire Premium label clear. Changes module pitch; existing printed shells and frame snapshots use the previous dimensions. This is a trial configuration, not a load rating.</HelpTip></HelpRow>
           {/if}

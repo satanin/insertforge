@@ -7,6 +7,7 @@ import { buildShelfManufacturingExport, buildShelfModuleExport, buildShelfCorner
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 import { prepareShelfMesh } from '$lib/utils/prepareShelfMesh';
+import { shelfCardSpans } from './shelfManufacturing';
 
 const cards = [{ id: 'standard', name: 'Standard', width: 66, length: 91, thickness: 0.3 }];
 const params = { ...defaultShelfDrawerParams, depth: 390, shellThickness: 3.6, roofThickness: 3.6,
@@ -19,6 +20,46 @@ const generalize = jscad.modifiers.generalize as unknown as (options: { snap: bo
 
 describe('depth section manufacturing', () => {
   const hybridParams = { ...params, manufacturing: { ...params.manufacturing, jointStyle: 'lap-keys' as const } };
+  it('prints both double drawer interiors with shared cell connections and twelve shell keys', () => {
+    for (const [centerDivider, jointStyle] of [[true, 'divider-dovetail'], [false, 'lap-keys'], [false, 'divider-dovetail']] as const) {
+      const p = { ...hybridParams, columns: 2 as const, centerDivider, manufacturing: {
+        ...hybridParams.manufacturing, jointStyle,
+        floorKeys: !centerDivider
+      } };
+      const model = createShelfManufacturing(p, cards);
+      expect(model.assembly.filter(item => item.part === 'key' && item.owner === 'shell')).toHaveLength(12);
+      const drawers = model.items.filter(item => item.part === 'drawer');
+      expect(drawers).toHaveLength(2);
+      expect(Math.abs(volume(jscad.booleans.intersect(drawers[0].geometry, drawers[1].geometry)))).toBeLessThan(1e-5);
+      const parts = createShelfDrawerParts(p, cards);
+      if (jointStyle === 'divider-dovetail') {
+        const seam = model.drawerCuts[0], width = parts.resolved.drawerWidth;
+        // Two independent male tongues, with solid front material between sockets.
+        for (const fraction of [0.25, 0.75]) {
+          const probe = jscad.primitives.cuboid({ size: [2, 1, 2],
+            center: [width * fraction, seam - 3, 20] });
+          expect(volume(jscad.booleans.intersect(probe, drawers[1].geometry))).toBeCloseTo(4, 5);
+          expect(Math.abs(volume(jscad.booleans.intersect(probe, drawers[0].geometry)))).toBeLessThan(1e-5);
+        }
+      }
+      const spans = shelfCardSpans(model, p.cardClearance);
+      expect(spans).toHaveLength(jointStyle === 'divider-dovetail' ? 2 : 1);
+      for (const [start, end] of spans) {
+        const cardBlock = jscad.primitives.cuboid({ size: [parts.resolved.cardWidth, end - start, parts.resolved.cardHeight],
+          center: [p.drawerWall + parts.resolved.cardWidth / 2, (start + end) / 2, p.drawerFloor + parts.resolved.cardHeight / 2] });
+        for (const section of drawers)
+          expect(Math.abs(volume(jscad.booleans.intersect(cardBlock, section.geometry)))).toBeLessThan(1e-5);
+      }
+      for (const item of model.items.filter(item => item.part !== 'sample')) {
+        expect(item.fits, item.name).toBe(true);
+        jscad.geometries.geom3.validate(generalize({ snap: true, triangulate: true }, prepareShelfMesh(item.printGeometry)));
+      }
+      const [x, y, z] = parts.drawerOffset;
+      for (const drawer of drawers) for (const travel of [0, 50, 200])
+        expect(Math.abs(volume(jscad.booleans.intersect(parts.shell,
+          jscad.transforms.translate([x, y - travel, z], drawer.geometry))))).toBeLessThan(1e-5);
+    }
+  });
   it('cuts a short full-height closed front with the exact handle socket', () => {
     const p = { ...hybridParams, labelWindow: true };
     const sample = shelfClosedFrontSample(p, cards);
@@ -67,6 +108,12 @@ describe('depth section manufacturing', () => {
     const original = createShelfManufacturing(hybridParams, cards);
     const drawers = model.items.filter(item => item.part === 'drawer');
     expect(drawers).toHaveLength(2);
+    expect(model.dividerDepth).toBe(7);
+    for (const [distance, expected] of [[7.5, 0], [6.5, 1]]) {
+      const probe = jscad.primitives.cuboid({ size: [1, 1, 1],
+        center: [model.resolved.drawerWidth / 4, model.drawerCuts[0] - distance, 20] });
+      expect(Math.abs(volume(jscad.booleans.intersect(probe, drawers[0].geometry)))).toBeCloseTo(expected, 5);
+    }
     const replacement = shelfDividerRearReplacement({ ...hybridParams, manufacturing: {
       ...hybridParams.manufacturing, jointStyle: 'divider-dovetail'
     } }, cards);

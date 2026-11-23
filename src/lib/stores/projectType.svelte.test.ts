@@ -3,9 +3,35 @@ import { addShelfModule, addShelfFrame, updateShelfFrame, syncShelfFrames, selec
 import { exportProjectToJson, importProjectFromJson } from '$lib/utils/storage';
 import { getProjectCardSizes } from '$lib/utils/projectCards';
 import { createShelfManufacturing } from '$lib/models/shelfManufacturing';
+import { resolveShelfDrawer } from '$lib/models/shelfStorage';
 import referenceProject from '../../../static/projects/kallax-4x3-vertical-v1.json?raw';
 
 describe('project types', () => {
+  it('creates a double module while keeping frame references on the single-cell pitch', () => {
+    importProject(importProjectFromJson(referenceProject));
+    const single = getProject().shelfModules!.find(module => module.type === 'card-drawer')!;
+    if (single.type !== 'card-drawer') throw new Error('Expected drawer');
+    selectShelfModule(single.id);
+    const double = addShelfModule(2)!;
+    const project = getProject();
+    const cards = getProjectCardSizes(project);
+    const r = resolveShelfDrawer(double.params, cards);
+    expect(double.params.columns).toBe(2);
+    expect(double.params.centerDivider).toBe(true);
+    expect(r.bodyWidth).toBeCloseTo(2 * resolveShelfDrawer(single.params, cards).bodyWidth);
+    addShelfFrame();
+    const frameId = getProject().selectedShelfModuleId!;
+    const frame = getProject().shelfModules!.find(module => module.id === frameId)!;
+    if (frame.type !== 'open-frame') throw new Error('Expected frame');
+    expect(frame.params.pitchWidth).toBeCloseTo(r.cellWidth);
+    syncShelfFrames(double.id, frame.id);
+    expect(frame.params.pitchWidth).toBeCloseTo(r.cellWidth);
+    selectShelfModule(double.id);
+    expect(addShelfModule()!.params.columns).toBe(1);
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    const restored = getProject().shelfModules!.find(module => module.id === double.id)!;
+    expect(restored.params).toMatchObject({ columns: 2, centerDivider: true, depth: 380 });
+  });
   it('loads both printable 380 mm reference drawers on the same pitch as the open frame', () => {
     importProject(importProjectFromJson(referenceProject));
     const project = getProject();
