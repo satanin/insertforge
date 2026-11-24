@@ -1,6 +1,6 @@
 # InsertForge Handoff
 
-- 2026-11-24 integración autorizada de estantería en main, release1.2.39; conserva cambios Card Storage de main59a9f43. Check y build pasan; suite con2 workers/timeout30s:354 pasan,1 omitida,3 fallos de volumen en defaultProjectGeometry reproducidos idénticos en main59a9f43 (no regresión). Despliegue GitHub Actions→Fly pendiente de comprobar. Carpeta principal tiene cambios ajenos sin commit y se mantiene intacta.
+- 2026-11-24 estantería integrada y subida a main en a8734d6, release1.2.39; conserva cambios Card Storage de main59a9f43. Check y build pasan; suite con2 workers/timeout30s:354 pasan,1 omitida,3 fallos de volumen en defaultProjectGeometry reproducidos idénticos en main59a9f43 (no regresión). Cloudflare Pages detecta commit y despliega (no se observan runs Fly). Carpeta principal tiene cambios ajenos sin commit y se mantiene intacta.
 
 - 2026-11-24 usuario informa prueba de cajón exitosa y autoriza tabique hembra7 mm también en doble; dos perfiles/machos/holguras conservados. Separador longitudinal doble extendido hasta trasera del frontal, cerrando hueco previo del área del asa por debajo de su asiento. Shell y envolvente intactas. Validación física de estos cambios del doble pendiente; sin commit.
 
