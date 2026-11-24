@@ -83,7 +83,7 @@
 
 ## Branch notes
 
-- El desarrollo de estantería vive aislado en `codex/shelf-storage`. `Project.projectType` distingue `insert` (predeterminado/archivos antiguos) y `shelf-storage`. Se elige al crear, no convierte el proyecto abierto. Los módulos de estantería no pertenecen a `Layer`; separar conjunto ensamblado y piezas de fabricación. Ver `docs/plans/shelf-storage.md`.
+- Estantería integrada en `main` por autorización del usuario el2026-11-24; `codex/shelf-storage` conserva el desarrollo de esta línea. `Project.projectType` distingue `insert` (predeterminado/archivos antiguos) y `shelf-storage`. Se elige al crear, no convierte el proyecto abierto. Los módulos de estantería no pertenecen a `Layer`; separar conjunto ensamblado y piezas de fabricación. Ver `docs/plans/shelf-storage.md`.
 
-- `codex/insertforge` es la rama estable actual.
+- `main` es la rama de integración y despliegue (GitHub Actions → Fly.io).
 - El prototipo de `Game Mat Tube` vive separado en `codex/game-mat-tube`.

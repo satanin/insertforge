@@ -1,5 +1,7 @@
 # InsertForge Handoff
 
+- 2026-11-24 integración autorizada de estantería en main, release1.2.39; conserva cambios Card Storage de main59a9f43. Check y build pasan; suite con2 workers/timeout30s:354 pasan,1 omitida,3 fallos de volumen en defaultProjectGeometry reproducidos idénticos en main59a9f43 (no regresión). Despliegue GitHub Actions→Fly pendiente de comprobar. Carpeta principal tiene cambios ajenos sin commit y se mantiene intacta.
+
 - 2026-11-24 usuario informa prueba de cajón exitosa y autoriza tabique hembra7 mm también en doble; dos perfiles/machos/holguras conservados. Separador longitudinal doble extendido hasta trasera del frontal, cerrando hueco previo del área del asa por debajo de su asiento. Shell y envolvente intactas. Validación física de estos cambios del doble pendiente; sin commit.
 
 - 2026-11-23 cajón doble en impresión por el usuario; pendientes calidad de impresión, montaje de ambos milanos y deslizamiento en shell. Probar vacío y con carga. Se conserva tabique8 mm.
@@ -148,7 +150,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.34`
+- Version visible actual: `1.2.38`
 
 ## Desarrollo local
 
@@ -178,6 +180,14 @@ pnpm run check
 - Prototipo separado de `Game Mat Tube`: `codex/game-mat-tube`
 
 ## Estado funcional actual
+
+- v1.2.38 (2026-11-17): cerrado el hueco entre el reposo inclinado de Card Storage y la pared. 33 pruebas y check correctos. Usuario autoriza commit y push.
+
+- v1.2.37 (2026-11-16): añadidas vistas previas rotatorias de Dice Tray y Card Storage en Add loose tray. Usuario solicita commit y push.
+
+- v1.2.36 (2026-11-16): usuario acepta el modo vertical de Card Storage y autoriza commit y push junto con v1.2.35. La altura máxima limita las paredes en modo vertical. 31 pruebas y check correctos. Validación impresa pendiente.
+
+- v1.2.35 (2026-11-16): usuario acepta las aberturas frontal y trasera redondeadas y autoriza el commit del bloque Card Storage. Aberturas y apoyo inclinado configurables en Manufacturing. 29 pruebas y check correctos. Validación impresa pendiente.
 
 - v1.2.34 (2026-10-25): usuario autoriza commit del bloque de consistencia de interfaz: categorías comunes, ayuda contextual, anchos/etiquetas/cantidades, scroll del editor y Empty Box hueca por defecto. Check/build, trece pruebas de interfaz y dos de defaults/persistencia verificados. Sin cambios de cálculos geométricos. Push no solicitado. Propuestas adicionales siguen pendientes en la [revisión y matriz de criterios](docs/plans/interface-review.md).
 

@@ -14,10 +14,11 @@
     type CardStorageParams,
     type StorageDivider
   } from '$lib/models/cardStorageTray';
-  import { ColorPicker, ColorPickerSwatch, FormControl, Input, Popover } from '@tableslayer/ui';
+  import { ColorPicker, ColorPickerSwatch, FormControl, Input, InputCheckbox, Popover } from '@tableslayer/ui';
   import OuterCornerControls from './OuterCornerControls.svelte';
   let { tray }: { tray: CardStorageTray } = $props();
   let result = $derived(resolveCardStorage(tray.params, getCardSizes()));
+  let upright = $derived(!tray.params.lid && tray.params.cardAngleMode === 'upright');
   let selectedPart = $state('all');
   let exportError = $state('');
   let busy = $state(false);
@@ -39,6 +40,7 @@
     updateCardStorageParams(tray.id, {
       ...tray.params,
       lid,
+      ...(lid ? { cardAngleMode: 'fit' as const } : {}),
       wallThickness: lid
         ? Math.max(tray.params.wallThickness, minimumCardStorageLidWallThickness(tray.params.lidClearance))
         : tray.params.wallThickness
@@ -133,8 +135,24 @@
           />
         </label>
       {/if}
+      <HelpRow>
+        <label>
+          Card angle
+          <select
+            value={upright ? 'upright' : 'fit'}
+            onchange={(e) => update('cardAngleMode', e.currentTarget.value === 'upright' ? 'upright' : 'fit')}
+          >
+            <option value="fit">Tilt to fit height</option>
+            <option value="upright" disabled={tray.params.lid}>Upright (90°)</option>
+          </select>
+        </label>
+        <HelpTip label="Help: Card angle">
+          Upright mode requires an open tray. The height limit applies to the tray walls and cards can extend above them.
+          Adding a lid switches back to Tilt to fit height.
+        </HelpTip>
+      </HelpRow>
       <label>
-        Maximum total height (mm)
+        {upright ? 'Maximum tray height (mm)' : 'Maximum total height (mm)'}
         <input
           type="number"
           min="1"
@@ -148,12 +166,37 @@
         {result.width.toFixed(1)} × {result.depth.toFixed(1)} × {result.height.toFixed(1)} mm
         <br />
         Capacity: {result.capacity} cards · Tilt: {((result.angle * 180) / Math.PI).toFixed(1)}° from upright
+        {#if result.cardOverhang > 0}
+          <br />
+          Cards extend {result.cardOverhang.toFixed(1)} mm above the tray walls.
+        {/if}
       </p>
       {#each result.errors as error}<p class="error" role="alert">{error}</p>{/each}
     </section>
   </EditorSection>
 
   <EditorSection title="Manufacturing" open={false}>
+    <HelpRow>
+      <InputCheckbox
+        label="Front and rear card openings"
+        checked={tray.params.cardAccessCutouts !== false}
+        onchange={(e) => update('cardAccessCutouts', e.currentTarget.checked)}
+      />
+      <HelpTip label="Help: Front and rear card openings">
+        Open the centre of both end walls so you can grip the cards from either end.
+      </HelpTip>
+    </HelpRow>
+    <HelpRow>
+      <InputCheckbox
+        label="Add tilted card support"
+        checked={!upright && tray.params.addTiltSupport !== false}
+        disabled={upright}
+        onchange={(e) => update('addTiltSupport', e.currentTarget.checked)}
+      />
+      <HelpTip label="Help: Tilted card support">
+        Adds a rear support when the maximum height requires the cards to tilt. Turning it off keeps the calculated tilt and tray dimensions.
+      </HelpTip>
+    </HelpRow>
     <div class="formGrid">
       <OuterCornerControls
         value={tray.params.outerCornerRadius}

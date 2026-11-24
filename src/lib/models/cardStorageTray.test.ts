@@ -19,6 +19,71 @@ const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
 });
 
 describe('Card Storage', () => {
+  it('limits the open tray walls while showing cards upright above them', () => {
+    const p = params({ cardAngleMode: 'upright', maxHeight: 30, addTiltSupport: true });
+    const r = resolveCardStorage(p, cards);
+    expect(r.valid).toBe(true);
+    expect(r.angle).toBe(0);
+    expect(r.height).toBe(30);
+    expect(r.cardOverhang).toBe(p.floorThickness + r.cardHeight - 30);
+    const [body] = createCardStorageParts(p, cards);
+    expect(jscad.measurements.measureBoundingBox(body.geometry)[1][2]).toBeCloseTo(30);
+    expect(createCardStorageParts({ ...p, addTiltSupport: false }, cards)[0].geometry).toEqual(body.geometry);
+    const [stack] = getCardStoragePositions(p, cards);
+    expect(stack.cardDividerTiltAngle).toBe(0);
+    expect(stack.cardDividerProjectedHeight).toBe(r.cardHeight);
+    expect(resolveCardStorage({ ...p, maxHeight: p.floorThickness }, cards).valid).toBe(false);
+  });
+
+  it('uses the height-fitting angle when a sliding lid is present', () => {
+    const p = params({ lid: true, maxHeight: 60, cardAngleMode: 'upright' });
+    const fit = resolveCardStorage({ ...p, cardAngleMode: 'fit' }, cards);
+    expect(fit.valid).toBe(true);
+    expect(fit.angle).toBeGreaterThan(0);
+    expect(resolveCardStorage(p, cards)).toEqual(fit);
+  });
+  it.each([false, true])('opens both ends while retaining the floor and side rails with lid=%s', (lid) => {
+    const p = params({ lid, lidText: '', maxHeight: 60 });
+    const r = resolveCardStorage(p, cards);
+    const [body, ...parts] = createCardStorageParts(p, cards);
+    const [closedBody, ...closedParts] = createCardStorageParts({ ...p, cardAccessCutouts: false }, cards);
+    const { measureVolume } = jscad.measurements;
+    const probe = (geometry: typeof body.geometry, center: [number, number, number]) =>
+      measureVolume(jscad.booleans.intersect(geometry, jscad.primitives.cuboid({ size: [0.2, 0.2, 0.2], center })));
+
+    for (const y of [p.wallThickness / 4, r.depth - p.wallThickness / 4]) {
+      const grip: [number, number, number] = [r.width / 2, y, r.wallHeight / 2];
+      expect(probe(closedBody.geometry, grip)).toBeGreaterThan(0);
+      expect(probe(body.geometry, grip)).toBeCloseTo(0);
+    }
+    expect(probe(body.geometry, [r.width / 2, r.depth / 2, p.floorThickness / 2])).toBeGreaterThan(0);
+    expect(probe(body.geometry, [p.wallThickness / 4, r.depth / 2, r.wallHeight / 2])).toBeGreaterThan(0);
+    expect(parts).toEqual(closedParts);
+  });
+  it.each([false, true])('can omit the tilted rear support with lid=%s', (lid) => {
+    const legacy = params({ lid, lidText: '', maxHeight: 60, addTiltSupport: undefined });
+    const disabled = { ...legacy, addTiltSupport: false };
+    const layout = resolveCardStorage(legacy, cards);
+    expect(layout.angle).toBeGreaterThan(0);
+    expect(resolveCardStorage(disabled, cards)).toEqual(layout);
+
+    const [supportedBody, ...supportedParts] = createCardStorageParts(legacy, cards);
+    const [unsupportedBody, ...unsupportedParts] = createCardStorageParts(disabled, cards);
+    const { measureBoundingBox, measureVolume } = jscad.measurements;
+    expect(measureVolume(unsupportedBody.geometry)).toBeLessThan(measureVolume(supportedBody.geometry));
+    expect(measureBoundingBox(unsupportedBody.geometry)).toEqual(measureBoundingBox(supportedBody.geometry));
+    expect(unsupportedParts).toEqual(supportedParts);
+  });
+  it.each([false, true])('fills the gap between the tilted support and end wall with lid=%s', (lid) => {
+    const p = params({ lid, lidText: '', maxHeight: 60 });
+    const r = resolveCardStorage(p, cards);
+    const [body] = createCardStorageParts(p, cards);
+    const probe = jscad.primitives.cuboid({
+      size: [0.2, 0.2, 0.2],
+      center: [p.wallThickness + 5, r.depth - p.wallThickness - p.clearance / 2, p.floorThickness + 5]
+    });
+    expect(jscad.measurements.measureVolume(jscad.booleans.intersect(body.geometry, probe))).toBeCloseTo(0.008, 6);
+  });
   it.each([false, true])('rounds the body and lid=%s without changing capacity, guides or dividers', (lid) => {
     const p = params({ lid, lidText: '', maxHeight: 60 });
     expect(defaultCardStorageParams.outerCornerRadius).toBe(3);

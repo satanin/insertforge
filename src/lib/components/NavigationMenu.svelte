@@ -1142,6 +1142,8 @@
                   handleAddLooseTray(layer.id, 'cardStorage');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('cardStorage', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Card Storage</Text>
                 <Text size="0.75rem" color="var(--fgMuted)">One cavity with removable, labelled dividers</Text>
@@ -1152,6 +1154,8 @@
                   handleAddLooseTray(layer.id, 'dice');
                   contentProps.close();
                 }}
+                onmouseenter={(e) => handleTrayTypeHover('dice', e.currentTarget)}
+                onmouseleave={handleTrayTypeLeave}
               >
                 <Text weight={500}>Dice Tray <span class="experimentalBadge">Experimental</span></Text>
                 <Text size="0.75rem" color="var(--fgMuted)">Individual pockets or a shared dice compartment</Text>
