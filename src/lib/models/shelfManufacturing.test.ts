@@ -33,6 +33,7 @@ describe('depth section manufacturing', () => {
       expect(Math.abs(volume(jscad.booleans.intersect(drawers[0].geometry, drawers[1].geometry)))).toBeLessThan(1e-5);
       const parts = createShelfDrawerParts(p, cards);
       if (jointStyle === 'divider-dovetail') {
+        expect(model.dividerDepth).toBe(7);
         const seam = model.drawerCuts[0], width = parts.resolved.drawerWidth;
         // Two independent male tongues, with solid front material between sockets.
         for (const fraction of [0.25, 0.75]) {

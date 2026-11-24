@@ -26,6 +26,10 @@ describe('modular shelf card drawer', () => {
       const rigid = parts.retentionClip ? jscad.booleans.subtract(parts.handle, parts.retentionClip) : parts.handle;
       for (const lift of [1, 5, 12]) expect(overlap(move(rigid, 0, 0, lift), parts.drawer)).toBeLessThan(1e-5);
       expect(parts.resolved.labelSlotXs).toHaveLength(labelWindows);
+      const front = labelWindow ? parts.resolved.frontThickness : Math.max(p.drawerWall, parts.resolved.labelFaceWall);
+      const bridge = jscad.primitives.cuboid({ size: [p.drawerWall, parts.resolved.frontReserve - front, 10],
+        center: [parts.resolved.drawerWidth / 2, (parts.resolved.frontReserve + front) / 2, p.drawerFloor + 5] });
+      expect(overlap(bridge, parts.drawer)).toBeCloseTo(volume(bridge), 5);
       const print = shelfPrintGeometry(parts, 'handle');
       const generalize = jscad.modifiers.generalize as unknown as (options: { snap: boolean; triangulate: boolean }, geometry: Geom3) => Geom3;
       jscad.geometries.geom3.validate(generalize({ snap: true, triangulate: true }, print));

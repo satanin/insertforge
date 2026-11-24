@@ -27,7 +27,7 @@ const { cuboid, polygon } = jscad.primitives;
 const KEY_HEIGHT = 7, SEAM_GAP = 0.15;
 const KEY_HEAD = 0.8, KEY_SETBACK = 0.1, KEY_SHOULDER = 1.2;
 const LAP_LENGTH = 12, LAP_GAP = 0.1, MIN_LAP_WEB = 0.8;
-const DIVIDER_DEPTH = 8;
+const DIVIDER_DEPTH = 7;
 /** Usable card spans in drawer-local Y, excluding the complete depth joint. */
 export function shelfCardSpans(plan: ReturnType<typeof resolveShelfManufacturing>, clearance: number): [number, number][] {
   const r = plan.resolved;
@@ -125,7 +125,7 @@ export function resolveShelfManufacturing(p: ShelfDrawerParams, cards: CardSize[
     if (drawerCuts.length && (drawerCuts[0] < r.rampEnd + 20 || r.drawerDepth - drawerCuts.at(-1)! < 35))
       errors.push('Drawer sections leave insufficient material beside the front or back. Choose a larger bed.');
   }
-  return { valid: !errors.length, errors, settings, shellCuts, drawerCuts, hybrid, divider, floorKeys, lapWeb, dividerDepth: r.columns === 1 ? 7 : DIVIDER_DEPTH,
+  return { valid: !errors.length, errors, settings, shellCuts, drawerCuts, hybrid, divider, floorKeys, lapWeb, dividerDepth: DIVIDER_DEPTH,
     lapLength: LAP_LENGTH, lapGap: LAP_GAP, keySeatDepth: KEY_HEAD + KEY_SETBACK, drawerWall: p.drawerWall,
     drawerFloor: p.drawerFloor, sampleWidth: floorKeys ? 42 : 30,
     shellCount: shellCuts.length + 1, drawerCount: drawerCuts.length + 1, resolved: r };

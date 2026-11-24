@@ -245,8 +245,9 @@ export function createShelfDrawerParts(p: ShelfDrawerParams, cards: CardSize[]) 
       [r.frontThickness, reinforcementBottom], [r.frontThickness, h], [0, h]
     ]);
   }
-  const centerWalls = r.centerDivider ? [block((w - t) / 2, r.frontReserve - 0.1, f - 0.1,
-    t, d - r.frontReserve - t + 0.2, sideHeight - f + 0.1)] : [];
+  const dividerFront = r.labelWindow ? r.frontThickness : Math.min(r.frontThickness, Math.max(t, r.labelFaceWall));
+  const centerWalls = r.centerDivider ? [block((w - t) / 2, dividerFront - 0.1, f - 0.1,
+    t, d - dividerFront - t + 0.2, sideHeight - f + 0.1)] : [];
   const drawerBase = union(block(0, 0, 0, w, d, f), block(faceLeft, 0, 0, faceWidth, r.frontThickness, f), front, ...centerWalls,
     block(0, d - t, f, w, t, sideHeight - f), sideProfile(0, t, sidePoints),
     sideProfile(w - t, t, sidePoints));

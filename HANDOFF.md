@@ -1,5 +1,7 @@
 # InsertForge Handoff
 
+- 2026-11-24 usuario informa prueba de cajón exitosa y autoriza tabique hembra7 mm también en doble; dos perfiles/machos/holguras conservados. Separador longitudinal doble extendido hasta trasera del frontal, cerrando hueco previo del área del asa por debajo de su asiento. Shell y envolvente intactas. Validación física de estos cambios del doble pendiente; sin commit.
+
 - 2026-11-23 cajón doble en impresión por el usuario; pendientes calidad de impresión, montaje de ambos milanos y deslizamiento en shell. Probar vacío y con carga. Se conserva tabique8 mm.
 
 - 2026-11-23 usuario confirma buena impresión del cajón simple con tabique hembra Dovetail reducido a7 mm y resistencia inicial aparentemente buena. Pendiente prueba con cartas cargadas prevista hoy; no dar por validada aún resistencia bajo carga/durabilidad. Doble sigue con8 mm.
