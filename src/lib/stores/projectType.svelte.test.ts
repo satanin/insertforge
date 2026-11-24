@@ -18,6 +18,7 @@ describe('project types', () => {
     const r = resolveShelfDrawer(double.params, cards);
     expect(double.params.columns).toBe(2);
     expect(double.params.centerDivider).toBe(true);
+    expect(double.params).toMatchObject({ wideHandle: true, labelWindows: 2, labelWindow: true });
     expect(r.bodyWidth).toBeCloseTo(2 * resolveShelfDrawer(single.params, cards).bodyWidth);
     addShelfFrame();
     const frameId = getProject().selectedShelfModuleId!;

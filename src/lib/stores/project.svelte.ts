@@ -3618,6 +3618,9 @@ export function addShelfModule(columns: 1 | 2 = 1): ShelfDrawerModule | undefine
     : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() };
   params.columns = columns;
   params.centerDivider = columns === 2;
+  params.wideHandle = columns === 2;
+  params.labelWindows = columns === 2 ? 2 : 1;
+  if (columns === 2) params.labelWindow = true;
   if (!reference && columns === 2) Object.assign(params, {
     shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
     drawerFloor: 2, bottomTracks: false, headroom: 1,
