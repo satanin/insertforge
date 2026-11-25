@@ -14,11 +14,19 @@ import {
 const cards = [{ id: 'standard', name: 'Standard sleeved', width: 66, length: 91, thickness: 0.6 }];
 const params = (extra: Partial<CardStorageParams> = {}): CardStorageParams => ({
   ...defaultCardStorageParams,
+  wallThickness: 3,
+  floorThickness: 3,
   dividers: [{ id: 'd1', label: '', tab: 'left' }],
   ...extra
 });
 
 describe('Card Storage', () => {
+  it('creates open trays with 1.5 mm walls and floor by default', () => {
+    expect(defaultCardStorageParams.wallThickness).toBe(1.5);
+    expect(defaultCardStorageParams.floorThickness).toBe(1.5);
+    expect(resolveCardStorage(defaultCardStorageParams, cards).valid).toBe(true);
+    expect(jscad.measurements.measureVolume(createCardStorageParts(defaultCardStorageParams, cards)[0].geometry)).toBeGreaterThan(0);
+  });
   it('limits the open tray walls while showing cards upright above them', () => {
     const p = params({ cardAngleMode: 'upright', maxHeight: 30, addTiltSupport: true });
     const r = resolveCardStorage(p, cards);
@@ -48,6 +56,11 @@ describe('Card Storage', () => {
     const [body, ...parts] = createCardStorageParts(p, cards);
     const [closedBody, ...closedParts] = createCardStorageParts({ ...p, cardAccessCutouts: false }, cards);
     const { measureVolume } = jscad.measurements;
+    const [shallowBody] = createCardStorageParts({ ...p, cardAccessDepthPercent: 40 }, cards);
+    const [zeroDepthBody] = createCardStorageParts({ ...p, cardAccessDepthPercent: 0 }, cards);
+    expect(zeroDepthBody.geometry).toEqual(closedBody.geometry);
+    expect(measureVolume(shallowBody.geometry)).toBeGreaterThan(measureVolume(body.geometry));
+    expect(measureVolume(shallowBody.geometry)).toBeLessThan(measureVolume(closedBody.geometry));
     const probe = (geometry: typeof body.geometry, center: [number, number, number]) =>
       measureVolume(jscad.booleans.intersect(geometry, jscad.primitives.cuboid({ size: [0.2, 0.2, 0.2], center })));
 

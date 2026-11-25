@@ -1,6 +1,7 @@
 import type { CardSleeveSelection } from '$lib/types/project';
 import { effectiveCardSize } from '$lib/utils/projectCards';
 import { createOuterBody } from './outerCorners';
+import { createCardAccessCutout } from './cardAccessCutout';
 import jscad from '@jscad/modeling';
 import type { Geom3 } from '@jscad/modeling/src/geometries/types';
 
@@ -28,6 +29,7 @@ export interface CardDividerStack extends CardSleeveSelection {
 }
 
 export interface CardDividerTrayParams {
+  cardAccessDepthPercent?: number;
   outerCornerRadius?: number; // Missing/0 preserves square exterior corners
   stacks: CardDividerStack[];
   orientation: 'vertical' | 'horizontal'; // Card orientation for entire tray
@@ -37,6 +39,15 @@ export interface CardDividerTrayParams {
   clearance: number; // Tolerance around cards
   rimHeight: number; // Extra height above cards
   maxHeight: number | null; // null = natural height, lower values tilt cards to fit
+}
+
+export const DEFAULT_CARD_DIVIDER_ACCESS_DEPTH_PERCENT = 65;
+
+export function getCardDividerAccessDepthPercent(params: CardDividerTrayParams): number {
+  const value = params.cardAccessDepthPercent;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : DEFAULT_CARD_DIVIDER_ACCESS_DEPTH_PERCENT;
 }
 
 export const defaultCardDividerTrayParams: CardDividerTrayParams = {
@@ -596,11 +607,12 @@ export function createCardDividerTray(
   targetHeight?: number,
   floorSpacerHeight?: number,
   showEmboss = true,
-  showStackLabels = true
+  showStackLabels = true,
+  roundedCardAccess = false
 ): Geom3 {
-  const key = JSON.stringify([params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels]);
+  const key = JSON.stringify([params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels, roundedCardAccess]);
   if (cardDividerGeometryCache?.key === key) return cardDividerGeometryCache.geometry;
-  const geometry = buildCardDividerTray(params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels);
+  const geometry = buildCardDividerTray(params, customCardSizes, trayName, targetHeight, floorSpacerHeight, showEmboss, showStackLabels, roundedCardAccess);
   // Bound memory to one tray and invalidate by values, including card sizes.
   cardDividerGeometryCache = { key, geometry };
   return geometry;
@@ -613,7 +625,8 @@ function buildCardDividerTray(
   targetHeight?: number,
   floorSpacerHeight?: number,
   showEmboss: boolean = true,
-  showStackLabels: boolean = true
+  showStackLabels: boolean = true,
+  roundedCardAccess = false
 ): Geom3 {
   const { stacks: originalStacks, orientation, stackDirection, wallThickness, floorThickness, clearance } = params;
 
@@ -701,55 +714,77 @@ function buildCardDividerTray(
     }
   }
 
-  // Add finger cutouts
-  // Cylinder diameter = half the card's shorter dimension for vertical, longer for horizontal
-  // Vertical: cards stand tall, cutout based on card width (shorter side)
-  // Horizontal: cards on side, cutout based on card length (longer side)
-  let maxCutoutDimension = 0;
-  for (const stack of stacks) {
-    const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
-    if (!cardSize) continue;
-    const cutoutDimension = orientation === 'vertical' ? cardSize.width : cardSize.length;
-    maxCutoutDimension = Math.max(maxCutoutDimension, cutoutDimension);
-  }
-
-  const cutoutRadius = maxCutoutDimension / 4; // Diameter is half the dimension, so radius is quarter
-  // Keep circular approximation error below 0.02 mm even for large custom cards.
-  const cutoutSegments = Math.max(32, Math.ceil(Math.PI / Math.acos(1 - Math.min(0.02 / cutoutRadius, 1)) / 4) * 4);
-  const cutoutCenterZ = trayHeight; // Cylinder midpoint at top of tray
-
-  if (stackDirection === 'frontToBack') {
-    // Single cylinder running along Y axis (through front wall)
-    // Cylinder is centered in X, midpoint at top of tray
-    const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
-
-    const fingerCutout = translate(
-      [trayWidth / 2, trayDepth / 2, cutoutCenterZ],
-      rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: cutoutSegments }))
-    );
-    tray = subtract(tray, fingerCutout);
-  } else {
-    // Side by side: One cylinder per stack, centered on each stack
-    let currentX = wallThickness;
-    const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
-
+  const cutouts: Geom3[] = [];
+  const accessDepth = getCardDividerAccessDepthPercent(params);
+  if (roundedCardAccess && accessDepth > 0 && resolvedSlots.length > 0) {
+    if (stackDirection === 'frontToBack') {
+      const slotWidth = Math.min(...resolvedSlots.map((slot) => slot.slotWidth)) - clearance * 2;
+      cutouts.push(createCardAccessCutout(
+        trayWidth / 2, slotWidth, maxProjectedHeight, effectiveFloorHeight, wallThickness, trayHeight, trayDepth, accessDepth
+      ));
+    } else {
+      let currentX = wallThickness;
+      for (const slot of resolvedSlots) {
+        const slotFloor = trayHeight - slot.projectedHeight;
+        cutouts.push(createCardAccessCutout(
+          currentX + slot.slotWidth / 2, slot.slotWidth - clearance * 2, slot.projectedHeight,
+          slotFloor, wallThickness, trayHeight, trayDepth, accessDepth
+        ));
+        currentX += slot.slotWidth + wallThickness;
+      }
+    }
+    tray = subtract(tray, ...cutouts);
+  } else if (!roundedCardAccess) {
+    // Add finger cutouts
+    // Cylinder diameter = half the card's shorter dimension for vertical, longer for horizontal
+    // Vertical: cards stand tall, cutout based on card width (shorter side)
+    // Horizontal: cards on side, cutout based on card length (longer side)
+    let maxCutoutDimension = 0;
     for (const stack of stacks) {
       const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
       if (!cardSize) continue;
+      const cutoutDimension = orientation === 'vertical' ? cardSize.width : cardSize.length;
+      maxCutoutDimension = Math.max(maxCutoutDimension, cutoutDimension);
+    }
 
-      const { width: cardWidth, length: cardLength } = cardSize;
-      const slotWidth = orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+    const cutoutRadius = maxCutoutDimension / 4; // Diameter is half the dimension, so radius is quarter
+    // Keep circular approximation error below 0.02 mm even for large custom cards.
+    const cutoutSegments = Math.max(32, Math.ceil(Math.PI / Math.acos(1 - Math.min(0.02 / cutoutRadius, 1)) / 4) * 4);
+    const cutoutCenterZ = trayHeight; // Cylinder midpoint at top of tray
 
-      // Cutout centered on this stack
-      const stackCenterX = currentX + slotWidth / 2;
+    if (stackDirection === 'frontToBack') {
+      // Single cylinder running along Y axis (through front wall)
+      // Cylinder is centered in X, midpoint at top of tray
+      const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
 
       const fingerCutout = translate(
-        [stackCenterX, trayDepth / 2, cutoutCenterZ],
+        [trayWidth / 2, trayDepth / 2, cutoutCenterZ],
         rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: cutoutSegments }))
       );
       tray = subtract(tray, fingerCutout);
+    } else {
+      // Side by side: One cylinder per stack, centered on each stack
+      let currentX = wallThickness;
+      const cutoutLength = trayDepth + 2; // Extend beyond tray for clean cut
 
-      currentX += slotWidth + wallThickness;
+      for (const stack of stacks) {
+        const cardSize = effectiveCardSize(getCardSize(stack.cardSizeId, customCardSizes), stack);
+        if (!cardSize) continue;
+
+        const { width: cardWidth, length: cardLength } = cardSize;
+        const slotWidth = orientation === 'vertical' ? cardWidth + clearance * 2 : cardLength + clearance * 2;
+
+        // Cutout centered on this stack
+        const stackCenterX = currentX + slotWidth / 2;
+
+        const fingerCutout = translate(
+          [stackCenterX, trayDepth / 2, cutoutCenterZ],
+          rotateX(Math.PI / 2, cylinder({ radius: cutoutRadius, height: cutoutLength, segments: cutoutSegments }))
+        );
+        tray = subtract(tray, fingerCutout);
+
+        currentX += slotWidth + wallThickness;
+      }
     }
   }
 

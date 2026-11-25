@@ -7,6 +7,7 @@ import type { CounterStack } from './counterTray';
 import { createBoxWithLidGrooves, createLid, createLidTextInlay, defaultLidParams } from './lid';
 import { createOuterBody, getOuterCornerRadius } from './outerCorners';
 import { vectorTextWithAccents } from './vectorTextWithAccents';
+import { createCardAccessCutout } from './cardAccessCutout';
 
 const { cuboid, polygon } = jscad.primitives;
 const { union, subtract, intersect } = jscad.booleans;
@@ -75,6 +76,7 @@ export interface CardStorageParams extends CardSleeveSelection {
   cardAngleMode?: 'fit' | 'upright';
   addTiltSupport?: boolean;
   cardAccessCutouts?: boolean;
+  cardAccessDepthPercent?: number;
   wallThickness: number;
   floorThickness: number;
   clearance: number;
@@ -97,8 +99,8 @@ export const defaultCardStorageParams: CardStorageParams = {
   exteriorLength: 150,
   maxHeight: null,
   addTiltSupport: true,
-  wallThickness: 3,
-  floorThickness: 3,
+  wallThickness: 1.5,
+  floorThickness: 1.5,
   clearance: 1,
   dividerThickness: 1.2,
   tabHeight: 10,
@@ -107,6 +109,13 @@ export const defaultCardStorageParams: CardStorageParams = {
   lidClearance: 0.3,
   dividers: []
 };
+
+export function getCardStorageAccessDepthPercent(p: CardStorageParams): number {
+  const value = p.cardAccessDepthPercent;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.min(100, value))
+    : p.cardAccessCutouts === false ? 0 : 100;
+}
 
 export function resolveCardStorage(p: CardStorageParams, cards: CardSize[]) {
   const card = effectiveCardSize(cards.find((c) => c.id === p.cardSizeId), p);
@@ -291,49 +300,11 @@ export function createCardStorageParts(p: CardStorageParams, cards: CardSize[]):
     const support = translate([W - w, D - w - c - lean, f], rotateY(-Math.PI / 2, wedge));
     body = union(body, support);
   }
-  if (p.cardAccessCutouts !== false) {
+  const accessDepth = getCardStorageAccessDepthPercent(p);
+  if (accessDepth > 0) {
+    // Continue the opening through the centre of the tilted rear support.
     const cardHeight = r.cardHeight * Math.cos(r.angle);
-    const sill = f + Math.min(cardHeight * 0.25, (H - f) / 2, Math.max(3, w));
-    const halfWidth = r.cardWidth * 0.35;
-    const lowerHalfWidth = halfWidth * 0.8;
-    const shoulder = sill + halfWidth - lowerHalfWidth;
-    const top = Math.max(H, shoulder) + 1;
-    const profile: [number, number][] = [
-      [W / 2 - lowerHalfWidth, sill],
-      [W / 2 + lowerHalfWidth, sill],
-      [W / 2 + halfWidth, shoulder],
-      [W / 2 + halfWidth, top],
-      [W / 2 - halfWidth, top],
-      [W / 2 - halfWidth, shoulder]
-    ];
-    const roundedProfile = profile.flatMap((corner, index) => {
-      if (corner[1] === top) return [corner];
-      const previous = profile[(index + profile.length - 1) % profile.length];
-      const next = profile[(index + 1) % profile.length];
-      const inset = (neighbor: [number, number]): [number, number] => {
-        const dx = neighbor[0] - corner[0];
-        const dz = neighbor[1] - corner[1];
-        const fraction = Math.min(0.45, 3 / Math.hypot(dx, dz));
-        return [corner[0] + dx * fraction, corner[1] + dz * fraction];
-      };
-      const start = inset(previous);
-      const end = inset(next);
-      return Array.from({ length: 9 }, (_, step): [number, number] => {
-        const t = step / 8;
-        const u = 1 - t;
-        return [
-          u * u * start[0] + 2 * u * t * corner[0] + t * t * end[0],
-          u * u * start[1] + 2 * u * t * corner[1] + t * t * end[1]
-        ];
-      });
-    });
-    // A single slot opens both end walls and continues through the centre
-    // of the tilted support. The side rails and the floor stay continuous.
-    const opening = extrudeLinear(
-      { height: D + 2 },
-      polygon({ points: roundedProfile })
-    );
-    body = subtract(body, translate([0, D + 1, 0], rotateX(Math.PI / 2, opening)));
+    body = subtract(body, createCardAccessCutout(W / 2, r.cardWidth, cardHeight, f, w, H, D, accessDepth));
   }
   // Trim after adding the tilted rear support, keeping a single exterior
   // contour. Skip the Boolean for old projects and explicit square corners.

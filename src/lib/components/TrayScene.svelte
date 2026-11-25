@@ -1804,16 +1804,20 @@
     {/each}
   {:else if geometry && !showLayerView}
     <!-- Single selected tray -->
+    {@const bodyGeometry = cardStorageDetail?.body ?? geometry}
+    {@const hasVertexColors = bodyGeometry.hasAttribute('color')}
     <T.Group position.x={selectedViewMatrix.elements[12]} position.z={selectedViewMatrix.elements[14]} rotation.y={selectedViewRotation * Math.PI / 180}>
-    <T.Mesh geometry={cardStorageDetail?.body ?? geometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
+    {#key hasVertexColors}
+    <T.Mesh geometry={bodyGeometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
       <T.MeshStandardMaterial
-        color={geometry.hasAttribute('color') ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
-        vertexColors={geometry.hasAttribute('color')}
+        color={hasVertexColors ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
+        vertexColors={hasVertexColors}
         roughness={0.6}
         metalness={0.1}
         side={THREE.DoubleSide}
       />
     </T.Mesh>
+    {/key}
     {#each partCotes as partCote}
       {@const [min, max] = partCote.bounds}
       <T.Group position.y={min[2]}>

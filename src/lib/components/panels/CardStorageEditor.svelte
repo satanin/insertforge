@@ -9,16 +9,24 @@
   import {
     DEFAULT_STORAGE_DIVIDER_COLOR,
     getCardStorageCornerMargin,
+    getCardStorageAccessDepthPercent,
     minimumCardStorageLidWallThickness,
     resolveCardStorage,
     type CardStorageParams,
     type StorageDivider
   } from '$lib/models/cardStorageTray';
-  import { ColorPicker, ColorPickerSwatch, FormControl, Input, InputCheckbox, Popover } from '@tableslayer/ui';
+  import { ColorPicker, ColorPickerSwatch, FormControl, Input, InputCheckbox, InputSlider, Popover } from '@tableslayer/ui';
   import OuterCornerControls from './OuterCornerControls.svelte';
   let { tray }: { tray: CardStorageTray } = $props();
   let result = $derived(resolveCardStorage(tray.params, getCardSizes()));
   let upright = $derived(!tray.params.lid && tray.params.cardAngleMode === 'upright');
+  let cutoutDepth = $derived(getCardStorageAccessDepthPercent(tray.params));
+  let previousCutout = $state<{ trayId: string; depth: number }>();
+
+  function setCutoutDepth(depth: number) {
+    if (depth === 0 && cutoutDepth > 0) previousCutout = { trayId: tray.id, depth: cutoutDepth };
+    updateCardStorageParams(tray.id, { ...tray.params, cardAccessDepthPercent: depth, cardAccessCutouts: depth > 0 });
+  }
   let selectedPart = $state('all');
   let exportError = $state('');
   let busy = $state(false);
@@ -179,13 +187,24 @@
     <HelpRow>
       <InputCheckbox
         label="Front and rear card openings"
-        checked={tray.params.cardAccessCutouts !== false}
-        onchange={(e) => update('cardAccessCutouts', e.currentTarget.checked)}
+        checked={cutoutDepth > 0}
+        onchange={(e) => {
+          const restoredDepth = previousCutout?.trayId === tray.id ? previousCutout.depth : 100;
+          setCutoutDepth(e.currentTarget.checked ? restoredDepth : 0);
+        }}
       />
       <HelpTip label="Help: Front and rear card openings">
-        Open the centre of both end walls so you can grip the cards from either end.
+        Lower values leave more wall under both openings. At 0% the walls stay closed.
       </HelpTip>
     </HelpRow>
+    <label for="storage-access-depth">Finger cutout depth · {cutoutDepth}%</label>
+    <InputSlider
+      id="storage-access-depth"
+      hex="var(--fgMuted)"
+      value={cutoutDepth}
+      onchange={(e) => setCutoutDepth(e.currentTarget.valueAsNumber)}
+    />
+    <div class="cutoutDepthLimits" aria-hidden="true"><span>0%</span><span>100%</span></div>
     <HelpRow>
       <InputCheckbox
         label="Add tilted card support"
@@ -418,6 +437,12 @@
 </section>
 
 <style>
+  .cutoutDepthLimits {
+    display: flex;
+    justify-content: space-between;
+    color: var(--fgMuted);
+    font-size: 0.75rem;
+  }
   .storageEditor {
     display: grid;
     gap: 0.85rem;

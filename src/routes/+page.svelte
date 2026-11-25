@@ -2153,7 +2153,8 @@
             maxHeight,
             spacerHeight,
             showEmboss,
-            showStackLabels
+            showStackLabels,
+            true
           );
           const dividerPositions = getCardDividerPositions(looseTray.params, cardSizes, maxHeight, spacerHeight);
           selectedTrayCounters = dividerPositions.map((pos) => ({

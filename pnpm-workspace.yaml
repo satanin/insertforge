@@ -1,0 +1,4 @@
+allowBuilds:
+  '@tableslayer/ui': false
+  core-js: false
+  esbuild: true

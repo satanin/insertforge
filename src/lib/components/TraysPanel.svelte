@@ -560,6 +560,7 @@
       {:else if isCardDividerTray(selectedTray) && onUpdateCardDividerParams}
         <CardDividerTrayEditor
           tray={selectedTray as CardDividerTray}
+          loose={getProject().layers.some((layer) => layer.looseTrays.some((tray) => tray.id === selectedTray.id))}
           {trayLetter}
           onUpdateParams={onUpdateCardDividerParams}
           {onUpdateTray}

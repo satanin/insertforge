@@ -1,5 +1,7 @@
 # InsertForge Handoff
 
+- 2026-11-25: usuario valida en app y autoriza commit/push del bloque v1.2.40: profundidad de aberturas Card Divider independiente/Card Storage, defaults pared/suelo Card Storage1,5 mm y colores del visor. Integrado con main conservando cotas por pieza de Shelf Storage. Check/build correctos; suite con2 workers/timeout30s:357 pasan,1 omitida,3 fallos históricos de volumen en defaultProjectGeometry documentados en la integración anterior. Validación física pendiente.
+
 - 2026-11-24 nuevos cajones dobles: asa ancha y dos ventanas activadas por defecto, incluso al copiar configuración de un simple. Existentes intactos. Nuevos simples restablecen asa normal/una ventana.11 tests del store y check correctos; usuario autoriza commit/push a main.
 
 - 2026-11-24 estantería integrada y subida a main en a8734d6, release1.2.39; conserva cambios Card Storage de main59a9f43. Check y build pasan; suite con2 workers/timeout30s:354 pasan,1 omitida,3 fallos de volumen en defaultProjectGeometry reproducidos idénticos en main59a9f43 (no regresión). Cloudflare Pages detecta commit y despliega (no se observan runs Fly). Carpeta principal tiene cambios ajenos sin commit y se mantiene intacta.
@@ -152,7 +154,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.38`
+- Version visible actual: `1.2.40`
 
 ## Desarrollo local
 
@@ -431,6 +433,8 @@ La app ya no es solo un generador de `counter trays`. Ahora soporta:
   - render correcto de una sola `section` cuando esa `section` es la seleccion activa
 
 ## Pendientes razonables
+
+- 2026-10-25: estudiar un Card Well mixto que permita combinar diferentes formatos/tamaños de cartas en una misma pieza. Pendiente definir distribución y dimensionado de los huecos; trabajo futuro, sin implementación por ahora.
 
 - v1.2.30: validar físicamente redondeo/apilado de Miniature Tray (radio limitado para conservar 0,6 mm alrededor de encajes) y cabida/extracción de Dice Tray. Explode extraíble eleva primero (30%) y luego aparta; deslizantes mantienen plano de guías.
 

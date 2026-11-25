@@ -521,7 +521,8 @@ function buildTrayGeometry(
   cardSizes: CustomCardSize[],
   counterShapes: CounterShape[],
   maxHeight: number,
-  spacerHeight: number
+  spacerHeight: number,
+  loose = false
 ): Geom3 {
   const showEmboss = tray.showEmboss ?? true;
   if (tray.type === 'dice') return createDiceTray(tray.params, tray.name, tray.color);
@@ -541,7 +542,8 @@ function buildTrayGeometry(
       maxHeight,
       spacerHeight,
       showEmboss,
-      showStackLabels
+      showStackLabels,
+      loose
     );
   }
   if (isCardTray(tray)) {
@@ -1119,7 +1121,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
       const spacerHeight = 0; // No spacer for loose trays
 
       // Generate standalone tray
-      cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
+      cachedSelectedTray = createTrayGeometry(tray, cardSizes, counterShapes, maxHeight, spacerHeight, true);
       selectedTrayGeometry = jscadToArrays(cachedSelectedTray);
       selectedTrayCounters = getTrayPositions(tray, cardSizes, counterShapes, maxHeight, spacerHeight);
 
@@ -1493,7 +1495,7 @@ async function handleGenerate(msg: GenerateMessage): Promise<void> {
         const spacerHeight = 0; // No spacer for loose trays
 
         // Generate tray geometry at the layer height
-        const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight);
+        const jscadGeom = createTrayGeometry(looseTray, cardSizes, counterShapes, maxHeight, spacerHeight, true);
 
         // Cache for STL export
         cachedAllLooseTrays.push({

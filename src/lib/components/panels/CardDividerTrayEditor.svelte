@@ -5,11 +5,13 @@
   import EditorSection from '../EditorSection.svelte';
   import QuantityInput from '../QuantityInput.svelte';
   import OuterCornerControls from './OuterCornerControls.svelte';
-  import { Input, InputCheckbox, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
+  import { Input, InputCheckbox, InputSlider, FormControl, Spacer, Select, Link, IconButton, Icon } from '@tableslayer/ui';
   import { IconX, IconMenu } from '@tabler/icons-svelte';
   import type { CardDividerTray } from '$lib/types/project';
   import {
     type CardDividerTrayParams,
+    getCardDividerAccessDepthPercent,
+    DEFAULT_CARD_DIVIDER_ACCESS_DEPTH_PERCENT,
     getCardDividerTrayDimensions,
     sanitizeCardDividerTrayParams,
     validateCardDividerHeight,
@@ -25,6 +27,7 @@
     actualHeight?: number;
     displayDimensions?: { width: number; depth: number; height: number } | null;
     renderMode?: 'all' | 'settings' | 'stacks';
+    loose?: boolean;
   }
 
   let {
@@ -34,13 +37,21 @@
     onUpdateTray,
     actualHeight,
     displayDimensions,
-    renderMode = 'all'
+    renderMode = 'all',
+    loose = false
   }: Props = $props();
 
   // Drag and drop state
   let draggedIndex: number | null = $state(null);
   let dragOverIndex: number | null = $state(null);
   let maxHeightWarning = $state('');
+  let cutoutDepth = $derived(getCardDividerAccessDepthPercent(tray.params));
+  let previousCutout = $state<{ trayId: string; depth: number }>();
+
+  function setCutoutDepth(depth: number) {
+    if (depth === 0 && cutoutDepth > 0) previousCutout = { trayId: tray.id, depth: cutoutDepth };
+    updateParam('cardAccessDepthPercent', depth);
+  }
 
   // Compute dimensions, using actualHeight if provided (when tray expands to match box height)
   // If displayDimensions is provided (with rotation applied), use those for display
@@ -339,6 +350,33 @@
           {/if}
         </div>
         <Spacer size="0.5rem" />
+        {#if loose}
+          <HelpRow>
+            <InputCheckbox
+              label="Finger cutout"
+              checked={cutoutDepth > 0}
+              onchange={(e) => {
+                const restoredDepth = previousCutout?.trayId === tray.id
+                  ? previousCutout.depth
+                  : DEFAULT_CARD_DIVIDER_ACCESS_DEPTH_PERCENT;
+                setCutoutDepth(e.currentTarget.checked ? restoredDepth : 0);
+              }}
+            />
+            <HelpTip label="Help: Finger cutout depth">
+              Lower values leave more wall under the opening. At 0% the walls stay closed.
+            </HelpTip>
+          </HelpRow>
+          <label for="divider-access-depth">Finger cutout depth · {cutoutDepth}%</label>
+          <InputSlider
+            id="divider-access-depth"
+            min="0"
+            max="100"
+            hex="var(--fgMuted)"
+            value={cutoutDepth}
+            onchange={(e) => setCutoutDepth(e.currentTarget.valueAsNumber)}
+          />
+          <div class="cutoutDepthLimits" aria-hidden="true"><span>0%</span><span>100%</span></div>
+        {/if}
         <div class="formGrid">
           <OuterCornerControls
             value={tray.params.outerCornerRadius}
@@ -417,6 +455,12 @@
 {/if}
 
 <style>
+  .cutoutDepthLimits {
+    display: flex;
+    justify-content: space-between;
+    color: var(--fgMuted);
+    font-size: 0.75rem;
+  }
   .panelFormSection {
     padding: 0 0.75rem;
   }

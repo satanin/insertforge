@@ -30,6 +30,32 @@ const cardSizes: CardSize[] = [
 ];
 
 describe('card divider tray angled height limits', () => {
+  it.each(['frontToBack', 'sideBySide'] as const)('opens both ends of loose dividers arranged %s', (stackDirection) => {
+    const p = {
+      ...defaultCardDividerTrayParams,
+      stackDirection,
+      stacks: [{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 30 }]
+    };
+    const original = createCardDividerTray(p, cardSizes);
+    const rounded = createCardDividerTray(p, cardSizes, undefined, undefined, undefined, false, false, true);
+    const { measureBoundingBox, measureVolume } = jscad.measurements;
+    const atDepth = (cardAccessDepthPercent: number) =>
+      createCardDividerTray({ ...p, cardAccessDepthPercent }, cardSizes, undefined, undefined, undefined, false, false, true);
+    expect(measureVolume(atDepth(0))).toBeGreaterThan(measureVolume(rounded));
+    expect(measureVolume(rounded)).toBeGreaterThan(measureVolume(atDepth(100)));
+    const bounds = measureBoundingBox(original);
+    expect(measureBoundingBox(rounded)).toEqual(bounds);
+    const [, [width, depth, height]] = bounds;
+    const { subtract, intersect } = jscad.booleans;
+    const removed = subtract(original, rounded);
+    for (const y of [p.wallThickness / 2, depth - p.wallThickness / 2]) {
+      const probe = jscad.primitives.cuboid({
+        center: [width / 2, y, height / 2],
+        size: [0.2, 0.2, 0.2]
+      });
+      expect(measureVolume(intersect(removed, probe))).toBeGreaterThan(0);
+    }
+  });
   it('reuses identical requests and invalidates for labels, parameters and custom card sizes', () => {
     const p = { ...defaultCardDividerTrayParams, stacks: [{ cardSizeId: DEFAULT_CARD_SIZE_IDS.standard, count: 10, label: 'A' }] };
     const first = createCardDividerTray(p, cardSizes, 'Test', undefined, undefined, false);
