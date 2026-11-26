@@ -1,5 +1,15 @@
 # Proyectos de almacenamiento para estantería
 
+## Alojamientos pasantes hasta el frontal — propuesta 2026-11-26
+
+Próximo cambio a estudiar por petición del usuario, sin implementación autorizada todavía. Extender los alojamientos hembra de conexión entre shells hasta la cara frontal, eliminando el tope actual de aproximadamente 10 mm. Objetivo: permitir desplazar longitudinalmente un módulo completo (shell y cajón) respecto a sus vecinos y combinar profundidades/posiciones distintas. No es un cambio del recorrido del cajón dentro de su shell ni de la unión de fabricación entre tramos del cajón.
+
+El usuario considera aceptable estudiar la pérdida del alineamiento frontal automático a cambio de mayor configurabilidad. Comparar una variante opcional pasante con la actual con tope; no sustituir ni migrar piezas existentes silenciosamente. Conservar perfil, paso y holguras de la interfaz impresa salvo decisión explícita de revisión.
+
+Antes de implementar, comprobar el recorrido completo en ambos sentidos con vecinos arriba, abajo, izquierda y derecha, combinaciones de simples/dobles, profundidades distintas y shells anteriores. Revisar longitud mínima de contacto y retención al desplazar, riesgo de movimiento involuntario durante extracción, material residual en suelo/lateral/frontal, transmisión de carga y fabricación en las orientaciones actuales. Si hace falta recuperar el posicionamiento, estudiar un tope desmontable o bloqueo impreso opcional sin fijar todavía una solución.
+
+Validar primero geometría, colisiones y compatibilidad; después imprimir una muestra para comprobar encaje, desplazamiento, estabilidad y uso con carga. Una comprobación geométrica no valida resistencia ni durabilidad. La alineación frontal/trasera de la vista actual sigue siendo una colocación del conjunto completo, no evidencia de que módulos individuales puedan desplazarse con la geometría actual.
+
 Validación física 2026-10-31 con cajón lleno de cartas enfundadas: el usuario confirma que el peso se nota pero no impide meter y sacar el cajón sin problemas. Quedan validados en este ensayo el espacio para cartas enfundadas y el deslizamiento con carga. Se suma al montaje revisado del cajón y encaje/robustez de shell con llaves ya confirmados. Las notas históricas que los marcan pendientes quedan superadas por esta prueba; durabilidad con uso continuado y carga máxima no evaluadas, interfaz aún no congelada.
 
 Validación física 2026-10-31 del cajón revisado: el usuario confirma que insertar las llaves del suelo desde el interior mejora mucho la facilidad de ensamblaje y el resultado queda bien. Impresión y montaje de esta revisión validados; pendientes carga, deslizamiento con peso y espacio libre real con cartas enfundadas.

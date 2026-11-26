@@ -156,6 +156,7 @@
     isLayoutEditMode?: boolean;
     isLayerLayoutEditMode?: boolean;
     onTrayDoubleClick?: (trayId: string) => void;
+    onMeshFaceClick?: (faceIndex: number) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
     showLayerView?: boolean;
@@ -224,6 +225,7 @@
     isLayoutEditMode = false,
     isLayerLayoutEditMode = false,
     onTrayDoubleClick,
+    onMeshFaceClick,
     onBoxDoubleClick,
     generating = false,
     showLayerView = false,
@@ -329,6 +331,7 @@
       {isLayerLayoutEditMode}
       onTrayClick={handleTrayClick}
       {onTrayDoubleClick}
+      {onMeshFaceClick}
       {onBoxDoubleClick}
       {generating}
       {showLayerView}

@@ -7,6 +7,7 @@
   import { exportShelfManufacturing } from '$lib/utils/exportShelfModule';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
+  import DimensionReadout from './DimensionReadout.svelte';
   let { module, cards, model, onpreview, projectExport }: { module: ShelfDrawerModule; cards: CardSize[]; projectExport?: Snippet;
     model: ReturnType<typeof createShelfManufacturing> | null; onpreview: (id: string) => void } = $props();
   const plan = $derived(resolveShelfManufacturing(module.params, cards));
@@ -70,7 +71,7 @@
           <strong>{set.name} · {module.params.depth} mm</strong>
           <output>{set.items.length} part(s) · {set.pieces.length - set.items.length} joining keys</output>
           {#each set.items as item}
-            <output>{item.name}: {item.assembledSize.map(v => v.toFixed(2)).join(' × ')} mm</output>
+            <DimensionReadout label={item.name} size={item.assembledSize} />
           {/each}
           {#if !set.fits}<output class="oversize">Exceeds print volume</output>{/if}
           {#if set.plates > 1}<output>Arrange on {set.plates} plates in the slicer.</output>{/if}

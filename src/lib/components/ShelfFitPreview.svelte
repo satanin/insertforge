@@ -3,37 +3,41 @@
   import { resolveShelfFit, type ShelfEnvelope } from '$lib/models/shelfFit';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
+  import { KALLAX_REFERENCE, KALLAX_REFERENCE_DIMENSIONS } from '$lib/models/shelfReference';
   let { module, capacity, color, onclose, initialMargin = 2 }: { module: ShelfEnvelope; capacity: number; color: string; onclose: () => void; initialMargin?: number } = $props();
-  let width = $state(335), height = $state(335), depth = $state(390);
+  let width = $state<number>(KALLAX_REFERENCE.width), height = $state<number>(KALLAX_REFERENCE.height), depth = $state<number>(KALLAX_REFERENCE.depth);
   // Capture the trial's starting margin once; the user can then edit it freely.
   let margin = $state(untrack(() => initialMargin));
   const fit = $derived(resolveShelfFit(module, { width, height, depth, margin }));
   const viewWidth = $derived(fit.valid ? width : 335);
   const viewHeight = $derived(fit.valid ? height : 335);
-  function preset() { width = 335; height = 335; depth = 390; margin = 2; }
+  function preset() { width = KALLAX_REFERENCE.width; height = KALLAX_REFERENCE.height; depth = KALLAX_REFERENCE.depth; }
 </script>
 
 <div class="fitPreview" aria-label="Shelf fit preview">
-  <header><div><small>DESIGN PREVIEW</small><h2>Try in a shelf</h2></div><button onclick={onclose}>Back to model</button></header>
+  <header><div><small>DESIGN PREVIEW · IKEA KALLAX</small><h2>Check opening fit</h2></div><button class="shelfPrimary" onclick={onclose}>← Back to selected module</button></header>
   <div class="controls">
-    <button onclick={preset}>Kallax reference</button>
+    <button onclick={preset}>KALLAX reference</button>
     <label>Opening width (mm)<input type="number" min="1" max="2000" bind:value={width} /></label>
     <label>Opening height (mm)<input type="number" min="1" max="2000" bind:value={height} /></label>
     <label>Usable depth (mm)<input type="number" min="1" max="2000" bind:value={depth} /></label>
     <label>Fitting margin (mm)<input type="number" min="0" max="100" step="0.5" bind:value={margin} /></label>
   </div>
-  <HelpRow><span>One opening · current drawer repeated</span><HelpTip label="About shelf dimensions">Kallax reference: 335 × 335 × 390 mm, based on IKEA's published opening dimensions. Measure your own opening. Margin is reserved on each side, above/below, and behind. Connected modules share their body pitch; only the exposed top/right connectors add to the overall envelope. Changing this preview does not resize the drawer or affect exports. This is a space check, not a shelf load rating.</HelpTip></HelpRow>
+  <HelpRow><span>One opening · current drawer repeated</span><HelpTip label="About shelf dimensions">KALLAX design reference: {KALLAX_REFERENCE_DIMENSIONS} (width × height × depth). Measure your own opening. Compatibility with other shelving systems has not been established. Margin is reserved on each side, above/below, and behind. Connected modules share their body pitch; only the exposed top/right connectors add to the overall envelope. Changing this preview does not resize the drawer or affect exports. This is a space check, not a shelf load rating.</HelpTip></HelpRow>
   {#if fit.valid}
     <div class="results" aria-live="polite"><strong>{fit.columns} columns × {fit.rows} rows = {fit.total} drawers</strong><span>≈ {fit.total * capacity} cards</span><span>Free width: {fit.freeWidth.toFixed(1)} mm · free height: {fit.freeHeight.toFixed(1)} mm</span></div>
     <div class="drawings">
       <figure><figcaption>Front · {width} × {height} mm</figcaption>
         <svg viewBox={`-12 -12 ${viewWidth + 24} ${viewHeight + 24}`} role="img" aria-label={`${fit.columns} columns and ${fit.rows} rows in the shelf opening`}>
           <defs><pattern id="shelf-drawer-grid" width={module.bodyWidth} height={module.bodyHeight} patternUnits="userSpaceOnUse" x={margin} y={height - margin - fit.rows * module.bodyHeight}>
-            <rect width={module.bodyWidth} height={module.bodyHeight} fill="#7f97a8" stroke="#273340" stroke-width="1" />
+            <rect width={module.bodyWidth} height={module.bodyHeight} fill="#7f97a8" />
+            <rect x="0.5" y="0.5" width={Math.max(0, module.bodyWidth - 1)} height={Math.max(0, module.bodyHeight - 1)} fill="none" stroke="#273340" stroke-width="1" />
             <rect x="5" y="8" width={Math.max(1, module.bodyWidth - 10)} height={Math.max(1, module.bodyHeight - 14)} fill="#526778" rx="1" />
             <rect x="6" y="8" width={Math.max(1, module.bodyWidth - 12)} height="12" fill={color} rx="1" />
           </pattern></defs>
-          <rect width={width} height={height} fill="#17202a" stroke="#d3c8b4" stroke-width="8" />
+          <!-- Furniture stays outside the measured opening; a centred stroke would invade it. -->
+          <path d={`M -8 -8 H ${width + 8} V ${height + 8} H -8 Z M 0 0 H ${width} V ${height} H 0 Z`} fill="#d3c8b4" fill-rule="evenodd" />
+          <rect width={width} height={height} fill="#17202a" />
           {#if fit.total > 0}
             <rect x={margin} y={height - margin - fit.usedHeight} width={fit.usedWidth} height={fit.usedHeight} fill="#7f97a8" opacity="0.5" />
             <rect x={margin} y={height - margin - fit.rows * module.bodyHeight} width={fit.columns * module.bodyWidth} height={fit.rows * module.bodyHeight} fill="url(#shelf-drawer-grid)" />
@@ -42,8 +46,9 @@
       </figure>
       <figure><figcaption>Side · rear aligned · {fit.totalDepth.toFixed(1)} mm with handle</figcaption>
         <svg viewBox={`${-25 - fit.depthOverflow} -12 ${depth + fit.depthOverflow + 50} ${viewHeight + 24}`} role="img" aria-label="Side view of drawer depth within shelf">
-          <path d={`M 0 0 H ${depth} V ${height} H 0`} fill="none" stroke="#d3c8b4" stroke-width="8" />
-          <rect x={depth - margin - module.depth} y={height - margin - module.bodyHeight} width={module.depth} height={module.bodyHeight} fill="#526778" stroke="#9bb0bf" />
+          <path d={`M 0 -4 H ${depth + 4} V ${height + 4} H 0`} fill="none" stroke="#d3c8b4" stroke-width="8" />
+          <rect x={depth - margin - module.depth} y={height - margin - module.bodyHeight} width={module.depth} height={module.bodyHeight} fill="#526778" />
+          <rect x={depth - margin - module.depth + 0.5} y={height - margin - module.bodyHeight + 0.5} width={Math.max(0, module.depth - 1)} height={Math.max(0, module.bodyHeight - 1)} fill="none" stroke="#9bb0bf" />
           <rect x={depth - margin - fit.totalDepth} y={height - margin - module.bodyHeight + 8} width={module.handleProjection} height="16" fill={color} />
           <path d={`M 0 0 V ${height}`} stroke="#a6bed3" stroke-dasharray="4 4" />
         </svg>

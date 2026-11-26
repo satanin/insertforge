@@ -305,8 +305,10 @@ export interface GlobalSettings {
 }
 
 export type ProjectType = 'insert' | 'shelf-storage';
+export interface ShelfProjectOptions { depth: number; labelWindow: boolean; }
 
 export interface Project {
+  shelfOptions?: ShelfProjectOptions;
   shelfModules?: import('$lib/models/shelfStorage').ShelfModule[];
   selectedShelfModuleId?: string | null;
   // Missing in older files: interpreted as an insert project.

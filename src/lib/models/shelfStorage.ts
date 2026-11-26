@@ -19,7 +19,7 @@ export interface ShelfDrawerParams {
   labelWindows?: 1 | 2;
   wideHandle?: boolean;
 }
-export interface ShelfDrawerModule { id: string; name: string; type: 'card-drawer'; params: ShelfDrawerParams; }
+export interface ShelfDrawerModule { id: string; name: string; type: 'card-drawer'; params: ShelfDrawerParams; placement?: { column: number; row: number }; customSettings?: { depth?: boolean; labelWindow?: boolean }; }
 export interface ShelfFrameParams { columns: number; rows: number; pitchWidth: number; pitchHeight: number; depth: number; wall: number; }
 export interface ShelfFrameModule { id: string; name: string; type: 'open-frame'; params: ShelfFrameParams; }
 export type ShelfModule = ShelfDrawerModule | ShelfFrameModule;

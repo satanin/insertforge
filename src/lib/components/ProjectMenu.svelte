@@ -5,6 +5,7 @@
   import type { ProjectType } from '$lib/types/project';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
+  import { KALLAX_REFERENCE_DIMENSIONS } from '$lib/models/shelfReference';
 
   let dialog: HTMLDialogElement;
   let fileInput: HTMLInputElement;
@@ -49,12 +50,12 @@
 
 <button class="projectMenuButton" onclick={open} title="Project menu">
   <span class="projectName">{project.name}</span>
-  <span class="projectType">{project.projectType === 'shelf-storage' ? 'Shelf storage · Experimental' : 'Box insert'}</span>
+  <span class="projectType">{project.projectType === 'shelf-storage' ? 'IKEA KALLAX storage · Experimental' : 'Box insert'}</span>
   <span aria-hidden="true">▾</span>
 </button>
 
 <dialog bind:this={dialog} aria-labelledby="new-project-title">
-  <form onsubmit={(e) => { e.preventDefault(); createNewProject(type, name); dialog.close(); }}>
+  <form onsubmit={(e) => { e.preventDefault(); createNewProject(type, name, true); dialog.close(); }}>
     <header>
       <h2 id="new-project-title">New project</h2>
       <button type="button" aria-label="Close project menu" onclick={() => dialog.close()}>×</button>
@@ -68,11 +69,11 @@
       </label>
       <label class="typeOption" class:selected={type === 'shelf-storage'}>
         <input type="radio" name="projectType" value="shelf-storage" bind:group={type} />
-        <span>Shelf storage <small>Experimental</small></span>
+        <span>IKEA KALLAX storage <small>Experimental</small></span>
       </label>
     </fieldset>
     {#if type === 'shelf-storage'}
-      <p class="notice" role="status">Experimental card drawers with separate shell and drawer. Fit and load capacity require physical validation.</p>
+      <HelpRow><span class="notice" role="status">IKEA KALLAX · reference opening {KALLAX_REFERENCE_DIMENSIONS} (W × H × D)</span><HelpTip label="About KALLAX compatibility">This modular drawer system is designed around the KALLAX reference opening. Measure your own opening before printing. Compatibility with other shelving systems has not been established. Fit and load capacity require physical validation.</HelpTip></HelpRow>
     {/if}
     <p class="notice">Creating a project replaces the current local project. Export its JSON first if you want to keep it.</p>
     {#if error}<p role="alert">{error}</p>{/if}

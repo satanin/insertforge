@@ -1,14 +1,18 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { autoUpdate, computePosition, flip, shift } from '@floating-ui/dom';
+  import { interfaceUi } from '$lib/stores/interface.svelte';
 
   let { label = 'Help', children }: { label?: string; children: Snippet } = $props();
   const id = $props.id();
-  let trigger: HTMLButtonElement;
+  let trigger = $state<HTMLButtonElement>();
+  let wrapper: HTMLSpanElement;
+  let actionTrigger = $state<HTMLElement | null>(null);
   let popup: HTMLDivElement;
   let open = $state(false);
   let pinned = $state(false);
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const activeTrigger = $derived(actionTrigger ?? trigger);
 
   function show() { clearTimeout(closeTimer); open = true; }
   function close() { clearTimeout(closeTimer); open = false; pinned = false; }
@@ -18,20 +22,60 @@
   }
 
   $effect(() => {
-    if (!open || !trigger || !popup) return;
+    if (!wrapper || interfaceUi.mode !== 'modern') { actionTrigger = null; return; }
+    const parent = wrapper.parentElement;
+    const action = parent?.classList.contains('helpRow') ? parent.querySelector<HTMLButtonElement>(':scope > button') : null;
+    actionTrigger = action;
+    if (!action) return;
+    action.setAttribute('aria-describedby', id);
+    let touchTimer: ReturnType<typeof setTimeout> | undefined;
+    let suppressClick = false;
+    const enter = (event: PointerEvent) => { if (event.pointerType !== 'touch') show(); };
+    const touch = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return;
+      touchTimer = setTimeout(() => { suppressClick = true; pinned = true; show(); }, 500);
+    };
+    const release = () => clearTimeout(touchTimer);
+    const click = (event: MouseEvent) => {
+      if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
+    };
+    action.addEventListener('pointerenter', enter);
+    action.addEventListener('pointerleave', leave);
+    action.addEventListener('focus', show);
+    action.addEventListener('blur', leave);
+    action.addEventListener('pointerdown', touch);
+    action.addEventListener('pointerup', release);
+    action.addEventListener('pointercancel', release);
+    action.addEventListener('click', click, true);
+    return () => {
+      clearTimeout(touchTimer);
+      action.removeAttribute('aria-describedby');
+      action.removeEventListener('pointerenter', enter);
+      action.removeEventListener('pointerleave', leave);
+      action.removeEventListener('focus', show);
+      action.removeEventListener('blur', leave);
+      action.removeEventListener('pointerdown', touch);
+      action.removeEventListener('pointerup', release);
+      action.removeEventListener('pointercancel', release);
+      action.removeEventListener('click', click, true);
+    };
+  });
+
+  $effect(() => {
+    if (!open || !activeTrigger || !popup) return;
     popup.style.visibility = 'hidden';
     popup.showPopover();
     const update = () => {
-      void computePosition(trigger, popup, {
+      void computePosition(activeTrigger, popup, {
         strategy: 'fixed', placement: 'left-start', middleware: [flip({ padding: 12 }), shift({ padding: 12, crossAxis: true })]
       }).then(({ x, y }) => {
         popup.style.left = `${x}px`; popup.style.top = `${y}px`;
         popup.style.visibility = 'visible';
       });
     };
-    const cleanup = autoUpdate(trigger, popup, update);
+    const cleanup = autoUpdate(activeTrigger, popup, update);
     const outside = (event: PointerEvent) => {
-      if (!trigger.contains(event.target as Node) && !popup.contains(event.target as Node)) close();
+      if (!activeTrigger.contains(event.target as Node) && !popup.contains(event.target as Node)) close();
     };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
     document.addEventListener('pointerdown', outside);
@@ -44,8 +88,8 @@
   });
 </script>
 
-<span class="helpTip">
-  <button bind:this={trigger} type="button" class="helpTipButton" aria-label={label}
+<span bind:this={wrapper} class="helpTip" class:helpTipAttached={!!actionTrigger}>
+  <button bind:this={trigger} hidden={!!actionTrigger} type="button" class="helpTipButton" aria-label={label}
     aria-expanded={open} aria-controls={id} aria-describedby={open ? id : undefined}
     onpointerenter={(event) => { if (event.pointerType !== 'touch') show(); }} onpointerleave={leave}
     onfocus={show} onblur={leave} onclick={() => { if (pinned) close(); else { pinned = true; show(); } }}>?</button>
@@ -55,6 +99,8 @@
 
 <style>
   .helpTip { display: inline-flex; vertical-align: middle; width: fit-content; }
+  .helpTipAttached { display: contents; }
+  .helpTipButton[hidden] { display: none; }
   .helpTipButton {
     display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem;
     padding: 0; border: 1px solid var(--inputBorder, #aab8cc); border-radius: 50%;

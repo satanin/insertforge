@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { PaneGroup, Pane, PaneResizer } from 'paneforge';
-  import { getProject, addShelfModule, addShelfFrame, selectShelfModule, removeShelfModule, updateShelfModule, syncShelfFrames } from '$lib/stores/project.svelte';
+  import { getProject, addShelfModule, canAddShelfModule, addShelfFrame, selectShelfModule, removeShelfModule, updateShelfModule, syncShelfFrames, setShelfDrawerCustomSetting } from '$lib/stores/project.svelte';
   import { getProjectCardSizes } from '$lib/utils/projectCards';
   import { resolveShelfDrawer, createShelfPreview, type ShelfDrawerParams, type ShelfPartId, type ShelfPreviewCote } from '$lib/models/shelfStorage';
   import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
@@ -9,12 +9,17 @@
   import { buildShelfProjectExport, planShelfProjectPlates, shelfProjectPreview } from '$lib/utils/exportShelfProject';
   import HelpRow from './HelpRow.svelte';
   import HelpTip from './HelpTip.svelte';
+  import { KALLAX_REFERENCE_DIMENSIONS } from '$lib/models/shelfReference';
   import ShelfFitPreview from './ShelfFitPreview.svelte';
+  import ShelfOpeningView from './ShelfOpeningView.svelte';
+  import ShelfProjectOptions from './ShelfProjectOptions.svelte';
+  import DimensionReadout from './DimensionReadout.svelte';
   import ShelfFrameEditor from './ShelfFrameEditor.svelte';
   import ShelfManufacturingEditor from './ShelfManufacturingEditor.svelte';
   import { createShelfManufacturing, defaultShelfManufacturing, shelfJointPreview, shelfManufacturingSets, shelfCardSpans } from '$lib/models/shelfManufacturing';
   import { createShelfFrame, resolveShelfFrame } from '$lib/models/shelfFrame';
   import type { BufferGeometry } from 'three';
+  import './shelfControls.css';
   import jscad from '@jscad/modeling';
 
   let { isMobile = false, projectFiles }: { isMobile?: boolean; projectFiles?: Snippet } = $props();
@@ -31,6 +36,7 @@
   let adjacent = $state(false);
   let print = $state(false);
   let shelfFit = $state(false);
+  let openingView = $state(true);
   let removing = $state<string | null>(null);
   let frameSyncMessage = $state('');
   let busy = $state(false);
@@ -49,6 +55,14 @@
   });
   let unlockedModuleId = $state<string | null>(null);
   const systemEditing = $derived(!!selected && unlockedModuleId === selected.id);
+  let cardsAndLabelOpen = $state(false);
+  $effect(() => {
+    // Reset defaults only when selecting a module or changing prototype mode.
+    // Geometry updates must not overwrite the user's disclosure state.
+    const moduleId = selected?.id;
+    const editing = systemEditing;
+    cardsAndLabelOpen = !!moduleId && (editing || untrack(() => resolved?.columns === 2));
+  });
   let geometry = $state<BufferGeometry | null>(null);
   let cotes = $state<ShelfPreviewCote[]>([]);
   let showDimensions = $state(false);
@@ -132,7 +146,7 @@
   <details open>
     <summary>Module plates · {selected?.name ?? 'Selected module'}</summary>
     <section>
-      <button disabled={busy || !selected} onclick={() => { platePreviewScope = 'module'; showProjectPreview = true; shelfFit = false; }}>Preview module plates</button>
+      <button disabled={busy || !selected} onclick={() => { openingView = false; platePreviewScope = 'module'; showProjectPreview = true; shelfFit = false; }}>Preview module plates</button>
       <HelpRow><span>Selected module only</span><HelpTip label="About module plates">Shows all printable parts of the selected module together, including shell, drawer, handle and joining keys, distributed across the required plates.</HelpTip></HelpRow>
     </section>
   </details>
@@ -140,8 +154,8 @@
     <summary>Complete project</summary>
     <section>
       <div class="actions">
-        <button disabled={busy || !modules.length} onclick={() => { platePreviewScope = 'project'; showProjectPreview = true; shelfFit = false; }}>Preview complete project plates</button>
-        <button disabled={busy || !modules.length} onclick={downloadProject}>{busy ? 'Preparing export…' : 'Download project · 3MF'}</button>
+        <button disabled={busy || !modules.length} onclick={() => { openingView = false; platePreviewScope = 'project'; showProjectPreview = true; shelfFit = false; }}>Preview complete project plates</button>
+        <button class="shelfPrimary" disabled={busy || !modules.length} onclick={downloadProject}>{busy ? 'Preparing export…' : 'Download project · 3MF'}</button>
       </div>
       <HelpRow><output>{projectPrintSettings.bedWidth} × {projectPrintSettings.bedDepth} × {projectPrintSettings.buildHeight} mm</output><HelpTip label="About project plates">Includes every module, its handle and the required joining keys. Uses the printer volume from {printerReference?.name ?? 'the default configuration'}. Smaller beds use additional plates. Open as a project in Bambu Studio and select your printer and filament before slicing.</HelpTip></HelpRow>
       {#if projectPreview?.error}<p role="alert">{projectPreview.error}</p>{/if}
@@ -161,6 +175,10 @@
 <PaneGroup direction={isMobile ? 'vertical' : 'horizontal'} class="shelfPanes">
   <Pane defaultSize={75} minSize={30}>
     <main class="shelfView">
+      {#if openingView}
+        <ShelfOpeningView onOpenModule={() => openingView = false} />
+      {/if}
+      <div class="moduleView" class:overviewHidden={openingView} inert={openingView}>
       <nav aria-label="Shelf modules" class="moduleList">
         <strong>Modules</strong>
         {#each modules as module (module.id)}
@@ -175,8 +193,8 @@
             </div></div>
           {/if}
         {/each}
-        <button onclick={() => addShelfModule()}>+ Add card drawer</button>
-        <button onclick={() => addShelfModule(2)}>+ Add double drawer · 2×1</button>
+        <button disabled={!canAddShelfModule(1)} onclick={() => addShelfModule(1, true)}>+ Add card drawer</button>
+        <button disabled={!canAddShelfModule(2)} onclick={() => addShelfModule(2, true)}>+ Add double drawer · 2×1</button>
         <button disabled={!modules.some(m => m.type === 'card-drawer' && m.params.stackingEnabled !== false)} onclick={() => { shelfFit = false; addShelfFrame(); }}>+ Add open frame</button>
         {#if selected?.type === 'card-drawer' && modules.some(m => m.type === 'open-frame')}
           <HelpRow><button disabled={!resolved?.valid || !resolved.stacking} onclick={() => { const count = syncShelfFrames(selected.id); frameSyncMessage = `${count} frame(s) updated from ${selected.name}`; }}>Update all frames</button><HelpTip label="About updating all frames">Copies this drawer's current cell pitch and depth to every open frame in this project. Keeps each frame's columns, rows, walls and name. Use after a deliberate revision of the system unit; saved frames never resize silently.</HelpTip></HelpRow>
@@ -206,7 +224,7 @@
             {/if}
           {/if}
           {#if selected.type === 'card-drawer'}
-          <button disabled={!resolved?.valid} onclick={() => shelfFit = true}>Try in a shelf</button>
+          <button disabled={!resolved?.valid} onclick={() => shelfFit = true}>Check KALLAX fit</button>
           {/if}
           <label><input type="checkbox" bind:checked={print} /> Print orientation</label>
           {#if print && manufacturingModel}
@@ -233,15 +251,27 @@
           <ShelfFitPreview module={resolved} capacity={resolved.capacity} color={selected.params.handleColor ?? '#df9756'} initialMargin={selected.params.bottomTracks === false && selected.params.drawerFloor >= 2 ? 1.5 : 2} onclose={() => shelfFit = false} />
         {/if}
       {:else}
-        <div class="emptyState"><h1>Shelf storage</h1><button onclick={() => addShelfModule()}>Create first card drawer</button></div>
+        <div class="emptyState"><h1>IKEA KALLAX storage</h1><button onclick={() => addShelfModule()}>Create first card drawer</button></div>
       {/if}
+      </div>
     </main>
   </Pane>
   <PaneResizer class="shelfResizer" />
   <Pane defaultSize={25} minSize={20}>
     <aside class="shelfEditor" aria-label="Shelf module editor">
-      <header><small>SHELF STORAGE · EXPERIMENTAL</small><h2>{selected?.name ?? 'New module'}</h2></header>
+      <header class="editorNavigation">
+        <small>IKEA KALLAX STORAGE · EXPERIMENTAL</small>
+        <nav class="viewNavigation" aria-label="Shelf workspace view">
+          <button aria-pressed={openingView} onclick={() => { openingView = true; shelfFit = false; }}>KALLAX overview</button>
+          <button aria-pressed={!openingView} disabled={!selected} onclick={() => { openingView = false; shelfFit = false; }}>Selected module</button>
+        </nav>
+        <h2>{selected?.name ?? 'New module'}</h2>
+        <div class="shelfReference">
+          <HelpRow><small>Reference opening · {KALLAX_REFERENCE_DIMENSIONS}</small><HelpTip label="About the KALLAX reference">Designed around a KALLAX opening (width × height × depth). Measure your own furniture before printing. Compatibility with other shelving systems has not been established. Module dimensions and exports use each piece's saved settings.</HelpTip></HelpRow>
+        </div>
+      </header>
       {@render projectFiles?.()}
+      <ShelfProjectOptions />
       {#if selected?.type === 'open-frame'}
         <ShelfFrameEditor module={selected} />
         {@render projectExportPanel()}
@@ -252,7 +282,7 @@
           <button onclick={() => unlockedModuleId = systemEditing ? null : selected.id}>{systemEditing ? 'Lock system settings' : 'Unlock prototype settings'}</button>
           {#if systemEditing}<output>Prototype editing: changes can break compatibility with printed parts.</output>{/if}
         </section>
-        <details open={systemEditing || resolved.columns === 2}><summary>Cards and label</summary><section>
+        <details bind:open={cardsAndLabelOpen}><summary>Cards and label</summary><section>
           {#if resolved.columns === 2}
             <HelpRow><label>Drawer interior<select value={resolved.centerDivider ? 'cards' : 'open'} onchange={e => {
               const centerDivider = e.currentTarget.value === 'cards';
@@ -263,7 +293,10 @@
               <option value="open">No centre divider</option>
             </select></label><HelpTip label="About double drawer interiors">Two card rows adds a longitudinal divider. The Dovetail depth joint creates a fixed transverse divider with either interior. Choose Lap and keys for a split drawer without transverse dividers.</HelpTip></HelpRow>
           {/if}
-          <HelpRow><label class="checkField"><input type="checkbox" checked={selected.params.labelWindow !== false} onchange={e => updateShelfModule(selected.id, { labelWindow: e.currentTarget.checked })} /> Identification window</label><HelpTip label="About window options">The closed front retains a short top-loading handle socket. Both options use the same handle and shell dimensions.</HelpTip></HelpRow>
+          {#if project.shelfOptions}
+            <label class="checkField"><input type="checkbox" checked={selected.customSettings?.labelWindow === true || (selected.params.labelWindow !== false) !== project.shelfOptions.labelWindow} onchange={e => setShelfDrawerCustomSetting(selected.id, 'labelWindow', e.currentTarget.checked)} /> Custom window option for this drawer</label>
+          {/if}
+          <HelpRow><label class="checkField"><input type="checkbox" disabled={!!project.shelfOptions && !selected.customSettings?.labelWindow && (selected.params.labelWindow !== false) === project.shelfOptions.labelWindow} checked={selected.params.labelWindow !== false} onchange={e => updateShelfModule(selected.id, { labelWindow: e.currentTarget.checked })} /> Identification window</label><HelpTip label="About window options">The closed front retains a short top-loading handle socket. Both options use the same handle and shell dimensions. Enable Custom window option to edit only this drawer. Changing the project window option replaces custom window choices on all drawers.</HelpTip></HelpRow>
           {#if resolved.columns === 2}
             {#if resolved.labelWindow && resolved.centerDivider}
               <label>Identification windows<select value={String(resolved.labelWindows)} onchange={e => updateShelfModule(selected.id, { labelWindows: Number(e.currentTarget.value) as 1 | 2 })}>
@@ -307,19 +340,22 @@
           <HelpRow><button onclick={() => updateShelfModule(selected.id, { shellThickness: 2, roofThickness: 2, socketWebThickness: 1.2, handleClearance: 0.25, handleRetention: false, drawerFloor: 1.2, bottomTracks: true, drawerWall: 2, slidingClearance: 0.5, cardClearance: 1, headroom: 1 })}>Compact for Kallax</button><HelpTip label="About compact preset">Restores the earlier compact trial: shell skin/roof 2 mm, socket backing 1.2 mm, handle clearance 0.25 mm without clip, drawer floor 1.2 mm, drawer walls 2 mm, sliding clearance 0.5 mm, card clearance 1 mm and headroom 1 mm. Bottom/left keep at least 3.8 mm for the tested dovetail sockets. The 8 mm handle leaves the entire Premium label clear. Changes module pitch; existing printed shells and frame snapshots use the previous dimensions. This is a trial configuration, not a load rating.</HelpTip></HelpRow>
           {/if}
           <div class="fieldGrid">
-            <label>Exterior depth (mm)<input type="number" min="45" max="1000" step="1" value={selected.params.depth} onchange={e => numeric('depth', e.currentTarget)} /></label>
+            <label>Exterior depth (mm)<input type="number" min="45" max="1000" step="1" disabled={!!project.shelfOptions && !selected.customSettings?.depth && selected.params.depth === project.shelfOptions.depth} value={selected.params.depth} onchange={e => numeric('depth', e.currentTarget)} /></label>
             {#if systemEditing}<label>Headroom (mm)<input type="number" min="0" max="40" step="1" value={selected.params.headroom} onchange={e => numeric('headroom', e.currentTarget)} /></label>{/if}
           </div>
+          {#if project.shelfOptions}
+            <label class="checkField"><input type="checkbox" checked={selected.customSettings?.depth === true || selected.params.depth !== project.shelfOptions.depth} onchange={e => setShelfDrawerCustomSetting(selected.id, 'depth', e.currentTarget.checked)} /> Custom length for this drawer</label>
+          {/if}
           {#if resolved.valid}
             <div class="dimensionSummary">
-              <output><strong>Shell</strong> {resolved.width.toFixed(2)} × {resolved.depth.toFixed(2)} × {resolved.height.toFixed(2)} mm</output>
-              <output><strong>Drawer</strong> {resolved.drawerWidth.toFixed(2)} × {resolved.drawerDepth.toFixed(2)} × {resolved.drawerHeight.toFixed(2)} mm</output>
+              <DimensionReadout label="Shell" size={[resolved.width, resolved.depth, resolved.height]} />
+              <DimensionReadout label="Drawer" size={[resolved.drawerWidth, resolved.drawerDepth, resolved.drawerHeight]} />
               <HelpRow><small>Width × depth × height</small><HelpTip label="About dimensions">The drawer dimensions are for the assembled body without its handle. The total depth with the handle is {(resolved.depth + resolved.handleProjection).toFixed(2)} mm.</HelpTip></HelpRow>
             </div>
           {/if}
         </section></details>
         {#if !resolved.valid}<section role="alert">{#each resolved.errors as error}<p>{error}</p>{/each}</section>{/if}
-        <ShelfManufacturingEditor module={selected} {cards} model={manufacturingModel} projectExport={projectExportPanel} onpreview={id => { showProjectPreview = false; manufacturingPart = id; print = true; shelfFit = false; }} />
+        <ShelfManufacturingEditor module={selected} {cards} model={manufacturingModel} projectExport={projectExportPanel} onpreview={id => { openingView = false; showProjectPreview = false; manufacturingPart = id; print = true; shelfFit = false; }} />
         <details open={systemEditing}><summary>Construction details</summary><section>
           {#if resolved.stacking}<output>Module pitch: {resolved.bodyWidth.toFixed(2)} × {resolved.bodyHeight.toFixed(2)} mm</output>{/if}
           {#if !systemEditing}<output>Headroom: {selected.params.headroom} mm</output>{/if}
@@ -376,6 +412,10 @@
 </PaneGroup>
 
 <style>
+  .moduleView { height: 100%; }
+  .overviewHidden { visibility: hidden; }
+  .shelfReference { margin-top: 0.5rem; min-width: 0; font-size: 0.8rem; }
+  .shelfReference small { display: block; margin-top: 0.25rem; color: var(--fgMuted); }
   :global(.shelfPanes) { flex: 1; min-height: 0; }
   :global(.shelfResizer) { width: 5px; background: var(--contrastLow); }
   .shelfView { height: 100%; position: relative; }
@@ -392,6 +432,8 @@
   button:disabled { opacity: 0.4; cursor: default; }
   .shelfEditor { height: 100%; overflow-y: auto; background: var(--bg); font-size: max(16px, 1rem); line-height: 1.45; }
   header { padding: 1rem; border-bottom: var(--borderThin); }
+  .editorNavigation { position: sticky; top: 0; z-index: 10; background: var(--bg); box-shadow: 0 2px 5px #0002; }
+  .viewNavigation { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
   h2 { font-size: 1.35rem; line-height: 1.2; margin: 0.35rem 0 0; }
   small, .prototypeStatus { color: var(--fgMuted); }
   section { padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.8rem; }

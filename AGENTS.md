@@ -43,6 +43,10 @@
 
 ## Current product constraints
 
+- Sistema visual compartido en `src/routes/design-system.css`: claro/oscuro y densidades balanced14px/36px y compact13px/32px; Density es preferencia de navegador, fuera del proyecto. Conservar Classic y canvas/cámara/reparto al cambiar apariencia. Usar tokens/primitivas compartidos, no nuevas escalas locales. Base rem sobre raíz histórica14px. Ver `docs/design/ui-guidelines.md`.
+
+- Consistencia UI (criterios del usuario2026-11-26): inputs/selects con fondo y dimensiones comunes y ancho completo de su celda; campos aislados al100%. Botones de panel al100% si únicos, dos en columnas50/50 menos gap, misma altura; ajustar texto hasta mínimo definido y luego separar en filas, sin recorte ni desbordamiento. Export parts recompone nombre/metadatos/medidas sin partir números/unidades. Ayuda de acciones sobre el propio botón por hover/foco y acceso táctil, sin `?` lateral que descuadre; ayudas de campos no reducen ancho. No introducir variantes visuales sin razón funcional. Ver `docs/design/ui-guidelines.md`; valores de densidad/tipografía aún en revisión.
+
 - Compatibilidad de shell: toda modificación debe conservar el encaje con las shells impresas anteriores del sistema, salvo decisión explícita del usuario de romper compatibilidad. Verificar paso, machos, alojamientos, topes y encaje en ambos sentidos. Conservar las revisiones incompatibles como interfaces distintas.
 
 - Estantería: proteger por defecto en UI los parámetros que alteran la retícula o el encaje (incluido contenido/etiqueta mientras el resolver derive de ellos la envolvente); mostrarlos como información y editar sólo tras desbloqueo explícito de prototipo. Longitud, nombre, color y área de impresión siguen accesibles. Nuevos cajones heredan una copia de la configuración del seleccionado o primer cajón; no migrar piezas existentes silenciosamente.

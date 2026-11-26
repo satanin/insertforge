@@ -1,8 +1,10 @@
 <script lang="ts">
   import './layout.css';
   import './modern.css';
+  import './design-system.css';
   import { onMount } from 'svelte';
-  import { interfaceUi, loadInterfacePreference, setInterfaceMode, type InterfaceMode } from '$lib/stores/interface.svelte';
+  import { interfaceUi, loadInterfacePreference, setInterfaceMode, setInterfaceDensity, type InterfaceMode, type InterfaceDensity } from '$lib/stores/interface.svelte';
+  import { harmonizeControls } from '$lib/actions/harmonizeControls';
   import { dev } from '$app/environment';
   import { resolve } from '$app/paths';
   import { Link, IconButton, Icon, Popover, Toast } from '@tableslayer/ui';
@@ -30,7 +32,7 @@
   <link rel="icon" type="image/svg+xml" href={dev ? '/favicon-dev.svg' : '/favicon.svg'} />
 </svelte:head>
 
-<div class="appContainer" class:ui-modern={interfaceUi.mode === 'modern'} class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
+<div class="appContainer" data-density={interfaceUi.density} use:harmonizeControls={interfaceUi.density + interfaceUi.mode} class:ui-modern={interfaceUi.mode === 'modern'} class:dark={mode.current === 'dark'} class:light={mode.current === 'light'}>
   <!-- Header -->
   <div class="appHeader">
     <div class="headerBrand">
@@ -50,7 +52,7 @@
         <Link href={APP_LINKS.daveSnider} target="_blank" rel="noopener noreferrer" color="fg">Dave Snider</Link>
       </div>
     </div>
-    <div style="display: flex; align-items: center; gap: 0.75rem;">
+    <div class="headerControls" style="display: flex; align-items: center; gap: 0.75rem;">
       <ProjectMenu />
       <label class="interfacePicker">
         <span>Interface</span>
@@ -59,6 +61,14 @@
           <option value="modern">New · Beta</option>
         </select>
       </label>
+      {#if interfaceUi.mode === 'modern'}
+        <label class="interfacePicker">
+          <span>Density</span>
+          <select aria-label="Interface density" value={interfaceUi.density} onchange={(event) => setInterfaceDensity(event.currentTarget.value as InterfaceDensity)}>
+            <option value="balanced">Balanced</option><option value="compact">Compact</option>
+          </select>
+        </label>
+      {/if}
       <div class="headerLinks">
         <Link href={APP_LINKS.changelog} color="fg">InsertForge Changelog</Link>
         <Link href={APP_LINKS.license} color="fg">License</Link>

@@ -5,8 +5,203 @@ import { getProjectCardSizes } from '$lib/utils/projectCards';
 import { createShelfManufacturing } from '$lib/models/shelfManufacturing';
 import { resolveShelfDrawer } from '$lib/models/shelfStorage';
 import referenceProject from '../../../static/projects/kallax-4x3-vertical-v1.json?raw';
+import { populateKallaxOpening, convertShelfDrawers, shelfMergeCandidates, shelfMergeNeighbours, canAddShelfModule, applyShelfProjectOptions, setShelfDrawerCustomSetting } from './project.svelte';
+import { layoutShelfOpening } from '$lib/models/shelfLayout';
+import { createShelfOpeningBuilder, type OpeningFaceRange } from '$lib/models/shelfOpeningGeometry';
+import jscad from '@jscad/modeling';
+import { jscadToBufferGeometry } from '$lib/utils/jscadToThree';
 
 describe('project types', () => {
+  it('moves the full assembly in rear view while keeping different drawer fronts aligned', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    applyShelfProjectOptions({ depth: 250 });
+    const modules = getProject().shelfModules!;
+    updateShelfModule(modules[1].id, { depth: 180 });
+    const before = exportProjectToJson(getProject());
+    const build = createShelfOpeningBuilder();
+    const bounds = (alignment: 'front' | 'rear') => {
+      const ranges: OpeningFaceRange[] = [];
+      const geometry = jscadToBufferGeometry(build(modules, getProjectCardSizes(getProject()), ranges, alignment));
+      const positions = geometry.getAttribute('position');
+      const result = ranges.slice(0, 2).map(range => {
+        let min = Infinity, max = -Infinity;
+        for (let vertex = range.start * 3; vertex < range.end * 3; vertex++) {
+          min = Math.min(min, positions.getY(vertex));
+          max = Math.max(max, positions.getY(vertex));
+        }
+        return { min, max };
+      });
+      geometry.dispose();
+      return result;
+    };
+    const front = bounds('front'), rear = bounds('rear');
+    expect(rear[0].max).toBeCloseTo(388.5);
+    expect(rear[0].min - front[0].min).toBeCloseTo(138.5);
+    expect(rear[1].min - front[1].min).toBeCloseTo(138.5);
+    expect(rear[1].min).toBeCloseTo(rear[0].min);
+    expect(rear[0].max - rear[1].max).toBeCloseTo(70);
+    expect(exportProjectToJson(getProject())).toBe(before);
+  });
+  it('applies each project option to all drawers, preserves other custom options and saves defaults for new drawers', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    addShelfFrame();
+    const frame = getProject().shelfModules!.find(module => module.type === 'open-frame')!;
+    const frameBefore = JSON.stringify(frame);
+    const first = getProject().shelfModules!.find(module => module.type === 'card-drawer')!;
+    setShelfDrawerCustomSetting(first.id, 'depth', true);
+    updateShelfModule(first.id, { depth: 180 });
+    expect(applyShelfProjectOptions({ labelWindow: false })).toEqual({ error: '', count: 11 });
+    expect(first.params.depth).toBe(180);
+    expect(first.type === 'card-drawer' && first.customSettings?.depth).toBe(true);
+    for (const module of getProject().shelfModules!.filter(module => module.type === 'card-drawer')) expect(module.params.labelWindow).toBe(false);
+    expect(applyShelfProjectOptions({ depth: 250 })).toEqual({ error: '', count: 11 });
+    for (const module of getProject().shelfModules!.filter(module => module.type === 'card-drawer')) {
+      expect(module.params.depth).toBe(250);
+      expect(module.params.labelWindow).toBe(false);
+      expect(module.customSettings?.depth).toBe(false);
+    }
+    expect(JSON.stringify(frame)).toBe(frameBefore);
+    const before = exportProjectToJson(getProject());
+    expect(applyShelfProjectOptions({ depth: NaN }).error).not.toBe('');
+    expect(applyShelfProjectOptions({ depth: 20 }).error).not.toBe('');
+    expect(exportProjectToJson(getProject())).toBe(before);
+    importProject(importProjectFromJson(before));
+    expect(getProject().shelfOptions).toEqual({ depth: 250, labelWindow: false });
+    const single = addShelfModule()!, double = addShelfModule(2)!;
+    expect(single.params).toMatchObject({ depth: 250, labelWindow: false });
+    expect(double.params).toMatchObject({ depth: 250, labelWindow: false, columns: 2 });
+    setShelfDrawerCustomSetting(single.id, 'depth', true);
+    updateShelfModule(single.id, { depth: 190 });
+    setShelfDrawerCustomSetting(single.id, 'depth', false);
+    expect(single.params.depth).toBe(250);
+  });
+  it('blocks additions to a full opening without mutating selection and re-enables each size only when it fits', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    expect(canAddShelfModule(1)).toBe(false);
+    expect(canAddShelfModule(2)).toBe(false);
+    const before = exportProjectToJson(getProject());
+    expect(addShelfModule(1, true)).toBeUndefined();
+    expect(addShelfModule(2, true)).toBeUndefined();
+    expect(exportProjectToJson(getProject())).toBe(before);
+    const ids = getProject().shelfModules!.slice(0, 2).map(module => module.id);
+    removeShelfModule(ids[0]);
+    expect(canAddShelfModule(1)).toBe(true);
+    expect(canAddShelfModule(2)).toBe(false);
+    removeShelfModule(ids[1]);
+    expect(canAddShelfModule(2)).toBe(true);
+    expect(addShelfModule(2, true)).toBeDefined();
+    expect(canAddShelfModule(1)).toBe(false);
+    expect(layoutShelfOpening(getProject().shelfModules!, getProjectCardSizes(getProject())).unplaced).toEqual([]);
+  });
+  it('compares effective merge settings and explains real differences with an adjacent drawer', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    const first = getProject().shelfModules![0], second = getProject().shelfModules![1];
+    if (first.type !== 'card-drawer' || second.type !== 'card-drawer') throw new Error('Expected drawers');
+    updateShelfModule(first.id, { labelWindow: undefined });
+    updateShelfModule(second.id, { labelWindow: true, manufacturing: Object.fromEntries(Object.entries(second.params.manufacturing!).reverse()) as typeof second.params.manufacturing });
+    expect(shelfMergeCandidates(first.id).map(item => item.id)).toContain(second.id);
+    updateShelfModule(first.id, { labelWindow: false });
+    expect(shelfMergeCandidates(first.id)).toEqual([]);
+    expect(shelfMergeNeighbours(first.id)[0].differences).toContain('Identification window: Off / On');
+    updateShelfModule(first.id, { labelWindow: true });
+    updateShelfModule(second.id, { depth: 200 });
+    expect(shelfMergeNeighbours(first.id)[0].differences).toContain('Exterior depth: 380 / 200');
+    expect(convertShelfDrawers(first.id, second.id)).toBe(false);
+  });
+  it('keeps a double in its original cells when splitting above an earlier empty cell', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    removeShelfModule(getProject().shelfModules![0].id);
+    const cards = getProjectCardSizes(getProject());
+    const before = layoutShelfOpening(getProject().shelfModules!, cards).placed;
+    const double = before.find(item => item.columns === 2)!;
+    expect(convertShelfDrawers(double.id)).toBe(true);
+    const after = layoutShelfOpening(getProject().shelfModules!, cards);
+    expect(after.unplaced).toEqual([]);
+    expect(after.placed.find(item => item.id === double.id)).toMatchObject({ column: double.column, row: double.row });
+    expect(after.placed.find(item => item.name.endsWith('right'))).toMatchObject({ column: double.column + 1, row: double.row });
+    for (const item of before.filter(item => item.id !== double.id)) {
+      expect(after.placed.find(module => module.id === item.id)).toMatchObject({ column: item.column, row: item.row });
+    }
+  });
+  it('splits and merges adjacent drawers without moving other cells and persists placements', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    const cards = getProjectCardSizes(getProject());
+    const before = layoutShelfOpening(getProject().shelfModules!, cards).placed;
+    const double = getProject().shelfModules!.find(module => module.type === 'card-drawer' && module.params.columns === 2)!;
+    expect(convertShelfDrawers(double.id)).toBe(true);
+    expect(getProject().shelfModules).toHaveLength(12);
+    const candidate = shelfMergeCandidates(double.id).find(item => item.name.endsWith('right'))!;
+    expect(candidate).toBeDefined();
+    const afterSplit = layoutShelfOpening(getProject().shelfModules!, cards);
+    expect(afterSplit.unplaced).toEqual([]);
+    for (const old of before.filter(item => item.id !== double.id)) {
+      expect(afterSplit.placed.find(item => item.id === old.id)).toMatchObject({ x: old.x, y: old.y });
+    }
+    expect(convertShelfDrawers(double.id, candidate.id)).toBe(true);
+    expect(getProject().shelfModules).toHaveLength(11);
+    expect(getProject().selectedShelfModuleId).toBe(double.id);
+    const result = layoutShelfOpening(getProject().shelfModules!, cards);
+    for (const old of before) expect(result.placed.find(item => item.id === old.id)).toMatchObject({ x: old.x, y: old.y, width: old.width });
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    expect(layoutShelfOpening(getProject().shelfModules!, cards).placed).toEqual(result.placed);
+    const first = getProject().shelfModules![0];
+    const neighbours = shelfMergeCandidates(first.id);
+    expect(neighbours.length).toBe(1);
+    updateShelfModule(neighbours[0].id, { depth: 200 });
+    expect(shelfMergeCandidates(first.id)).toEqual([]);
+    const unchanged = exportProjectToJson(getProject());
+    expect(convertShelfDrawers(first.id, neighbours[0].id)).toBe(false);
+    expect(convertShelfDrawers(first.id, getProject().shelfModules![4].id)).toBe(false);
+    expect(exportProjectToJson(getProject())).toBe(unchanged);
+  });
+  it('updates both opening views when a drawer identification window changes', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    const module = getProject().shelfModules![0];
+    const cards = getProjectCardSizes(getProject());
+    const build = createShelfOpeningBuilder();
+    const ranges: OpeningFaceRange[] = [];
+    const open = build(getProject().shelfModules!, cards, ranges);
+    expect(ranges.map(range => range.id)).toEqual(getProject().shelfModules!.map(module => module.id));
+    expect(ranges.every((range, index) => range.end > range.start && (index === 0 || ranges[index - 1].end === range.start))).toBe(true);
+    const triangles = jscad.geometries.geom3.toPolygons(open).reduce((count, polygon) => count + Math.max(0, polygon.vertices.length - 2), 0);
+    expect(ranges[ranges.length - 1].end).toBe(triangles);
+    expect(ranges[0].start).toBeGreaterThan(0); // Furniture has no drawer ID.
+    expect(new Set(jscad.geometries.geom3.toPolygons(open).map(polygon => JSON.stringify(polygon.color))).size).toBeGreaterThan(2);
+    updateShelfModule(module.id, { labelWindow: false });
+    expect(layoutShelfOpening(getProject().shelfModules!, cards).placed[0].labelWindow).toBe(false);
+    const closed = build(getProject().shelfModules!, cards);
+    // Closed fronts are thinner than the label pocket walls, so compare change, not direction.
+    expect(Math.abs(jscad.measurements.measureVolume(closed) - jscad.measurements.measureVolume(open))).toBeGreaterThan(1);
+    expect(jscad.measurements.measureBoundingBox(closed)).toEqual(jscad.measurements.measureBoundingBox(open));
+    updateShelfModule(module.id, { labelWindow: true });
+    expect(jscad.measurements.measureVolume(build(getProject().shelfModules!, cards))).toBeCloseTo(jscad.measurements.measureVolume(open), 5);
+  });
+  it('creates eleven real drawers filling twelve KALLAX cells and preserves them through JSON', () => {
+    createNewProject('shelf-storage', 'KALLAX', true);
+    const modules = getProject().shelfModules!;
+    expect(modules).toHaveLength(11);
+    expect(modules.filter(module => module.type === 'card-drawer' && module.params.columns === 2)).toHaveLength(1);
+    let layout = layoutShelfOpening(modules, getProjectCardSizes(getProject()));
+    expect(layout.unplaced).toEqual([]);
+    expect(layout.placed).toHaveLength(11);
+    for (const a of layout.placed) {
+      expect(a.x + a.width).toBeLessThanOrEqual(335);
+      expect(a.y).toBeGreaterThanOrEqual(0);
+      for (const b of layout.placed.filter(item => item.id !== a.id)) {
+        expect(a.x >= b.x + b.width - 0.01 || b.x >= a.x + a.width - 0.01 || a.y >= b.y + b.height - 0.01 || b.y >= a.y + a.height - 0.01).toBe(true);
+      }
+    }
+    populateKallaxOpening();
+    expect(getProject().shelfModules).toHaveLength(11);
+    importProject(importProjectFromJson(exportProjectToJson(getProject())));
+    layout = layoutShelfOpening(getProject().shelfModules!, getProjectCardSizes(getProject()));
+    expect(layout.placed).toHaveLength(11);
+    addShelfModule();
+    expect(layoutShelfOpening(getProject().shelfModules!, getProjectCardSizes(getProject())).unplaced).toHaveLength(1);
+    removeShelfModule(getProject().selectedShelfModuleId!);
+    updateShelfModule(getProject().shelfModules![0].id, { headroom: 25 });
+    expect(layoutShelfOpening(getProject().shelfModules!, getProjectCardSizes(getProject())).unplaced.length).toBeGreaterThan(0);
+  });
   it('creates a double module while keeping frame references on the single-cell pitch', () => {
     importProject(importProjectFromJson(referenceProject));
     const single = getProject().shelfModules!.find(module => module.type === 'card-drawer')!;

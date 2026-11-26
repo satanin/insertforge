@@ -1,5 +1,43 @@
 # InsertForge Handoff
 
+- v1.2.41 (2026-11-26): usuario autoriza commit/push del bloque KALLAX/planner y sistema visual. Corrección final: referencia KALLAX en inspector y reserva explícita de100 px+separación para cubo, evitando tapar botones de cámara en Selected module; pruebas1280/1920 pasan. Incluye opciones globales/custom, conversión simple/doble y temas/densidades. Sin cambios en interfaces de shell impresas; milano pasante sólo estudio futuro. Validación física de nuevas combinaciones pendiente. Suite unitaria:365 pasan,1 omitida y3 fallos históricos de volumen; check y pruebas navegador correctos.
+
+- 2026-11-26: sistema visual aplicado por petición usuario a New · Beta: claro blanco/gris + azul, oscuro carbón; Density balanced14/36 y compact13/32 persistente e independiente del proyecto. Tokens compartidos, inputs/selects homogéneos y de ancho completo, acciones iguales con reducción hasta12px y luego filas, Export parts con medidas estructuradas y ayudas de acción sobre botón (hover/foco/pulsación larga). Classic conservado. Check/build correctos;17 pruebas navegador pasan (4 nuevas de temas/densidades,7 interfaz/canvas y6 editores/táctil), incluidos canvas1280/1920 sin cambios de tamaño/remontaje. Suite unitaria365 pasan,1 omitida y3 fallos históricos de volumen. Revisión visual usuario pendiente; sin versión/commit/push. Ver [guía](docs/design/ui-guidelines.md).
+
+- 2026-11-26: usuario fija homogeneidad del sistema: fondos comunes de inputs/selects, ancho total por celda, botones100%/50–50 según fila con texto adaptable y salto de fila al mínimo; ayudas integradas sin `?` lateral y medidas Export parts sin cortes arbitrarios. [Reglas](docs/design/ui-guidelines.md) resumidas en AGENTS. Catálogo actualizado para revisión; escala/densidad pendientes. App aún no migrada a estas reglas; sin commit/push.
+
+- 2026-11-26: alineación en vista3D sustituye desplegable poco visible por botones Front aligned / Rear aligned siempre visibles, activo azul y grupo con borde/fondo. Pendiente revisión visual usuario; sin commit/push.
+
+- 2026-11-26 próximo cambio a estudiar: abrir alojamientos hembra del milano de shell hasta el frontal para permitir desplazamiento longitudinal de módulos completos. Usuario acepta estudiar pérdida de alineamiento a cambio de configurabilidad. No implementado ni validado; conservar interfaz impresa hasta decidir. Ver [alcance y comprobaciones](docs/plans/shelf-storage.md#alojamientos-pasantes-hasta-el-frontal--propuesta-2026-11-26).
+
+- 2026-11-26: usuario elige alineación como opción de vista3D: Front aligned (default) / Rear aligned. Trasera desplaza conjunto completo según shell más larga con1,5 mm detrás; no retranquea piezas individuales ni rompe plano frontal. Cambio de largo global deja hueco visible delante. Sin efecto en datos/export. Pendiente revisión usuario; sin commit/push.
+
+- 2026-11-26: Project options en panel lateral: largo y ventana se aplican directamente a todos al cambiar (usuario descarta botón Apply redundante). Cada cambio modifica sólo esa opción y fija default de nuevas piezas. Custom length/window por cajón explícitos; cambiar opción global reemplaza esa personalización, conserva la otra. Valida todos antes de mutar; JSON conserva opciones, marcos mantienen snapshots. Pendiente revisión usuario; sin versión/commit/push.
+
+- 2026-11-26: usuario descarta alinear al fondo por interferir con inserción del cajón. Conjunto3D conserva frontales alineados; retirado ensayo de retranqueo. Visibilidad de largos distintos pendiente de decidir (vista lateral/corte), sin alterar montaje.
+
+- 2026-11-26: alta desde hueco/vista individual deshabilitada si el candidato real no cabe (simple/doble comprobados por separado); guardia antes de mutar. Módulos ya fuera permanecen visibles en bloque de alto contraste con Select/Delete por fila; Delete selected drawer y confirmación explícita. Pendiente revisión usuario; sin versión/commit/push.
+
+- 2026-11-26: controles Shelf Storage con contraste común (Classic/New, claro/oscuro), bordes/foco/hover y acciones principales azules. Navegación sticky explícita KALLAX overview / Selected module en lugar de toggle difícil de encontrar. Footer separa alta de cajones/selección; Inspect selected module sustituye botón con nombre largo. Pendiente revisión visual usuario; sin versión/commit/push.
+
+- 2026-11-26: KALLAX reference restablece sólo medidas del hueco, conserva fitting margin. Antes imponía2 mm frente a1,5 inicial y pasaba3→2 filas (331,05+4=335,05>335). No se borraban módulos: sólo cambiaba simulación de repetición. Pendiente validación usuario; sin commit/push.
+
+- 2026-11-26: usuario valida mejora visual de Check opening fit. Marco fuera del hueco medido (antes stroke centrado invadía4 mm) y contornos de módulos hacia dentro, sin superponerse al mueble. Medidas/cálculo/holguras/export intactos; check correcto. Sin commit/push.
+
+- 2026-11-26: merge compara valores efectivos (defaults/orden de claves no bloquean) y muestra vecinos con diferencias concretas, incluidos Identification window y largo, en lugar del aviso genérico. No elimina ajustes distintos silenciosamente. Pendiente revisión usuario; sin commit/push.
+
+- 2026-11-26: acciones Split into two single drawers / Merge with vecino compatible en vista del hueco. Conversión conserva profundidad y configuración; singles usan asa estándar, doble divisor/asa ancha/dos ventanas si habilitadas. Unión sólo de vecinos horizontales con configuración coincidente; errores no mutan proyecto. Posiciones por celda guardadas en módulos tras conversión, sin desplazar otros ni rellenar huecos anteriores con piezas convertidas. Pendiente validación usuario; sin versión/commit/push.
+
+- 2026-11-26: Cards and label conserva apertura manual al modificar Identification window y demás parámetros. Sustituido open derivado de geometría por estado enlazado; defaults sólo al cambiar módulo/modo prototipo. Pendiente validación usuario; sin commit/push.
+
+- 2026-11-26: añadido clic directo en módulos de vista3D mediante rangos de triángulos, resaltado azul del seleccionado y filtro de arrastre >5px. Mueble excluido de selección; selector accesible conservado.13 pruebas pasan (incluyen identidad/rangos de caras). Prueba interactiva pendiente: navegador quedó sin acceso a localhost al recargar; servidor responde200 desde workspace. No dar por validado hasta probar usuario. Sin commit/push.
+
+- 2026-11-26: hueco con selector2D/3D, 3D inicial con geometría real de shells/cajones/asas, mobiliario sólo contextual sin export. Selector de cajón en3D; clic directo en2D. Ventanas/cantidad/asa/color reflejados en esquema y geometría reactiva; caché por variante conserva colores por polígono tras transformaciones JSCAD.13 pruebas de store/geometría/persistencia pasan; navegador verificado. Pendiente revisión usuario; sin versión/commit/push.
+
+- 2026-11-25: vista frontal del hueco KALLAX como entrada, selección de cajones conectada al editor y retorno a3D sin desmontar canvas. Alta/baja redistribuye desde abajo; módulos incompatibles/sobrantes quedan listados con motivo. Nuevo proyecto desde menú:10 simples+1 doble reales con perfil de referencia impreso, existentes intactos; preset explícito sólo si vacío.12 tests store/persistencia/cabida pasan; navegador muestra11 cajones sin solapes. Pendiente revisión usuario; sin versión/commit/push. Largo global y agrupación de exports pendientes.
+
+- 2026-11-25: identificación IKEA KALLAX y hueco de referencia335×335×390 mm visibles al crear/abrir Shelf Storage; referencia compartida con comprobador de cabida. Otras estanterías sin compatibilidad confirmada. Sólo interfaz, sin modificar geometría/proyectos. Pendiente revisión del usuario; sin versión/commit/push. Siguientes pasos: vista del hueco con10 simples+1 doble, largo global con excepciones explícitas y export agrupado por variante/cantidad.
+
 - 2026-11-25: usuario valida en app y autoriza commit/push del bloque v1.2.40: profundidad de aberturas Card Divider independiente/Card Storage, defaults pared/suelo Card Storage1,5 mm y colores del visor. Integrado con main conservando cotas por pieza de Shelf Storage. Check/build correctos; suite con2 workers/timeout30s:357 pasan,1 omitida,3 fallos históricos de volumen en defaultProjectGeometry documentados en la integración anterior. Validación física pendiente.
 
 - 2026-11-24 nuevos cajones dobles: asa ancha y dos ventanas activadas por defecto, incluso al copiar configuración de un simple. Existentes intactos. Nuevos simples restablecen asa normal/una ventana.11 tests del store y check correctos; usuario autoriza commit/push a main.
@@ -154,7 +192,7 @@
 - Rama actual: `main`
 - App visible: `InsertForge`
 - Atribucion visible: `based on Counter Slayer by Dave Snider`
-- Version visible actual: `1.2.40`
+- Version visible actual: `1.2.41`
 
 ## Desarrollo local
 

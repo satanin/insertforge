@@ -1,0 +1,38 @@
+/* Shared controls for the shelf workspace in both Classic and New themes. */
+.shelfPanes {
+  --shelf-control-bg: color-mix(in srgb, var(--bg) 88%, var(--fg) 12%);
+  --shelf-control-hover: color-mix(in srgb, var(--bg) 78%, var(--fg) 22%);
+  --shelf-control-border: color-mix(in srgb, var(--bg) 50%, var(--fg) 50%);
+  --shelf-accent: #245ba8;
+}
+.shelfPanes button:not(.helpTipButton) {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  color: var(--fg);
+  background: var(--shelf-control-bg);
+  border: 1px solid var(--shelf-control-border);
+  border-radius: 0.4rem;
+  font-weight: 600;
+  line-height: 1.3;
+  box-shadow: 0 1px 2px #0002;
+  transition: background 120ms, border-color 120ms;
+}
+.shelfPanes button:not(.helpTipButton):hover:not(:disabled) { background: var(--shelf-control-hover); }
+.shelfPanes button.shelfPrimary,
+.shelfPanes button[aria-pressed='true'],
+.shelfPanes button.active {
+  background: var(--shelf-accent);
+  border-color: var(--shelf-accent);
+  color: #fff;
+}
+.shelfPanes button.shelfPrimary:hover:not(:disabled),
+.shelfPanes button[aria-pressed='true']:hover:not(:disabled),
+.shelfPanes button.active:hover:not(:disabled) { background: #194780; }
+.shelfPanes button.shelfDanger { border-color: #cf5261; }
+.shelfPanes button:not(.helpTipButton):disabled { opacity: 0.45; box-shadow: none; cursor: default; }
+.shelfPanes button:focus-visible,
+.shelfPanes select:focus-visible,
+.shelfPanes summary:focus-visible { outline: 3px solid #4289dc; outline-offset: 3px; }
+.shelfPanes input:not([type='checkbox'], [type='range'], [type='color']),
+.shelfPanes select { border: 1px solid var(--shelf-control-border); }
+.shelfPanes summary { border-bottom: 1px solid var(--shelf-control-border); }

@@ -172,6 +172,7 @@
     isLayerLayoutEditMode?: boolean;
     onTrayClick?: (info: TrayClickInfo | null) => void;
     onTrayDoubleClick?: (trayId: string) => void;
+    onMeshFaceClick?: (faceIndex: number) => void;
     onBoxDoubleClick?: (boxId: string) => void;
     generating?: boolean;
     showLayerView?: boolean;
@@ -244,6 +245,7 @@
     isLayerLayoutEditMode = false,
     onTrayClick,
     onTrayDoubleClick,
+    onMeshFaceClick,
     onBoxDoubleClick,
     generating = false,
     showLayerView = false,
@@ -1292,7 +1294,7 @@
   }
 </script>
 
-<T.PerspectiveCamera makeDefault position={[printBedSize * 1.0, printBedSize * 0.8, printBedSize * 1.5]} fov={50}>
+<T.PerspectiveCamera makeDefault position={cameraPosition ?? [printBedSize * 1.0, printBedSize * 0.8, printBedSize * 1.5]} fov={50}>
   {@const isTransitioning =
     transitionPhase === 'fading-to-edit' ||
     transitionPhase === 'fading-to-normal' ||
@@ -1307,7 +1309,7 @@
     ? [layerEditModeCenter.x, 0, layerEditModeCenter.z]
     : visualEditMode
       ? [editModeCenter.x, 0, editModeCenter.z]
-      : [0, 0, printBedSize / 2]}
+      : cameraLookAt ?? [0, 0, printBedSize / 2]}
   <OrbitControls
     target={editTarget}
     enableDamping={!isTransitioning && !debugMode}
@@ -1808,7 +1810,12 @@
     {@const hasVertexColors = bodyGeometry.hasAttribute('color')}
     <T.Group position.x={selectedViewMatrix.elements[12]} position.z={selectedViewMatrix.elements[14]} rotation.y={selectedViewRotation * Math.PI / 180}>
     {#key hasVertexColors}
-    <T.Mesh geometry={bodyGeometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}>
+    <T.Mesh geometry={bodyGeometry} rotation.x={-Math.PI / 2} position.x={meshOffset.x} position.y={0} position.z={meshOffset.z}
+      onclick={(event: IntersectionEvent<MouseEvent>) => {
+        if (!onMeshFaceClick || event.faceIndex == null || event.delta > 5) return;
+        event.stopPropagation();
+        onMeshFaceClick(event.faceIndex);
+      }}>
       <T.MeshStandardMaterial
         color={hasVertexColors ? '#ffffff' : getTrayColor(selectedTrayId, 0)}
         vertexColors={hasVertexColors}

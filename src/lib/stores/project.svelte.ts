@@ -1,6 +1,8 @@
 import { DEFAULT_CARD_SLEEVE_THICKNESSES, getProjectCardSizes, migrateProjectCards } from '$lib/utils/projectCards';
 import defaultProjectJson from '$lib/data/defaultProject.json';
 import { defaultShelfDrawerParams, resolveShelfDrawer, type ShelfDrawerParams, type ShelfDrawerModule, type ShelfFrameParams } from '$lib/models/shelfStorage';
+import { layoutShelfOpening } from '$lib/models/shelfLayout';
+import { defaultShelfManufacturing } from '$lib/models/shelfManufacturing';
 import { APP_VERSION } from '$lib/appInfo';
 import { defaultCardDividerTrayParams, sanitizeCardDividerTrayParams, type CardDividerTrayParams } from '$lib/models/cardDividerTray';
 import { defaultCardStorageParams, type CardStorageParams } from '$lib/models/cardStorageTray';
@@ -3593,11 +3595,12 @@ export function resetProjectToBlank(): void {
 }
 
 // A shelf project has no synthetic layers. Components will belong to modules.
-export function createNewProject(projectType: import('$lib/types/project').ProjectType = 'insert', name = ''): void {
+export function createNewProject(projectType: import('$lib/types/project').ProjectType = 'insert', name = '', withShelfPreset = false): void {
   const next = createBlankProject();
   next.projectType = projectType;
   next.name = name.trim() || (projectType === 'insert' ? DEFAULT_PROJECT_NAME : 'Shelf storage');
   if (projectType === 'shelf-storage') {
+    next.shelfOptions = { depth: defaultShelfDrawerParams.depth, labelWindow: true };
     next.shelfModules = [];
     next.selectedShelfModuleId = null;
     next.layers = [];
@@ -3605,14 +3608,30 @@ export function createNewProject(projectType: import('$lib/types/project').Proje
     next.globalSettings = undefined;
   }
   project = next;
+  if (projectType === 'shelf-storage' && withShelfPreset) populateKallaxOpening();
   saveNow(project);
 }
 
-export function addShelfModule(columns: 1 | 2 = 1): ShelfDrawerModule | undefined {
-  if (project.projectType !== 'shelf-storage') return;
-  project.shelfModules ??= [];
-  const reference = project.shelfModules.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
-    ?? project.shelfModules.find(m => m.type === 'card-drawer');
+// Explicit preset: never replace or resize modules in an existing project.
+export function populateKallaxOpening(): void {
+  if (project.projectType !== 'shelf-storage' || project.shelfModules?.length) return;
+  for (let index = 0; index < 11; index++) {
+    const module = addShelfModule(index === 10 ? 2 : 1)!;
+    updateShelfModule(module.id, {
+      sleeve: 'premium', shellThickness: 3.6, roofThickness: 3.6, socketWebThickness: 1,
+      drawerFloor: 2, drawerWall: 2, bottomTracks: false, headroom: 1,
+      handleClearance: 0.12, handleRetention: true,
+      manufacturing: { split: true, bedWidth: 250, bedDepth: 250, buildHeight: 250,
+        margin: 5, jointClearance: 0.15, jointStyle: 'divider-dovetail', floorKeys: true }
+    }, index === 10 ? 'Double Card Drawer' : `Card Drawer ${index + 1}`);
+  }
+  project.selectedShelfModuleId = project.shelfModules![0].id;
+  autosave();
+}
+
+function newShelfDrawerParams(columns: 1 | 2): ShelfDrawerParams {
+  const reference = project.shelfModules?.find(m => m.id === project.selectedShelfModuleId && m.type === 'card-drawer')
+    ?? project.shelfModules?.find(m => m.type === 'card-drawer');
   const params = reference?.type === 'card-drawer'
     ? { ...structuredClone($state.snapshot(reference.params)), depth: defaultShelfDrawerParams.depth }
     : { ...defaultShelfDrawerParams, cardSizeId: getProjectDefaultCardSizeId() };
@@ -3627,6 +3646,57 @@ export function addShelfModule(columns: 1 | 2 = 1): ShelfDrawerModule | undefine
     handleClearance: 0.12, handleRetention: true
   });
   if (params.manufacturing) params.manufacturing.jointStyle = 'divider-dovetail';
+  if (project.shelfOptions) Object.assign(params, project.shelfOptions);
+  return params;
+}
+
+export function applyShelfProjectOptions(options: Partial<import('$lib/types/project').ShelfProjectOptions>): { error: string; count: number } {
+  if (project.projectType !== 'shelf-storage') return { error: 'Open a shelf storage project.', count: 0 };
+  if (('depth' in options && (typeof options.depth !== 'number' || !Number.isFinite(options.depth) || options.depth < 45 || options.depth > 1000))
+    || ('labelWindow' in options && typeof options.labelWindow !== 'boolean')) {
+    return { error: 'Enter a drawer length between 45 and 1000 mm.', count: 0 };
+  }
+  const drawers = (project.shelfModules ?? []).filter(module => module.type === 'card-drawer');
+  const cards = getProjectCardSizes(project);
+  // Validate the entire change before writing anything; frames keep their compatibility snapshots.
+  for (const module of drawers) {
+    const result = resolveShelfDrawer({ ...module.params, ...options }, cards);
+    if (!result.valid) return { error: `${module.name}: ${result.errors.join(' ')}`, count: 0 };
+  }
+  project.shelfOptions = { depth: project.shelfOptions?.depth ?? drawers[0]?.params.depth ?? defaultShelfDrawerParams.depth,
+    labelWindow: project.shelfOptions?.labelWindow ?? (drawers[0]?.params.labelWindow !== false), ...options };
+  for (const module of drawers) {
+    module.params = { ...module.params, ...options };
+    module.customSettings = { ...module.customSettings,
+      ...('depth' in options ? { depth: false } : {}),
+      ...('labelWindow' in options ? { labelWindow: false } : {}) };
+  }
+  autosave();
+  return { error: '', count: drawers.length };
+}
+
+export function setShelfDrawerCustomSetting(id: string, key: 'depth' | 'labelWindow', custom: boolean): void {
+  const module = project.shelfModules?.find(module => module.id === id);
+  if (project.projectType !== 'shelf-storage' || module?.type !== 'card-drawer' || !project.shelfOptions) return;
+  module.customSettings = { ...module.customSettings, [key]: custom };
+  if (!custom) {
+    if (key === 'depth') module.params = { ...module.params, depth: project.shelfOptions.depth };
+    else module.params = { ...module.params, labelWindow: project.shelfOptions.labelWindow };
+  }
+  autosave();
+}
+
+export function canAddShelfModule(columns: 1 | 2 = 1): boolean {
+  if (project.projectType !== 'shelf-storage') return false;
+  const candidate: ShelfDrawerModule = { id: '__new_shelf_drawer__', name: '', type: 'card-drawer', params: newShelfDrawerParams(columns) };
+  return layoutShelfOpening([...(project.shelfModules ?? []), candidate], getProjectCardSizes(project))
+    .placed.some(module => module.id === candidate.id);
+}
+
+export function addShelfModule(columns: 1 | 2 = 1, requireOpeningSpace = false): ShelfDrawerModule | undefined {
+  if (project.projectType !== 'shelf-storage' || (requireOpeningSpace && !canAddShelfModule(columns))) return;
+  project.shelfModules ??= [];
+  const params = newShelfDrawerParams(columns);
   const module: ShelfDrawerModule = { id: crypto.randomUUID(), type: 'card-drawer',
     name: `${columns === 2 ? 'Double drawer 2×1' : 'Card drawer'} ${project.shelfModules.length + 1}`,
     params };
@@ -3640,6 +3710,89 @@ export function selectShelfModule(id: string): void {
   if (!project.shelfModules?.some(m => m.id === id)) return;
   project.selectedShelfModuleId = id;
   autosave();
+}
+
+export function shelfMergeNeighbours(id: string): { id: string; name: string; differences: string[] }[] {
+  const modules = project.shelfModules ?? [];
+  const selected = modules.find(module => module.id === id);
+  if (selected?.type !== 'card-drawer' || (selected.params.columns ?? 1) !== 1) return [];
+  const layout = layoutShelfOpening(modules, getProjectCardSizes(project));
+  const cell = layout.placed.find(item => item.id === id);
+  if (!cell) return [];
+  // A merge must not silently discard different content, manufacturing or appearance settings.
+  const normalise = (params: ShelfDrawerParams) => ({ ...defaultShelfDrawerParams, ...params,
+    labelWindow: params.labelWindow !== false, stackingEnabled: params.stackingEnabled !== false,
+    bottomTracks: params.bottomTracks !== false, handleRetention: params.handleRetention === true,
+    roofThickness: params.roofThickness ?? params.shellThickness,
+    socketWebThickness: params.socketWebThickness ?? 1.2, handleClearance: params.handleClearance ?? 0.25,
+    manufacturing: { ...defaultShelfManufacturing, ...params.manufacturing }
+  });
+  const canonical = (value: unknown): string => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return JSON.stringify(Object.entries(value).filter(([, value]) => value !== undefined)
+        .sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, canonical(value)]));
+    }
+    return JSON.stringify(value) ?? '';
+  };
+  const labels: Record<string, string> = { depth: 'Exterior depth', labelWindow: 'Identification window',
+    handleColor: 'Handle colour', manufacturing: 'Print setup', cardSizeId: 'Card format', sleeve: 'Sleeve', orientation: 'Card orientation' };
+  const baseline = normalise(selected.params);
+  const ignored = new Set(['columns', 'centerDivider', 'wideHandle', 'labelWindows']);
+  return layout.placed.filter(item => item.id !== id && item.columns === 1 && item.row === cell.row && Math.abs(item.column - cell.column) === 1)
+    .flatMap(item => {
+      const other = modules.find(module => module.id === item.id);
+      if (other?.type !== 'card-drawer') return [];
+      const candidate = normalise(other.params);
+      const keys = new Set([...Object.keys(baseline), ...Object.keys(candidate)]);
+      const a = baseline as unknown as Record<string, unknown>, b = candidate as unknown as Record<string, unknown>;
+      const display = (value: unknown) => typeof value === 'boolean' ? value ? 'On' : 'Off' : typeof value === 'object' ? 'different settings' : String(value ?? 'default');
+      const differences = [...keys].filter(key => !ignored.has(key) && canonical(a[key]) !== canonical(b[key]))
+        .map(key => `${labels[key] ?? key.replace(/([A-Z])/g, ' $1')}: ${display(a[key])} / ${display(b[key])}`);
+      return [{ id: item.id, name: item.name, differences }];
+    });
+}
+
+export function shelfMergeCandidates(id: string): { id: string; name: string }[] {
+  return shelfMergeNeighbours(id).filter(item => !item.differences.length).map(({ id, name }) => ({ id, name }));
+}
+
+export function convertShelfDrawers(id: string, neighbourId?: string): boolean {
+  if (project.projectType !== 'shelf-storage') return false;
+  const modules = project.shelfModules ?? [];
+  const source = modules.find(module => module.id === id);
+  if (source?.type !== 'card-drawer') return false;
+  const layout = layoutShelfOpening(modules, getProjectCardSizes(project));
+  const cell = layout.placed.find(item => item.id === id);
+  if (!cell) return false;
+  const splitting = (source.params.columns ?? 1) === 2;
+  if (!splitting && !shelfMergeCandidates(id).some(item => item.id === neighbourId)) return false;
+  // Freeze current cells, preserving unrelated drawers even when the layout contains holes.
+  for (const item of layout.placed) {
+    const module = modules.find(module => module.id === item.id);
+    if (module?.type === 'card-drawer') module.placement = { column: item.column, row: item.row };
+  }
+  const params = structuredClone($state.snapshot(source.params));
+  const index = modules.findIndex(module => module.id === id);
+  if (splitting) {
+    const single = { ...params, columns: 1 as const, centerDivider: false, wideHandle: false, labelWindows: 1 as const };
+    modules.splice(index, 1,
+      { ...source, name: `${source.name} · left`, params: single, placement: { column: cell.column, row: cell.row } },
+      { id: crypto.randomUUID(), type: 'card-drawer', name: `${source.name} · right`, params: structuredClone(single), customSettings: { ...source.customSettings }, placement: { column: cell.column + 1, row: cell.row } });
+  } else {
+    const neighbour = layout.placed.find(item => item.id === neighbourId)!;
+    const other = modules.find(module => module.id === neighbourId)!;
+    const left = cell.column < neighbour.column ? source : other;
+    const right = cell.column < neighbour.column ? other : source;
+    const merged: ShelfDrawerModule = { id: source.id, name: `${left.name} + ${right.name}`,
+      customSettings: { ...source.customSettings },
+      type: 'card-drawer', placement: { column: Math.min(cell.column, neighbour.column), row: cell.row },
+      params: { ...params, columns: 2, centerDivider: true, wideHandle: true, labelWindows: 2 } };
+    modules.splice(index, 1, merged);
+    modules.splice(modules.findIndex(module => module.id === neighbourId), 1);
+  }
+  project.selectedShelfModuleId = source.id;
+  autosave();
+  return true;
 }
 
 export function removeShelfModule(id: string): void {
